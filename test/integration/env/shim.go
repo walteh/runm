@@ -159,7 +159,7 @@ func RunShim(ctx context.Context) error {
 		return errors.New("failed to get caller")
 	}
 
-	os.Setenv("LINUX_RUNTIME_BUILD_DIR", filepath.Join(filepath.Dir(filename), "..", "..", "..", "gen", "build", "linux_vf_arm64"))
+	os.Setenv("LINUX_RUNTIME_BUILD_DIR", filepath.Join(filepath.Dir(filename), "..", "..", "..", "gen", "build", "linux_vf_offline_arm64"))
 
 	shim.Run(ctx, manager.NewDebugManager(manager.NewShimManager("io.containerd.runc.v2")), func(c *shim.Config) {
 		c.NoReaper = true

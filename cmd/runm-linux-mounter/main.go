@@ -255,29 +255,11 @@ func mountRootfsPrimary(ctx context.Context) error {
 }
 
 func mountRootfsSecondary(ctx context.Context, prefix string, customMounts []specs.Mount) error {
-	// dirs := []string{}
 	cmds := [][]string{}
 
-	// cmds = append(cmds, []string{"rm", "-rf", prefix + "/etc/hosts"})
-	// cmds = append(cmds, []string{"rm", "-rf", prefix + "/etc/resolv.conf"})
-
-	// if err := os.MkdirAll(filepath.Join(prefix, "etc"), 0755); err != nil {
-	// 	return errors.Errorf("making directories: %w", err)
-	// }
-
-	// dirs = append(dirs, filepath.Join(prefix, constants.Ec1AbsPath))
-
-	// trying to figure out how to proerly do this to not skip things
 	for _, mount := range customMounts {
 
 		dest := filepath.Join(prefix, mount.Destination)
-		// if mount.Destination == "/etc/resolv.conf" || mount.Destination == "/etc/hosts" {
-		// 	continue
-		// }
-		// if mount.Type != "ec1-virtiofs" {
-		// 	if mount.Type == "bind" || slices.Contains(mount.Options, "rbind") {
-		// 		continue
-		// 	}
 
 		if mount.Source == constants.RootfsVirtioTag {
 			continue

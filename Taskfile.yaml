@@ -299,6 +299,49 @@ tasks:
           - cmd: mv -f {{.TMP_DIR}}/initramfs.cpio.gz {{.OUT_DIR}}/initramfs.cpio.gz
           - cmd: mv -f {{.TMP_DIR}}/mbin.squashfs {{.OUT_DIR}}/mbin.squashfs
 
+    linux:vf-offline:*:
+        label: 'linux:vf-offline:{{.ARCH}}'
+        requires: {vars: [ARCH]}
+        desc: builds the initramfs
+        sources:
+          - ./linux/initramfs/**
+        generates:
+          - ./gen/build/initramfs_{{ .ARCH }}/**
+        vars:
+            ARCH: "{{index .MATCH 0}}"
+            VF_DIR: "{{.BUILD_OUT_DIR}}/linux_vf_{{ .ARCH }}"
+            OUT_DIR: "{{.BUILD_OUT_DIR}}/linux_vf_offline_{{ .ARCH }}"
+            TMP_DIR:
+                sh: mktemp -d
+        cmds:
+          - defer: rm -rf {{.TMP_DIR}}
+          - cmd: mkdir -p {{.TMP_DIR}} {{.TMP_DIR}}/initramfs {{.TMP_DIR}}/mbin {{.OUT_DIR}}
+
+          - cmd: cp {{.VF_DIR}}/initramfs.cpio.gz {{.TMP_DIR}}/initramfs.cpio.gz
+          - cmd: mkdir -p {{.TMP_DIR}}/initramfs
+          - cmd: cd {{.TMP_DIR}}/initramfs && (cpio -idm < {{.TMP_DIR}}/initramfs.cpio.gz)
+
+          - cmd: cp {{.VF_DIR}}/mbin.squashfs {{.TMP_DIR}}/mbin.squashfs
+          - cmd: unsquashfs -q {{.TMP_DIR}}/mbin.squashfs {{.TMP_DIR}}/mbin
+
+          - |-
+            GOOS=linux GOARCH=${ARCH} go build \
+                -ldflags="-s -w -extldflags=-static" \
+                -trimpath -o {{.TMP_DIR}}/initramfs/runm-linux-mounter ./cmd/runm-linux-mounter
+          - |-
+            GOOS=linux GOARCH=${ARCH} go build \
+                -ldflags="-s -w -extldflags=-static" \
+                -trimpath -o {{.TMP_DIR}}/mbin/runm-linux-init ./cmd/runm-linux-init
+
+          - mksquashfs {{.TMP_DIR}}/mbin {{.TMP_DIR}}/mbin-new.squashfs  -quiet
+          - |-
+            cd {{.TMP_DIR}}/initramfs && find . -print0 | cpio --null -o --format=newc > {{.TMP_DIR}}/initramfs-new.cpio
+          - gzip -1 -q {{.TMP_DIR}}/initramfs-new.cpio
+
+          - cp {{.VF_DIR}}/kernel {{.OUT_DIR}}/kernel
+          - cp {{.TMP_DIR}}/initramfs-new.cpio.gz {{.OUT_DIR}}/initramfs.cpio.gz
+          - cp {{.TMP_DIR}}/mbin-new.squashfs {{.OUT_DIR}}/mbin.squashfs
+
     linux:all:
         desc: builds all linux components
         cmds:
@@ -441,7 +484,7 @@ tasks:
                 sh: realpath ./gen/build/linux_vf_arm64
         cmds:
           - task: dev:shim:killall
-          - task: linux:vf:arm64
+          - task: linux:vf-offline:arm64
           - cmd: |-
                 timeout 20s sudo -A -E go tool goshim run -codesign -log-file-to-append-in=.logs/containerd.log ./test/integration/cmd/nerdctl-test run \
                     --platform=linux/arm64 \
