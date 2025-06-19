@@ -75,20 +75,40 @@ func mount(ctx context.Context) error {
 	// mount devtmpfs
 
 	os.MkdirAll("/dev", 0755)
-	os.MkdirAll("/sys", 0755)
+	os.MkdirAll("/sys", 0755) //
 	os.MkdirAll("/proc", 0755)
 
 	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "devtmpfs", "devtmpfs", "/dev"); err != nil {
 		return errors.Errorf("problem mounting devtmpfs: %w", err)
 	}
 
+	// {
+	// 	"destination": "/sys/fs/cgroup",
+	// 	"type": "cgroup",
+	// 	"source": "cgroup",
+	// 	"options": [
+	// 		"nosuid",
+	// 		"noexec",
+	// 		"nodev",
+	// 		"relatime",
+	// 		"ro"
+	// 	]
+	// }
+
 	// mount sysfs
-	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "sysfs", "sysfs", "/sys"); err != nil {
+	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "sysfs", "sysfs", "/sys", "-o", "nosuid,noexec,nodev,ro"); err != nil {
 		return errors.Errorf("problem mounting sysfs: %w", err)
 	}
 
 	// mount proc
 	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "proc", "proc", "/proc"); err != nil {
+		return errors.Errorf("problem mounting proc: %w", err)
+	}
+
+	// if err := os.MkdirAll("/sys/fs/cgroup", 0755); err != nil {
+	// 	return errors.Errorf("mkdir - /sys/fs/cgroup: %w", err)
+	// }
+	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "cgroup", "cgroup", "/sys/fs/cgroup", "-o", "nosuid,noexec,nodev,relatime,ro"); err != nil {
 		return errors.Errorf("problem mounting proc: %w", err)
 	}
 
