@@ -190,7 +190,11 @@ func NewContainer(
 	if err != nil {
 		return nil, errgrpc.ToGRPC(err)
 	}
+
+	slog.InfoContext(ctx, "done creating init process - starting it")
+
 	if err := p.Create(ctx, config); err != nil {
+		slog.ErrorContext(ctx, "failed to create init process", "error", err)
 		return nil, errgrpc.ToGRPC(err)
 	}
 	container := &Container{
@@ -206,6 +210,8 @@ func NewContainer(
 		// 	// container.cgroup = cg
 		// }
 	}
+
+	slog.InfoContext(ctx, "done starting init process")
 	return container, nil
 }
 

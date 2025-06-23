@@ -64,7 +64,7 @@ func NewHostUnixConsoleSocket(ctx context.Context, socket UnixAllocatedSocket) (
 }
 
 func NewHostVsockFdConsoleSocket(ctx context.Context, socket VsockAllocatedSocket, proxier VsockProxier) (*HostConsoleSocket, error) {
-	conn, path, err := proxier.Proxy(ctx, socket.Port())
+	conn, path, err := proxier.ProxyVsock(ctx, socket.Port())
 	if err != nil {
 		return nil, err
 	}

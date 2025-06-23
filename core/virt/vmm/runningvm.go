@@ -86,6 +86,7 @@ func (r *RunningVM[VM]) GuestService(ctx context.Context) (*grpcruntime.GRPCClie
 				lastError = err
 				continue
 			}
+			r.runtime.SetVsockProxier(r)
 			return r.runtime, nil
 		case <-timeout.C:
 			slog.ErrorContext(ctx, "timeout waiting for guest service connection", "error", lastError)
@@ -95,6 +96,38 @@ func (r *RunningVM[VM]) GuestService(ctx context.Context) (*grpcruntime.GRPCClie
 			return nil, ctx.Err()
 		}
 	}
+}
+
+func (r *RunningVM[VM]) ProxyVsock(ctx context.Context, port uint32) (*net.UnixConn, string, error) {
+	conn, err := r.vm.VSockConnect(ctx, uint32(port))
+	if err != nil {
+		return nil, "", errors.Errorf("connecting to vsock: %w", err)
+	}
+
+	unixSocketPath := filepath.Join(r.workingDir, fmt.Sprintf("vsock-%d.sock", port))
+
+	// open a unix socket to the connection in a working directory
+	unixConn, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: unixSocketPath, Net: "unix"})
+	if err != nil {
+		return nil, "", err
+	}
+
+	// copy the connection to the unix socket
+	go func() {
+		_, err := io.Copy(unixConn, conn)
+		if err != nil {
+			slog.ErrorContext(ctx, "error copying connection to unix socket", "error", err)
+		}
+	}()
+
+	go func() {
+		_, err := io.Copy(conn, unixConn)
+		if err != nil {
+			slog.ErrorContext(ctx, "error copying connection to vsock", "error", err)
+		}
+	}()
+
+	return unixConn, unixSocketPath, nil
 }
 
 func (r *RunningVM[VM]) ForwardStdio(ctx context.Context, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {

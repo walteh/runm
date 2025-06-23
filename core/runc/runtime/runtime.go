@@ -215,7 +215,7 @@ type ReferableByReferenceId interface {
 }
 
 type VsockProxier interface {
-	Proxy(ctx context.Context, port uint32) (*net.UnixConn, string, error)
+	ProxyVsock(ctx context.Context, port uint32) (*net.UnixConn, string, error)
 }
 
 type VsockFdProxier interface {

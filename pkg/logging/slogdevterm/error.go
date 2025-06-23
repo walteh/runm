@@ -83,15 +83,18 @@ func buildErrorTraces(err error, styles *Styles, render renderFunc, hyperlink Hy
 				// Extract wrapper message
 				currentMsg := current.Error()
 				nextMsg := next.Error()
-				wrapper := ""
+				var wrapper string
 				if idx := strings.Index(currentMsg, nextMsg); idx > 0 {
 					wrapper = strings.TrimSuffix(strings.TrimSpace(currentMsg[:idx]), ":")
+				} else {
+					wrapper = currentMsg
 				}
 
 				if wrapper != "" {
 					message := render(styles.Error.Main, wrapper)
 					traces = append(traces, fmt.Sprintf("    %s: %s", location, message))
 				}
+
 			}
 		}
 
@@ -250,6 +253,9 @@ func getRootError(err error) error {
 		next := errors.Unwrap(current)
 		if next == nil {
 			return current
+		}
+		if _, ok := next.(errors.E); !ok {
+			return next
 		}
 		current = next
 	}

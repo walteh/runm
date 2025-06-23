@@ -103,7 +103,7 @@ func runGrpcVsockServer(ctx context.Context) error {
 		return errors.Errorf("container-id flag is required")
 	}
 
-	wrkDir := constants.Ec1AbsPath
+	// wrkDir := constants.Ec1AbsPath
 
 	realRuntime := goruncruntime.WrapdGoRuncRuntime(&gorunc.Runc{
 		Command:      "/mbin/runc",
@@ -115,7 +115,7 @@ func runGrpcVsockServer(ctx context.Context) error {
 		SystemdCgroup: false,
 	})
 
-	realSocketAllocator := runtime.NewGuestUnixSocketAllocator(wrkDir)
+	realSocketAllocator := runtime.NewGuestVsockSocketAllocator(3, 2300)
 
 	cgroupAdapter, err := goruncruntime.NewCgroupV2Adapter(ctx, containerId)
 	if err != nil {

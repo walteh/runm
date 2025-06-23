@@ -31,7 +31,8 @@ type GRPCClientRuntime struct {
 	// used internally, no neeed to implement it
 	socketAllocatorGrpcService runmv1.SocketAllocatorServiceClient
 
-	vsockProxier        runtime.VsockProxier
+	vsockProxier runtime.VsockProxier
+
 	sharedDirPathPrefix string
 
 	conn *grpc.ClientConn
@@ -68,6 +69,10 @@ func NewGRPCClientRuntimeFromConn(conn *grpc.ClientConn) (*GRPCClientRuntime, er
 	}
 
 	return client, nil
+}
+
+func (me *GRPCClientRuntime) SetVsockProxier(proxier runtime.VsockProxier) {
+	me.vsockProxier = proxier
 }
 
 func (me *GRPCClientRuntime) Management() runmv1.GuestManagementServiceClient {

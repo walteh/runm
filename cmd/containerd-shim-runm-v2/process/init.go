@@ -21,7 +21,6 @@ package process
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -30,6 +29,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"gitlab.com/tozd/go/errors"
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/console"
@@ -37,6 +37,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/stdio"
 	"github.com/containerd/fifo"
 	"github.com/containerd/log"
+	slogctx "github.com/veqryn/slog-context"
 
 	google_protobuf "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	gorunc "github.com/containerd/go-runc"
@@ -109,17 +110,19 @@ func (p *Init) Create(ctx context.Context, r *process.CreateConfig) error {
 		pidFile = newPidFile(p.Bundle)
 	)
 
+	ctx = slogctx.Append(ctx, "process.init.create", "id", p.id)
 	if r.Terminal {
 		if socket, err = p.runtime.NewTempConsoleSocket(ctx); err != nil {
-			return fmt.Errorf("failed to create OCI runtime console socket: %w", err)
+			return errors.Errorf("failed to create OCI runtime console socket: %w", err)
 		}
 		defer socket.Close()
 	} else {
 		if pio, err = createIO(ctx, p.id, p.IoUID, p.IoGID, p.stdio, p.runtime); err != nil {
-			return fmt.Errorf("failed to create init process I/O: %w", err)
+			return errors.Errorf("failed to create init process I/O: %w", err)
 		}
 		p.io = pio
 	}
+
 	if r.Checkpoint != "" {
 		return p.createCheckpointedState(r, pidFile)
 	}
@@ -149,21 +152,21 @@ func (p *Init) Create(ctx context.Context, r *process.CreateConfig) error {
 	if socket != nil {
 		console, err := socket.ReceiveMaster()
 		if err != nil {
-			return fmt.Errorf("failed to retrieve console master: %w", err)
+			return errors.Errorf("failed to retrieve console master: %w", err)
 		}
 		console, err = p.Platform.CopyConsole(ctx, console, p.id, r.Stdin, r.Stdout, r.Stderr, &p.wg)
 		if err != nil {
-			return fmt.Errorf("failed to start console copy: %w", err)
+			return errors.Errorf("failed to start console copy: %w", err)
 		}
 		p.console = console
 	} else {
 		if err := pio.Copy(ctx, &p.wg); err != nil {
-			return fmt.Errorf("failed to start io pipe copy: %w", err)
+			return errors.Errorf("failed to start io pipe copy: %w", err)
 		}
 	}
 	pid, err := p.runtime.ReadPidFile(ctx, pidFile.Path())
 	if err != nil {
-		return fmt.Errorf("failed to retrieve OCI runtime container pid: %w", err)
+		return errors.Errorf("failed to retrieve OCI runtime container pid: %w", err)
 	}
 	p.pid = pid
 	return nil
@@ -172,7 +175,7 @@ func (p *Init) Create(ctx context.Context, r *process.CreateConfig) error {
 func (p *Init) openStdin(path string) error {
 	sc, err := fifo.OpenFifo(context.Background(), path, unix.O_WRONLY|unix.O_NONBLOCK, 0)
 	if err != nil {
-		return fmt.Errorf("failed to open stdin fifo %s: %w", path, err)
+		return errors.Errorf("failed to open stdin fifo %s: %w", path, err)
 	}
 	p.stdin = sc
 	p.closers = append(p.closers, sc)
@@ -306,7 +309,7 @@ func (p *Init) delete(ctx context.Context) error {
 	if err2 := mount.UnmountRecursive(p.Rootfs, 0); err2 != nil {
 		log.G(ctx).WithError(err2).Warn("failed to cleanup rootfs mount")
 		if err == nil {
-			err = fmt.Errorf("failed rootfs umount: %w", err2)
+			err = errors.Errorf("failed rootfs umount: %w", err2)
 		}
 	}
 	return err
@@ -399,7 +402,7 @@ func (p *Init) exec(ctx context.Context, path string, r *process.ExecConfig) (Pr
 	// spec.Terminal = r.Terminal
 
 	if r.Spec == nil {
-		return nil, fmt.Errorf("spec is nil")
+		return nil, errors.Errorf("spec is nil")
 	}
 
 	e := &execProcess{
@@ -452,7 +455,7 @@ func (p *Init) checkpoint(ctx context.Context, r *process.CheckpointConfig) erro
 		if cerr := copyFile(dumpLog, filepath.Join(work, "dump.log")); cerr != nil {
 			log.G(ctx).WithError(cerr).Error("failed to copy dump.log to criu-dump.log")
 		}
-		return fmt.Errorf("%s path= %s", criuError(err), dumpLog)
+		return errors.Errorf("%s path= %s", criuError(err), dumpLog)
 	}
 	return nil
 }
@@ -486,11 +489,11 @@ func (p *Init) runtimeError(ctx context.Context, rErr error, msg string) error {
 	rMsg, err := getLastRuntimeError(ctx, p.runtime)
 	switch {
 	case err != nil:
-		return fmt.Errorf("%s: %s (%s): %w", msg, "unable to retrieve OCI runtime error", err.Error(), rErr)
+		return errors.Errorf("%s: %s (%s): %w", msg, "unable to retrieve OCI runtime error", err.Error(), rErr)
 	case rMsg == "":
-		return fmt.Errorf("%s: %w", msg, rErr)
+		return errors.Errorf("%s: %w", msg, rErr)
 	default:
-		return fmt.Errorf("%s: %s", msg, rMsg)
+		return errors.Errorf("%s: %s", msg, rMsg)
 	}
 }
 

@@ -332,7 +332,10 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 		return nil, err
 	}
 
+	slog.InfoContext(ctx, "done creating container")
+
 	if s.primaryContainerId != "" {
+		slog.ErrorContext(ctx, "runm only supports one container per shim", "primaryContainerId", s.primaryContainerId, "containerId", r.ID)
 		return nil, errgrpc.ToGRPCf(errdefs.ErrAlreadyExists, "runm only supports one container per shim")
 	}
 
@@ -353,11 +356,15 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 		Pid:        uint32(container.Pid()),
 	})
 
+	slog.InfoContext(ctx, "done sending create event")
+
 	// The following line cannot return an error as the only state in which that
 	// could happen would also cause the container.Pid() call above to
 	// nil-deference panic.
 	proc, _ := container.Process("")
 	handleStarted(container, proc)
+
+	slog.InfoContext(ctx, "done creating container")
 
 	return &taskAPI.CreateTaskResponse{
 		Pid: uint32(container.Pid()),

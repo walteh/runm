@@ -52,7 +52,7 @@ func (h *HostAllocatedSocket) Ready() error {
 }
 
 func NewHostAllocatedVsockSocket(ctx context.Context, port uint32, refId string, proxier VsockProxier) (*HostAllocatedSocket, error) {
-	conn, path, err := proxier.Proxy(ctx, port)
+	conn, path, err := proxier.ProxyVsock(ctx, port)
 	if err != nil {
 		return nil, err
 	}
@@ -73,12 +73,20 @@ func NewHostAllocatedSocketFromId(ctx context.Context, id string, proxier VsockP
 	case strings.HasPrefix(id, "socket:vsock:"):
 		port, err := strconv.Atoi(strings.TrimPrefix(id, "socket:vsock:"))
 		if err != nil {
-			return nil, err
+			return nil, errors.Errorf("allocating vsock socket: %w", err)
 		}
-		return NewHostAllocatedVsockSocket(ctx, uint32(port), id, proxier)
+		sock, err := NewHostAllocatedVsockSocket(ctx, uint32(port), id, proxier)
+		if err != nil {
+			return nil, errors.Errorf("allocating vsock socket: %w", err)
+		}
+		return sock, nil
 	case strings.HasPrefix(id, "socket:unix:"):
 		path := strings.TrimPrefix(id, "socket:unix:")
-		return NewHostAllocatedUnixSocket(ctx, path, id)
+		sock, err := NewHostAllocatedUnixSocket(ctx, path, id)
+		if err != nil {
+			return nil, errors.Errorf("allocating unix socket: %w", err)
+		}
+		return sock, nil
 	}
 	return nil, errors.Errorf("invalid socket type: %s", id)
 }
@@ -342,4 +350,26 @@ func (g *GuestUnixSocketAllocator) AllocateSocket(ctx context.Context) (Allocate
 		return nil, errors.Errorf("failed to allocate unix socket: %w", err)
 	}
 	return unixSock, nil
+}
+
+var _ SocketAllocator = (*GuestVsockSocketAllocator)(nil)
+
+var guestVsockSocketCounter = atomic.NewInt64(0)
+
+func NewGuestVsockSocketAllocator(cid uint32, basePort uint32) *GuestVsockSocketAllocator {
+	return &GuestVsockSocketAllocator{cid: cid, basePort: basePort}
+}
+
+type GuestVsockSocketAllocator struct {
+	basePort uint32
+	cid      uint32
+}
+
+func (g *GuestVsockSocketAllocator) AllocateSocket(ctx context.Context) (AllocatedSocket, error) {
+	port := uint32(g.basePort) + uint32(guestVsockSocketCounter.Add(1))
+	sock, err := NewGuestAllocatedVsockSocket(ctx, g.cid, port)
+	if err != nil {
+		return nil, errors.Errorf("failed to allocate vsock socket: %w", err)
+	}
+	return sock, nil
 }

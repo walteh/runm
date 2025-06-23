@@ -34,17 +34,17 @@ func (c *GRPCClientRuntime) NewTempConsoleSocket(ctx context.Context) (runtime.C
 
 	sock, err := c.socketAllocatorGrpcService.AllocateSocketStream(ctx, &runmv1.AllocateSocketStreamRequest{})
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("allocating socket stream: %w", err)
 	}
 
 	refId, err := sock.Recv()
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("receiving socket reference id: %w", err)
 	}
 
 	hsock, err := runtime.NewHostAllocatedSocketFromId(ctx, refId.GetSocketReferenceId(), c.vsockProxier)
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("allocating host allocated socket: %w", err)
 	}
 
 	ready := make(chan error)
@@ -70,7 +70,7 @@ func (c *GRPCClientRuntime) NewTempConsoleSocket(ctx context.Context) (runtime.C
 		return nil, errors.Errorf("timeout waiting for socket to be ready")
 	case err := <-ready:
 		if err != nil {
-			return nil, err
+			return nil, errors.Errorf("socket not ready: %w", err)
 		}
 	}
 	slog.InfoContext(ctx, "socket is ready - D")
@@ -171,9 +171,11 @@ func (c *GRPCClientRuntime) NewPipeIO(ctx context.Context, ioUID, ioGID int, opt
 	req := &runmv1.AllocateSocketsRequest{}
 	req.SetCount(uint32(count))
 
+	slog.InfoContext(ctx, "allocating sockets", "count", count)
+
 	iov, err := c.socketAllocatorGrpcService.AllocateSockets(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("allocating sockets: %w", err)
 	}
 
 	ioReq := &runmv1.AllocateIORequest{}
@@ -183,7 +185,7 @@ func (c *GRPCClientRuntime) NewPipeIO(ctx context.Context, ioUID, ioGID int, opt
 
 	sock, err := c.socketAllocatorGrpcService.AllocateIO(ctx, ioReq)
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("allocating IO: %w", err)
 	}
 
 	count2 := 0
@@ -205,7 +207,7 @@ func (c *GRPCClientRuntime) NewPipeIO(ctx context.Context, ioUID, ioGID int, opt
 
 	_, err = c.socketAllocatorGrpcService.BindIOToSockets(ctx, bindReq)
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("binding IO to sockets: %w", err)
 	}
 
 	var stdinRef, stdoutRef, stderrRef string
@@ -225,21 +227,21 @@ func (c *GRPCClientRuntime) NewPipeIO(ctx context.Context, ioUID, ioGID int, opt
 	if stdinRef != "" {
 		stdinAllocated, err = runtime.NewHostAllocatedSocketFromId(ctx, stdinRef, c.vsockProxier)
 		if err != nil {
-			return nil, err
+			return nil, errors.Errorf("allocating stdin socket: %w", err)
 		}
 	}
 
 	if stdoutRef != "" {
 		stdoutAllocated, err = runtime.NewHostAllocatedSocketFromId(ctx, stdoutRef, c.vsockProxier)
 		if err != nil {
-			return nil, err
+			return nil, errors.Errorf("allocating stdout socket: %w", err)
 		}
 	}
 
 	if stderrRef != "" {
 		stderrAllocated, err = runtime.NewHostAllocatedSocketFromId(ctx, stderrRef, c.vsockProxier)
 		if err != nil {
-			return nil, err
+			return nil, errors.Errorf("allocating stderr socket: %w", err)
 		}
 	}
 
