@@ -327,11 +327,11 @@ tasks:
           - |-
             GOOS=linux GOARCH=${ARCH} go build \
                 -ldflags="-s -w -extldflags=-static" \
-                -trimpath -o {{.TMP_DIR}}/initramfs/runm-linux-mounter ./cmd/runm-linux-mounter
+                 -o {{.TMP_DIR}}/initramfs/runm-linux-mounter ./cmd/runm-linux-mounter
           - |-
             GOOS=linux GOARCH=${ARCH} go build \
                 -ldflags="-s -w -extldflags=-static" \
-                -trimpath -o {{.TMP_DIR}}/mbin/runm-linux-init ./cmd/runm-linux-init
+                 -o {{.TMP_DIR}}/mbin/runm-linux-init ./cmd/runm-linux-init
 
           - mksquashfs {{.TMP_DIR}}/mbin {{.TMP_DIR}}/mbin-new.squashfs  -quiet
           - |-

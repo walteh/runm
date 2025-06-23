@@ -77,12 +77,13 @@ func (c *GoRuncRuntimeCreator) Features(ctx context.Context) (*features.Features
 
 func (c *GoRuncRuntimeCreator) Create(ctx context.Context, opts *runtime.RuntimeOptions) (runtime.Runtime, error) {
 	r := WrapdGoRuncRuntime(&gorunc.Runc{
-		Command:       opts.ProcessCreateConfig.Runtime,
-		Log:           filepath.Join(opts.ProcessCreateConfig.Bundle, runtime.LogFileBase),
-		LogFormat:     gorunc.JSON,
-		PdeathSignal:  unix.SIGKILL,
-		Root:          filepath.Join(opts.ProcessCreateConfig.Options.Root, opts.Namespace),
-		SystemdCgroup: opts.ProcessCreateConfig.Options.SystemdCgroup,
+		Command:      opts.ProcessCreateConfig.Runtime,
+		Log:          filepath.Join(opts.ProcessCreateConfig.Bundle, runtime.LogFileBase),
+		LogFormat:    gorunc.JSON,
+		PdeathSignal: unix.SIGKILL,
+		Root:         filepath.Join(opts.ProcessCreateConfig.Options.Root, opts.Namespace),
+		// SystemdCgroup: opts.ProcessCreateConfig.Options.SystemdCgroup,
+		SystemdCgroup: false,
 	})
 	return r, nil
 }

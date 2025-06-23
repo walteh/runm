@@ -15,7 +15,7 @@ var _ runtime.CgroupAdapter = (*CgroupV2Adapter)(nil)
 type CgroupV2Adapter struct {
 }
 
-func NewCgroupV2Adapter(ctx context.Context) (*CgroupV2Adapter, error) {
+func NewCgroupV2Adapter(ctx context.Context, containerId string) (*CgroupV2Adapter, error) {
 	return nil, errors.Errorf("not implemented")
 }
 

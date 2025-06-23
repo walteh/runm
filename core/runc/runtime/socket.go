@@ -178,18 +178,34 @@ func BindConsoleToSocket(ctx context.Context, cons ConsoleSocket, sock Allocated
 // BindIOToSockets implements SocketAllocator.
 func BindIOToSockets(ctx context.Context, ios IO, stdin, stdout, stderr AllocatedSocket) error {
 
+	if ios == nil {
+		return errors.Errorf("ios is nil")
+	}
+
 	if stdin != nil {
 		go func() {
+			if err := stdin.Ready(); err != nil {
+				slog.ErrorContext(ctx, "failed to ready stdin", "error", err)
+				return
+			}
 			io.Copy(ios.Stdin(), stdin.Conn())
 		}()
 	}
 	if stdout != nil {
 		go func() {
+			if err := stdout.Ready(); err != nil {
+				slog.ErrorContext(ctx, "failed to ready stdout", "error", err)
+				return
+			}
 			io.Copy(stdout.Conn(), ios.Stdout())
 		}()
 	}
 	if stderr != nil {
 		go func() {
+			if err := stderr.Ready(); err != nil {
+				slog.ErrorContext(ctx, "failed to ready stderr", "error", err)
+				return
+			}
 			io.Copy(stderr.Conn(), ios.Stderr())
 		}()
 	}

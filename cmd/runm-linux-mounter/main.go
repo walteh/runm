@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log/slog"
 	"os"
@@ -27,6 +28,17 @@ import (
 // 	"/hbin/lshw",
 // }
 
+var (
+	containerIdFlag string
+	runmModeFlag    string
+)
+
+func init() {
+	flag.StringVar(&containerIdFlag, "container-id", "", "the container id")
+	flag.StringVar(&runmModeFlag, "runm-mode", "", "the runm mode")
+	flag.Parse()
+}
+
 func main() {
 
 	pid := os.Getpid()
@@ -46,6 +58,10 @@ func main() {
 		os.Exit(1)
 	}
 }
+
+const (
+	CGroupName = "runm"
+)
 
 func recoveryMain(ctx context.Context) (err error) {
 	errChan := make(chan error)
@@ -67,6 +83,14 @@ func recoveryMain(ctx context.Context) (err error) {
 }
 
 func mount(ctx context.Context) error {
+
+	if runmModeFlag == "" {
+		return errors.Errorf("runm-mode flag is required")
+	}
+
+	if containerIdFlag == "" {
+		return errors.Errorf("container-id flag is required")
+	}
 
 	if _, err := os.Stat(constants.Ec1AbsPath); os.IsNotExist(err) {
 		os.MkdirAll(constants.Ec1AbsPath, 0755)
@@ -95,21 +119,35 @@ func mount(ctx context.Context) error {
 	// 	]
 	// }
 
+	// parse the args to get the container-id flag
+
 	// mount sysfs
-	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "sysfs", "sysfs", "/sys", "-o", "nosuid,noexec,nodev,ro"); err != nil {
+	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "sysfs", "sysfs", "/sys", "-o", "nosuid,noexec,nodev"); err != nil {
 		return errors.Errorf("problem mounting sysfs: %w", err)
 	}
 
-	// mount proc
 	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "proc", "proc", "/proc"); err != nil {
 		return errors.Errorf("problem mounting proc: %w", err)
 	}
 
-	// if err := os.MkdirAll("/sys/fs/cgroup", 0755); err != nil {
-	// 	return errors.Errorf("mkdir - /sys/fs/cgroup: %w", err)
-	// }
-	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "cgroup", "cgroup", "/sys/fs/cgroup", "-o", "nosuid,noexec,nodev,relatime,ro"); err != nil {
-		return errors.Errorf("problem mounting proc: %w", err)
+	// Mount the unified cgroup v2 hierarchy
+	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "cgroup2", "none", "/sys/fs/cgroup", "-o", "nsdelegate"); err != nil {
+		return errors.Errorf("problem mounting cgroup2: %w", err)
+	}
+
+	// Enable the memory controller in the root cgroup
+	if err := ExecCmdForwardingStdio(ctx, "sh", "-c", "echo +memory > /sys/fs/cgroup/cgroup.subtree_control"); err != nil {
+		return errors.Errorf("failed to enable memory controller: %w", err)
+	}
+
+	// Create a child cgroup so that per-controller files appear (including memory.events)
+	if err := ExecCmdForwardingStdio(ctx, "mkdir", "-p", "/sys/fs/cgroup/"+containerIdFlag); err != nil {
+		return errors.Errorf("failed to create child cgroup: %w", err)
+	}
+
+	// List the new cgroup directory to verify memory.events is present
+	if err := ExecCmdForwardingStdio(ctx, "ls", "-lah", "/sys/fs/cgroup/"+containerIdFlag); err != nil {
+		return errors.Errorf("problem listing child cgroup: %w", err)
 	}
 
 	// cmds = append(cmds, []string{"mkdir", "-p", prefix + "/dev/pts"})
@@ -356,7 +394,11 @@ func switchRoot(ctx context.Context) error {
 
 	env := os.Environ()
 	argc := "/mbin/runm-linux-init"
-	argv := []string{}
+	argv := []string{
+		argc,
+		"-container-id=" + containerIdFlag,
+		"-runm-mode=" + runmModeFlag,
+	}
 	// env = append(env, "PATH=/usr/sbin:/usr/bin:/sbin:/bin:/hbin")
 
 	// argc := "/bin/busybox"

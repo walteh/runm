@@ -19,10 +19,10 @@ type CgroupV2Adapter struct {
 	cgroup *cgroup2.Manager
 }
 
-func NewCgroupV2Adapter(ctx context.Context) (*CgroupV2Adapter, error) {
+func NewCgroupV2Adapter(ctx context.Context, containerId string) (*CgroupV2Adapter, error) {
 
 	// get the cgroup manager
-	cg, err := cgroup2.Load("/")
+	cg, err := cgroup2.Load("/" + containerId)
 	if err != nil {
 		return nil, errors.Errorf("failed to load cgroup2 for root: %w", err)
 	}
@@ -32,6 +32,7 @@ func NewCgroupV2Adapter(ctx context.Context) (*CgroupV2Adapter, error) {
 
 // OpenEventChan implements runtime.CgroupAdapter.
 func (me *CgroupV2Adapter) OpenEventChan(ctx context.Context) (<-chan runtime.CgroupEvent, <-chan error, error) {
+
 	evch, errch := me.cgroup.EventChan()
 
 	evch2 := make(chan runtime.CgroupEvent)

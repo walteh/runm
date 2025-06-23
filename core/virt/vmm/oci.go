@@ -141,7 +141,7 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 		bootloader = &virtio.LinuxBootloader{
 			InitrdPath:    filepath.Join(linuxRuntimeBuildDir, "initramfs.cpio.gz"),
 			VmlinuzPath:   filepath.Join(linuxRuntimeBuildDir, "kernel"),
-			KernelCmdLine: "console=hvc0 systemd.unified_cgroup_hierarchy=1 -- runm-mode=oci",
+			KernelCmdLine: "console=hvc0 systemd.unified_cgroup_hierarchy=1 -- -runm-mode=oci -container-id=" + ctrconfig.ID,
 		}
 	default:
 		return nil, errors.Errorf("unsupported OS: %s", ctrconfig.Platform.OS())

@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"flag"
 	"fmt"
 	"log/slog"
 	"os"
@@ -27,10 +29,22 @@ import (
 	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/logging"
 
+	"github.com/containerd/containerd/v2/pkg/oci"
 	gorunc "github.com/containerd/go-runc"
 
 	runtimemock "github.com/walteh/runm/gen/mocks/core/runc/runtime"
 )
+
+var (
+	containerId string
+	runmMode    string
+)
+
+func init() {
+	flag.StringVar(&containerId, "container-id", "", "the container id")
+	flag.StringVar(&runmMode, "runm-mode", "", "the runm mode")
+	flag.Parse()
+}
 
 func main() {
 
@@ -85,6 +99,10 @@ func runGrpcVsockServer(ctx context.Context) error {
 		}
 	}()
 
+	if containerId == "" {
+		return errors.Errorf("container-id flag is required")
+	}
+
 	wrkDir := constants.Ec1AbsPath
 
 	realRuntime := goruncruntime.WrapdGoRuncRuntime(&gorunc.Runc{
@@ -99,7 +117,7 @@ func runGrpcVsockServer(ctx context.Context) error {
 
 	realSocketAllocator := runtime.NewGuestUnixSocketAllocator(wrkDir)
 
-	cgroupAdapter, err := goruncruntime.NewCgroupV2Adapter(ctx)
+	cgroupAdapter, err := goruncruntime.NewCgroupV2Adapter(ctx, containerId)
 	if err != nil {
 		return errors.Errorf("failed to create cgroup adapter: %w", err)
 	}
@@ -139,6 +157,23 @@ func runGrpcVsockServer(ctx context.Context) error {
 	})
 
 	return egroup.Wait()
+}
+
+func loadSpec(ctx context.Context) (spec *oci.Spec, exists bool, err error) {
+	specd, err := os.ReadFile(filepath.Join(constants.Ec1AbsPath, constants.ContainerSpecFile))
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return nil, false, nil
+		}
+		return nil, false, errors.Errorf("reading spec: %w", err)
+	}
+
+	err = json.Unmarshal(specd, &spec)
+	if err != nil {
+		return nil, false, errors.Errorf("unmarshalling spec: %w", err)
+	}
+
+	return spec, true, nil
 }
 
 func logFile(ctx context.Context, path string) {
