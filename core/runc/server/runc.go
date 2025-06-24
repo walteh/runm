@@ -92,7 +92,7 @@ func (s *Server) Create(ctx context.Context, req *runmv1.RuncCreateRequest) (*ru
 
 	err = s.runtime.Create(ctx, req.GetId(), req.GetBundle(), opts)
 	if err != nil {
-		resp.SetGoError(err.Error())
+		return nil, errors.Errorf("failed to create container: %w", err)
 	}
 	return resp, nil
 }

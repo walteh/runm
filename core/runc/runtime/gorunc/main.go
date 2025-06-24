@@ -75,6 +75,11 @@ func (c *GoRuncRuntimeCreator) Features(ctx context.Context) (*features.Features
 	return &feat, nil
 }
 
+// todo the move here might be to add the exitting
+// Create ionterface to the above type (not creator)
+// and so we can wrao stdio from sockets for logging purposes
+// ie redirect a copy to stdiout
+
 func (c *GoRuncRuntimeCreator) Create(ctx context.Context, opts *runtime.RuntimeOptions) (runtime.Runtime, error) {
 	r := WrapdGoRuncRuntime(&gorunc.Runc{
 		Command:      opts.ProcessCreateConfig.Runtime,

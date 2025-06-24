@@ -28,6 +28,7 @@ import (
 	"syscall"
 	"time"
 
+	"gitlab.com/tozd/go/errors"
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/console"
@@ -155,12 +156,12 @@ func (e *execProcess) kill(ctx context.Context, sig uint32, _ bool) error {
 	pid := e.pid.get()
 	switch {
 	case pid == 0:
-		return fmt.Errorf("process not created: %w", errdefs.ErrFailedPrecondition)
+		return errors.Errorf("process not created: %w", errdefs.ErrFailedPrecondition)
 	case !e.exited.IsZero():
-		return fmt.Errorf("process already finished: %w", errdefs.ErrNotFound)
+		return errors.Errorf("process already finished: %w", errdefs.ErrNotFound)
 	default:
 		if err := unix.Kill(pid, syscall.Signal(sig)); err != nil {
-			return fmt.Errorf("exec kill error: %w", checkKillError(err))
+			return errors.Errorf("exec kill error: %w", checkKillError(err))
 		}
 	}
 	return nil
@@ -196,12 +197,12 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 	)
 	if e.stdio.Terminal {
 		if socket, err = e.parent.runtime.NewTempConsoleSocket(ctx); err != nil {
-			return fmt.Errorf("failed to create runc console socket: %w", err)
+			return errors.Errorf("failed to create runc console socket: %w", err)
 		}
 		defer socket.Close()
 	} else {
 		if pio, err = createIO(ctx, e.id, e.parent.IoUID, e.parent.IoGID, e.stdio, e.parent.runtime); err != nil {
-			return fmt.Errorf("failed to create init process I/O: %w", err)
+			return errors.Errorf("failed to create init process I/O: %w", err)
 		}
 		e.io = pio
 	}
@@ -230,19 +231,19 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 	if socket != nil {
 		console, err := socket.ReceiveMaster()
 		if err != nil {
-			return fmt.Errorf("failed to retrieve console master: %w", err)
+			return errors.Errorf("failed to retrieve console master: %w", err)
 		}
 		if e.console, err = e.parent.Platform.CopyConsole(ctx, console, e.id, e.stdio.Stdin, e.stdio.Stdout, e.stdio.Stderr, &e.wg); err != nil {
-			return fmt.Errorf("failed to start console copy: %w", err)
+			return errors.Errorf("failed to start console copy: %w", err)
 		}
 	} else {
 		if err := pio.Copy(ctx, &e.wg); err != nil {
-			return fmt.Errorf("failed to start io pipe copy: %w", err)
+			return errors.Errorf("failed to start io pipe copy: %w", err)
 		}
 	}
 	pid, err := e.parent.runtime.ReadPidFile(ctx, pidFile.Path())
 	if err != nil {
-		return fmt.Errorf("failed to retrieve OCI runtime exec pid: %w", err)
+		return errors.Errorf("failed to retrieve OCI runtime exec pid: %w", err)
 	}
 	e.pid.pid = pid
 	return nil
@@ -251,7 +252,7 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 func (e *execProcess) openStdin(path string) error {
 	sc, err := fifo.OpenFifo(context.Background(), path, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
 	if err != nil {
-		return fmt.Errorf("failed to open stdin fifo %s: %w", path, err)
+		return errors.Errorf("failed to open stdin fifo %s: %w", path, err)
 	}
 	e.stdin = sc
 	e.closers = append(e.closers, sc)

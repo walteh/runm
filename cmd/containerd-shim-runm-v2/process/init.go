@@ -22,6 +22,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -45,6 +46,7 @@ import (
 
 	"github.com/walteh/runm/core/runc/process"
 	"github.com/walteh/runm/core/runc/runtime"
+	"github.com/walteh/runm/pkg/stackerr"
 )
 
 // Init represents an initial process for a container
@@ -138,10 +140,15 @@ func (p *Init) Create(ctx context.Context, r *process.CreateConfig) error {
 		opts.ConsoleSocket = socket
 	}
 
+	slog.InfoContext(ctx, "calling runtime.Create", "id", r.ID, "bundle", r.Bundle, "opts", opts)
+
 	// gorunc:call Create
 	if err := p.runtime.Create(ctx, r.ID, r.Bundle, opts); err != nil {
+		// fmt.Fprintf(logging.GetDefaultLogWriter(), "runtime error (%T): %+v\n", err, err)
+		// slog.ErrorContext(ctx, "runtime error", "error", err, "type", reflect.TypeOf(err))
 		return p.runtimeError(ctx, err, "OCI runtime create failed")
 	}
+	slog.InfoContext(ctx, "done calling runtime.Create")
 	if r.Stdin != "" {
 		if err := p.openStdin(r.Stdin); err != nil {
 			return err
@@ -482,15 +489,20 @@ func (p *Init) Stdio() stdio.Stdio {
 }
 
 func (p *Init) runtimeError(ctx context.Context, rErr error, msg string) error {
+
 	if rErr == nil {
 		return nil
 	}
 
+	if enc, ok := rErr.(*stackerr.StackedEncodableError); ok {
+		return errors.Errorf("%s: %w", msg, enc)
+	}
+
 	rMsg, err := getLastRuntimeError(ctx, p.runtime)
 	switch {
-	case err != nil:
-		return errors.Errorf("%s: %s (%s): %w", msg, "unable to retrieve OCI runtime error", err.Error(), rErr)
-	case rMsg == "":
+	// case err != nil:
+	// return errors.Errorf("%s: %s (%s): %w", msg, "unable to retrieve OCI runtime error", err.Error(), rErr)
+	case err != nil, rMsg == "":
 		return errors.Errorf("%s: %w", msg, rErr)
 	default:
 		return errors.Errorf("%s: %s", msg, rMsg)

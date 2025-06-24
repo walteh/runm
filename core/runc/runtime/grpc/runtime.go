@@ -245,7 +245,7 @@ func (c *GRPCClientRuntime) NewPipeIO(ctx context.Context, ioUID, ioGID int, opt
 		}
 	}
 
-	ioz := runtime.NewHostUnixProxyIo(ctx, stdinAllocated, stdoutAllocated, stderrAllocated)
+	ioz := runtime.NewHostAllocatedStdio(ctx, sock.GetIoReferenceId(), stdinAllocated, stdoutAllocated, stderrAllocated)
 
 	return ioz, nil
 }
@@ -262,9 +262,11 @@ func (c *GRPCClientRuntime) Create(ctx context.Context, id, bundle string, optio
 	req.SetBundle(bundle)
 	req.SetOptions(conv)
 
+	slog.InfoContext(ctx, "creating container", "id", id, "bundle", bundle)
+
 	resp, err := c.runtimeGrpcService.Create(ctx, req)
 	if err != nil {
-		return err
+		return errors.Errorf("creating container - %T: %w", err, err)
 	}
 	if resp.GetGoError() != "" {
 		return errors.New(resp.GetGoError())

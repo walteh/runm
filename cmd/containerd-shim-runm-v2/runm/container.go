@@ -35,7 +35,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/stdio"
 	"github.com/containerd/errdefs"
-	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -44,6 +43,7 @@ import (
 	"github.com/walteh/runm/cmd/containerd-shim-runm-v2/process"
 	rtprocess "github.com/walteh/runm/core/runc/process"
 	"github.com/walteh/runm/core/runc/runtime"
+	"github.com/walteh/runm/pkg/grpcerr"
 )
 
 // NewContainer returns a new runc container
@@ -170,7 +170,7 @@ func NewContainer(
 	if cg, ok := rt.(runtime.CgroupAdapter); ok {
 		cgroupAdapter = cg
 	} else {
-		return nil, fmt.Errorf("runtime is not a cgroup adapter")
+		return nil, grpcerr.ToContainerdTTRPCf(ctx, errdefs.ErrAborted, "runtime is not a cgroup adapter")
 	}
 
 	slog.InfoContext(ctx, "creating init process", "id", r.ID)
@@ -188,15 +188,31 @@ func NewContainer(
 		cgroupAdapter,
 	)
 	if err != nil {
-		return nil, errgrpc.ToGRPC(err)
+		return nil, grpcerr.ToContainerdTTRPC(ctx, err)
 	}
 
 	slog.InfoContext(ctx, "done creating init process - starting it")
 
 	if err := p.Create(ctx, config); err != nil {
-		slog.ErrorContext(ctx, "failed to create init process", "error", err)
-		return nil, errgrpc.ToGRPC(err)
+		// slog.ErrorContext(ctx, "failed to create init process", "error", err)
+
+		// errz := grpcerr.FromGRPCStatusError(err).(*stackerr.StackedEncodableError)
+		// for errz != nil {
+		// 	for errz.Next != nil {
+		// 		fmt.Fprintf(logging.GetDefaultLogWriter(), "--------------------------------\n")
+		// 		fmt.Fprintf(logging.GetDefaultLogWriter(), "message: %s\n", errz.Message)
+		// 		// slog.ErrorContext(ctx, "failed to create init process", "error", errz)
+		// 		fmt.Fprintf(logging.GetDefaultLogWriter(), "source: %v\n", errz.Source)
+		// 		fmt.Fprintf(logging.GetDefaultLogWriter(), "next: %v\n", errz.Next)
+		// 		errz = errz.Next
+		// 	}
+		// 	errz = nil
+		// }
+
+		return nil, grpcerr.ToContainerdTTRPC(ctx, err)
 	}
+
+	slog.InfoContext(ctx, "creating container struct")
 	container := &Container{
 		ID:              r.ID,
 		Bundle:          r.Bundle,
@@ -211,7 +227,6 @@ func NewContainer(
 		// }
 	}
 
-	slog.InfoContext(ctx, "done starting init process")
 	return container, nil
 }
 

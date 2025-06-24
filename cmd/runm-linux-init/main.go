@@ -27,6 +27,7 @@ import (
 	goruncruntime "github.com/walteh/runm/core/runc/runtime/gorunc"
 	"github.com/walteh/runm/core/runc/server"
 	"github.com/walteh/runm/linux/constants"
+	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/pkg/logging"
 
 	"github.com/containerd/containerd/v2/pkg/oci"
@@ -105,11 +106,19 @@ func runGrpcVsockServer(ctx context.Context) error {
 
 	// wrkDir := constants.Ec1AbsPath
 
+	// ls -la /mbin/runc
+
+	// fmt.Println("YOOOOO ls -la /mbin")
+
+	// ExecCmdForwardingStdio(ctx, "ls", "-la", "/mbin")
+
 	realRuntime := goruncruntime.WrapdGoRuncRuntime(&gorunc.Runc{
 		Command:      "/mbin/runc",
 		Log:          filepath.Join(constants.Ec1AbsPath, runtime.LogFileBase),
 		LogFormat:    gorunc.JSON,
 		PdeathSignal: unix.SIGKILL,
+		Debug:        true,
+
 		// Root:          filepath.Join(opts.ProcessCreateConfig.Options.Root, opts.Namespace),
 		Root:          constants.NewRootAbsPath,
 		SystemdCgroup: false,
@@ -124,7 +133,7 @@ func runGrpcVsockServer(ctx context.Context) error {
 
 	var mockRuntimeExtras = &runtimemock.MockRuntimeExtras{}
 
-	grpcVsockServer := grpc.NewServer()
+	grpcVsockServer := grpc.NewServer(grpc.UnaryInterceptor(grpcerr.UnaryServerInterceptor()))
 
 	realEventHandler := goruncruntime.NewGoRuncEventHandler()
 

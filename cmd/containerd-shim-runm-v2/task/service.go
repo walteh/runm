@@ -54,6 +54,7 @@ import (
 	"github.com/walteh/runm/cmd/containerd-shim-runm-v2/runm"
 	"github.com/walteh/runm/core/runc/oom"
 	"github.com/walteh/runm/core/runc/runtime"
+	"github.com/walteh/runm/pkg/grpcerr"
 	runmv1 "github.com/walteh/runm/proto/v1"
 )
 
@@ -324,7 +325,7 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 
 	spec, err := oci.ReadSpec(specPath)
 	if err != nil {
-		return nil, errors.Errorf("reading spec: %w", err)
+		return nil, grpcerr.ToContainerdTTRPCf(ctx, err, "reading spec")
 	}
 
 	container, err := runm.NewContainer(ctx, s.platform, r, spec, s.publisher, s.creator)
@@ -336,7 +337,7 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 
 	if s.primaryContainerId != "" {
 		slog.ErrorContext(ctx, "runm only supports one container per shim", "primaryContainerId", s.primaryContainerId, "containerId", r.ID)
-		return nil, errgrpc.ToGRPCf(errdefs.ErrAlreadyExists, "runm only supports one container per shim")
+		return nil, grpcerr.ToContainerdTTRPCf(ctx, errdefs.ErrAlreadyExists, "runm only supports one container per shim")
 	}
 
 	s.primaryContainerId = r.ID
@@ -390,7 +391,7 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 	} else {
 		if _, initExited := s.containerInitExit[container]; initExited {
 			s.lifecycleMu.Unlock()
-			return nil, errgrpc.ToGRPCf(errdefs.ErrFailedPrecondition, "container %s init process is not running", container.ID)
+			return nil, grpcerr.ToContainerdTTRPCf(ctx, errdefs.ErrFailedPrecondition, "container %s init process is not running", container.ID)
 		}
 		s.runningExecs[container]++
 	}
@@ -502,7 +503,7 @@ func (s *service) Exec(ctx context.Context, r *taskAPI.ExecProcessRequest) (*pty
 	}
 	ok, cancel := container.ReserveProcess(r.ExecID)
 	if !ok {
-		return nil, errgrpc.ToGRPCf(errdefs.ErrAlreadyExists, "id %s", r.ExecID)
+		return nil, grpcerr.ToContainerdTTRPCf(ctx, errdefs.ErrAlreadyExists, "id %s", r.ExecID)
 	}
 	process, err := container.Exec(ctx, r)
 	if err != nil {
@@ -738,7 +739,7 @@ func (s *service) Stats(ctx context.Context, r *taskAPI.StatsRequest) (*taskAPI.
 	}
 	cgx := container.CgroupAdapter()
 	if cgx == nil {
-		return nil, errgrpc.ToGRPCf(errdefs.ErrNotFound, "cgroup does not exist")
+		return nil, grpcerr.ToContainerdTTRPCf(ctx, errdefs.ErrNotFound, "cgroup does not exist")
 	}
 	stats, err := cgx.Stat(ctx)
 	if err != nil {
@@ -760,7 +761,7 @@ func (s *service) Stats(ctx context.Context, r *taskAPI.StatsRequest) (*taskAPI.
 	// 	}
 	// 	statsx = stats
 	// default:
-	// 	return nil, errgrpc.ToGRPCf(errdefs.ErrNotImplemented, "unsupported cgroup type %T", cg)
+	// 	return nil, grpcerr.ToContainerdTTRPCf(ctx, errdefs.ErrNotImplemented, "unsupported cgroup type %T", cg)
 	// }
 	data, err := typeurl.MarshalAny(statsx)
 	if err != nil {
@@ -919,7 +920,7 @@ func (s *service) getContainer(id string) (*runm.Container, error) {
 	container := s.containers[id]
 	s.mu.Unlock()
 	if container == nil {
-		return nil, errgrpc.ToGRPCf(errdefs.ErrNotFound, "container not created")
+		return nil, grpcerr.ToContainerdTTRPCf(context.Background(), errdefs.ErrNotFound, "container not created")
 	}
 	return container, nil
 }

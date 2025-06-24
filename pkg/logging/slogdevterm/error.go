@@ -3,13 +3,14 @@ package slogdevterm
 import (
 	"fmt"
 	"log/slog"
-	"runtime"
 	"slices"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/list"
+	"github.com/walteh/runm/pkg/stackerr"
 	"gitlab.com/tozd/go/errors"
+	"google.golang.org/grpc/status"
 )
 
 // stackTracer interface matches the one from pkg/errors for extracting stack traces
@@ -22,6 +23,23 @@ type frameProvider interface {
 	Frame() uintptr
 }
 
+func isolateBetterError(err error) error {
+	// For non-errors.E types, fall back to simple display
+	if errz, ok := err.(errors.E); ok {
+		return errz
+	}
+
+	if errz, ok := err.(*stackerr.StackedEncodableError); ok {
+		return errz
+	}
+
+	if st, ok := status.FromError(err); ok {
+		return stackerr.FromGRPCStatusError(st)
+	}
+
+	return nil
+}
+
 // ErrorToTrace renders an error with a simple two-part structure:
 // 1. Error traces list (individual errors with their locations)
 // 2. Simple stack trace (just call stack, no context mapping)
@@ -31,9 +49,12 @@ func ErrorToTrace(err error, record slog.Record, styles *Styles, render renderFu
 	}
 
 	// For non-errors.E types, fall back to simple display
-	if _, ok := err.(errors.E); !ok {
+	betterErr := isolateBetterError(err)
+	if betterErr == nil {
 		return renderSimpleError(err, styles, render, record, hyperlink)
 	}
+
+	err = betterErr
 
 	// Build the display
 	var sections []string
@@ -55,7 +76,7 @@ func ErrorToTrace(err error, record slog.Record, styles *Styles, render renderFu
 	}
 
 	// Get the root error message for header (avoid repetition)
-	rootError := getRootError(err)
+	rootError := stackerr.GetRootError(err)
 	header := render(styles.Error.Main, rootError.Error())
 	content := strings.Join(sections, "\n\n")
 
@@ -66,39 +87,46 @@ func ErrorToTrace(err error, record slog.Record, styles *Styles, render renderFu
 func buildErrorTraces(err error, styles *Styles, render renderFunc, hyperlink HyperlinkFunc) []string {
 	var traces []string
 
-	current := err
+	sources := stackerr.NewStackedEncodableErrorFromError(err)
+
 	for {
-		next := errors.Unwrap(current)
+		enhancedSource := sources.Source
+		next := sources.Next
+		currentMsg := sources.Message
+
+		var nextMsg string
 		if next == nil {
-			// Core error - skip it since we show it in the header
+			nextMsg = ""
+		} else {
+			nextMsg = next.Message
+		}
+
+		var location string
+		if enhancedSource != nil {
+			location = RenderEnhancedSource(enhancedSource, styles, render, hyperlink)
+		} else {
 			break
 		}
 
-		// Wrapper error
-		if fp, ok := current.(frameProvider); ok {
-			if pc := fp.Frame(); pc != 0 {
-				enhancedSource := NewEnhancedSource(pc)
-				location := enhancedSource.Render(styles, render, hyperlink)
-
-				// Extract wrapper message
-				currentMsg := current.Error()
-				nextMsg := next.Error()
-				var wrapper string
-				if idx := strings.Index(currentMsg, nextMsg); idx > 0 {
-					wrapper = strings.TrimSuffix(strings.TrimSpace(currentMsg[:idx]), ":")
-				} else {
-					wrapper = currentMsg
-				}
-
-				if wrapper != "" {
-					message := render(styles.Error.Main, wrapper)
-					traces = append(traces, fmt.Sprintf("    %s: %s", location, message))
-				}
-
-			}
+		// Extract wrapper message
+		var wrapper string
+		if idx := strings.Index(currentMsg, nextMsg); idx > 0 {
+			wrapper = strings.TrimSuffix(strings.TrimSpace(currentMsg[:idx]), ":")
+		} else {
+			wrapper = currentMsg
 		}
 
-		current = next
+		if wrapper != "" {
+			message := render(styles.Error.Main, wrapper)
+			traces = append(traces, fmt.Sprintf("    %s: %s", location, message))
+		}
+
+		if next == nil {
+			break
+		}
+
+		sources = next
+
 	}
 
 	slices.Reverse(traces)
@@ -108,45 +136,26 @@ func buildErrorTraces(err error, styles *Styles, render renderFunc, hyperlink Hy
 
 // buildSimpleStackTrace creates a simple call stack without context mapping
 func buildSimpleStackTrace(err error, styles *Styles, render renderFunc, hyperlink HyperlinkFunc, errorTraces []string) string {
-	// Get stack trace from the outermost error
-	if st, ok := err.(stackTracer); ok {
-		frames := filterRelevantFrames(convertStackTrace(st.StackTrace()))
-		if len(frames) == 0 {
-			return ""
-		}
-
-		var rows []string
-		// HERE:
-		for _, frame := range frames {
-			enhancedSource := NewEnhancedSource(frame.PC)
-			locationDisplay := enhancedSource.Render(styles, render, hyperlink)
-			// for _, trace := range errorTraces {
-			// 	if strings.Contains(trace, locationDisplay) {
-			// 		continue HERE
-			// 	}
-			// }
-			rows = append(rows, locationDisplay)
-		}
-
-		// Dedupe consecutive identical rows
-		rows = dedupeConsecutive(rows)
-
-		// Create the list
-		l := list.New(convertToListItems(rows)...).
-			Enumerator(errorEnumerator).
-			EnumeratorStyleFunc(errorEnumeratorStyle)
-
-		return l.String()
+	sources := stackerr.GetEnhancedSourcesFromError(err)
+	if len(sources) == 0 {
+		return ""
 	}
 
-	return ""
-}
+	var rows []string
+	for _, source := range sources {
+		rows = append(rows, RenderEnhancedSource(source, styles, render, hyperlink))
+	}
 
-// convertPCToFrame converts a program counter to a runtime.Frame
-func convertPCToFrame(pc uintptr) runtime.Frame {
-	frames := runtime.CallersFrames([]uintptr{pc})
-	frame, _ := frames.Next()
-	return frame
+	// Dedupe consecutive identical rows
+	rows = dedupeConsecutive(rows)
+
+	// Create the list
+	l := list.New(convertToListItems(rows)...).
+		Enumerator(errorEnumerator).
+		EnumeratorStyleFunc(errorEnumeratorStyle)
+
+	return l.String()
+
 }
 
 // dedupeConsecutive removes consecutive identical strings
@@ -176,17 +185,6 @@ func convertToListItems(rows []string) []any {
 	return items
 }
 
-// filterRelevantFrames filters out internal/uninteresting frames
-func filterRelevantFrames(frames []runtime.Frame) []runtime.Frame {
-	var relevant []runtime.Frame
-	for _, frame := range frames {
-		if isRelevantFrame(frame) {
-			relevant = append(relevant, frame)
-		}
-	}
-	return relevant
-}
-
 // errorEnumerator returns rounded tree-style connectors like Rust errors
 func errorEnumerator(items list.Items, i int) string {
 	if i == items.Length()-1 {
@@ -200,67 +198,6 @@ func errorEnumeratorStyle(items list.Items, i int) lipgloss.Style {
 	return lipgloss.NewStyle()
 }
 
-// getPC extracts the program counter from a frame
-func getPC(frame runtime.Frame) uintptr {
-	return frame.PC
-}
-
-// isRelevantFrame determines if a frame should be included in the stack trace
-func isRelevantFrame(frame runtime.Frame) bool {
-	// Skip runtime internals
-	if strings.HasPrefix(frame.Function, "runtime.") {
-		return false
-	}
-
-	// Skip reflect internals
-	if strings.HasPrefix(frame.Function, "reflect.") {
-		return false
-	}
-
-	// Skip testing internals
-	if strings.Contains(frame.Function, "testing.") {
-		return false
-	}
-
-	// Skip empty frames
-	if frame.Function == "" && frame.File == "" {
-		return false
-	}
-
-	return true
-}
-
-// convertStackTrace converts a slice of PCs to runtime.Frames
-func convertStackTrace(st []uintptr) []runtime.Frame {
-	var frames []runtime.Frame
-
-	callersFrames := runtime.CallersFrames(st)
-	for {
-		frame, more := callersFrames.Next()
-		frames = append(frames, frame)
-		if !more {
-			break
-		}
-	}
-
-	return frames
-}
-
-// getRootError finds the innermost (root) error in the chain
-func getRootError(err error) error {
-	current := err
-	for {
-		next := errors.Unwrap(current)
-		if next == nil {
-			return current
-		}
-		if _, ok := next.(errors.E); !ok {
-			return next
-		}
-		current = next
-	}
-}
-
 // renderSimpleError renders a simple error with optional stack trace from log record
 func renderSimpleError(err error, styles *Styles, render renderFunc, record slog.Record, hyperlink HyperlinkFunc) string {
 	// Start with the error message
@@ -268,8 +205,8 @@ func renderSimpleError(err error, styles *Styles, render renderFunc, record slog
 
 	// If we have source information from the log record, add it as a simple stack trace
 	if record.PC != 0 {
-		enhancedSource := NewEnhancedSource(record.PC)
-		location := enhancedSource.Render(styles, render, hyperlink)
+		enhancedSource := stackerr.NewEnhancedSource(record.PC)
+		location := RenderEnhancedSource(enhancedSource, styles, render, hyperlink)
 
 		// Create a simple single-item list with the location
 		l := list.New(location).

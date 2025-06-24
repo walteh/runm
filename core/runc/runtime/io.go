@@ -8,47 +8,55 @@ import (
 	gorunc "github.com/containerd/go-runc"
 )
 
-var _ IO = &HostUnixProxyIo{}
+var _ IO = &HostAllocatedStdio{}
 
-type HostUnixProxyIo struct {
+var _ ReferableByReferenceId = &HostAllocatedStdio{}
+
+type HostAllocatedStdio struct {
 	StdinSocket  AllocatedSocket
 	StdoutSocket AllocatedSocket
 	StderrSocket AllocatedSocket
+	ReferenceId  string
 }
 
-func NewHostUnixProxyIo(ctx context.Context, stdinRef, stdoutRef, stderrRef AllocatedSocket) *HostUnixProxyIo {
-	return &HostUnixProxyIo{
+func (p *HostAllocatedStdio) GetReferenceId() string {
+	return p.ReferenceId
+}
+
+func NewHostAllocatedStdio(ctx context.Context, referenceId string, stdinRef, stdoutRef, stderrRef AllocatedSocket) *HostAllocatedStdio {
+	return &HostAllocatedStdio{
 		StdinSocket:  stdinRef,
 		StdoutSocket: stdoutRef,
 		StderrSocket: stderrRef,
+		ReferenceId:  referenceId,
 	}
 }
 
-func (p *HostUnixProxyIo) Stdin() io.WriteCloser {
+func (p *HostAllocatedStdio) Stdin() io.WriteCloser {
 	if p.StdinSocket == nil {
 		return nil
 	}
 	return p.StdinSocket.Conn()
 }
 
-func (p *HostUnixProxyIo) Stdout() io.ReadCloser {
+func (p *HostAllocatedStdio) Stdout() io.ReadCloser {
 	if p.StdoutSocket == nil {
 		return nil
 	}
 	return p.StdoutSocket.Conn()
 }
 
-func (p *HostUnixProxyIo) Stderr() io.ReadCloser {
+func (p *HostAllocatedStdio) Stderr() io.ReadCloser {
 	if p.StderrSocket == nil {
 		return nil
 	}
 	return p.StderrSocket.Conn()
 }
 
-func (p *HostUnixProxyIo) Set(stdio *exec.Cmd) {
+func (p *HostAllocatedStdio) Set(stdio *exec.Cmd) {
 }
 
-func (p *HostUnixProxyIo) Close() error {
+func (p *HostAllocatedStdio) Close() error {
 	if p.StdinSocket != nil {
 		p.StdinSocket.Close()
 	}

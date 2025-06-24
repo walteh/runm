@@ -322,7 +322,9 @@ tasks:
           - cmd: cd {{.TMP_DIR}}/initramfs && (cpio -idm < {{.TMP_DIR}}/initramfs.cpio.gz)
 
           - cmd: cp {{.VF_DIR}}/mbin.squashfs {{.TMP_DIR}}/mbin.squashfs
-          - cmd: unsquashfs -q {{.TMP_DIR}}/mbin.squashfs {{.TMP_DIR}}/mbin
+          - cmd: unsquashfs  -d {{.TMP_DIR}}/mbin {{.TMP_DIR}}/mbin.squashfs
+
+          - cmd: ls -lahr {{.TMP_DIR}}
 
           - |-
             GOOS=linux GOARCH=${ARCH} go build \
@@ -333,7 +335,7 @@ tasks:
                 -ldflags="-s -w -extldflags=-static" \
                  -o {{.TMP_DIR}}/mbin/runm-linux-init ./cmd/runm-linux-init
 
-          - mksquashfs {{.TMP_DIR}}/mbin {{.TMP_DIR}}/mbin-new.squashfs  -quiet
+          - mksquashfs {{.TMP_DIR}}/mbin/* {{.TMP_DIR}}/mbin-new.squashfs  -quiet
           - |-
             cd {{.TMP_DIR}}/initramfs && find . -print0 | cpio --null -o --format=newc > {{.TMP_DIR}}/initramfs-new.cpio
           - gzip -1 -q {{.TMP_DIR}}/initramfs-new.cpio

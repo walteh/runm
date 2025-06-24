@@ -12,6 +12,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
+	"github.com/walteh/runm/pkg/stackerr"
 )
 
 var _ slog.Handler = (*TermLogger)(nil)
@@ -129,7 +130,7 @@ func NewTermLogger(writer io.Writer, sopts *slog.HandlerOptions, opts ...TermLog
 		styles:        DefaultStyles(),
 		renderOpts:    []termenv.OutputOption{},
 		name:          "",
-		hyperlinkFunc: hyperlink,
+		hyperlinkFunc: stackerr.Hyperlink,
 		nameColors:    make(map[string]lipgloss.Color),
 	}
 	for _, opt := range opts {
@@ -213,7 +214,7 @@ func (l *TermLogger) Handle(ctx context.Context, r slog.Record) error {
 
 	// 3. Source (if requested).
 	if l.slogOptions != nil && l.slogOptions.AddSource {
-		b.WriteString(NewEnhancedSource(r.PC).Render(l.styles, l.renderFunc, l.hyperlinkFunc))
+		b.WriteString(RenderEnhancedSource(stackerr.NewEnhancedSource(r.PC), l.styles, l.renderFunc, l.hyperlinkFunc))
 		b.WriteByte(' ')
 	}
 

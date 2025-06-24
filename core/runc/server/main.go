@@ -59,6 +59,7 @@ func (s *Server) RegisterGrpcServer(grpcServer *grpc.Server) {
 	runmv1.RegisterCgroupAdapterServiceServer(grpcServer, s)
 	runmv1.RegisterEventServiceServer(grpcServer, s)
 	runmv1.RegisterGuestManagementServiceServer(grpcServer, s)
+
 }
 
 // 	// Create gRPC server

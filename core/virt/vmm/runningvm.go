@@ -17,6 +17,7 @@ import (
 	grpcruntime "github.com/walteh/runm/core/runc/runtime/grpc"
 	"github.com/walteh/runm/core/virt/virtio"
 	"github.com/walteh/runm/linux/constants"
+	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/pkg/logging"
 	runmv1 "github.com/walteh/runm/proto/v1"
 	"gitlab.com/tozd/go/errors"
@@ -72,6 +73,7 @@ func (r *RunningVM[VM]) GuestService(ctx context.Context) (*grpcruntime.GRPCClie
 					slog.InfoContext(ctx, "dialing vsock", "port", constants.RunmVsockPort, "ignored_addr", addr)
 					return conn, nil
 				}),
+				grpc.WithUnaryInterceptor(grpcerr.UnaryClientInterceptor()),
 			)
 			if err != nil {
 				lastError = err

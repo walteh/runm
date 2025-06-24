@@ -19,31 +19,31 @@ func ConvertIOFromProto(ctx context.Context, req *runmv1.RuncIO) (runtime.IO, er
 	return NewServerIOFromClient(ctx, req)
 }
 
-func ConvertIOToProto(ctx context.Context, rvio runtime.IO) (*runmv1.RuncIO, error) {
-	res := &runmv1.RuncIO{}
+// func ConvertIOToProto(ctx context.Context, rvio runtime.IO) (*runmv1.RuncIO, error) {
+// 	res := &runmv1.RuncIO{}
 
-	switch iot := rvio.(type) {
-	case *stdio.HostVsockProxyIo:
-		rviod := &runmv1.RuncVsockIO{}
-		rviod.SetStdinVsockPort(iot.StdinPort)
-		rviod.SetStdoutVsockPort(iot.StdoutPort)
-		rviod.SetStderrVsockPort(iot.StderrPort)
-		rviod.SetVsockContextId(3)
-		res.SetVsock(rviod)
-	case *stdio.HostUnixProxyIo:
-		rviod := &runmv1.RuncUnixIO{}
-		rviod.SetStdinPath(iot.StdinPath)
-		rviod.SetStdoutPath(iot.StdoutPath)
-		rviod.SetStderrPath(iot.StderrPath)
-		res.SetUnix(rviod)
-	case *stdio.HostNullIo:
-		res.SetNull(&runmv1.RuncNullIO{})
-	default:
-		return nil, errors.Errorf("io is not a vsock proxy io")
-	}
+// 	switch iot := rvio.(type) {
+// 	case *runtime.HostVsockProxyIo:
+// 		rviod := &runmv1.RuncVsockIO{}
+// 		rviod.SetStdinVsockPort(iot.StdinPort)
+// 		rviod.SetStdoutVsockPort(iot.StdoutPort)
+// 		rviod.SetStderrVsockPort(iot.StderrPort)
+// 		rviod.SetVsockContextId(3)
+// 		res.SetVsock(rviod)
+// 	case *runtime.HostAllocatedStdio:
+// 		rviod := &runmv1.RuncUnixIO{}
+// 		rviod.SetStdinPath(iot.StdinPath)
+// 		rviod.SetStdoutPath(iot.StdoutPath)
+// 		rviod.SetStderrPath(iot.StderrPath)
+// 		res.SetUnix(rviod)
+// 	case *stdio.HostNullIo:
+// 		res.SetNull(&runmv1.RuncNullIO{})
+// 	default:
+// 		return nil, errors.Errorf("io is not a vsock proxy io")
+// 	}
 
-	return res, nil
-}
+// 	return res, nil
+// }
 
 func NewServerIOFromClient(ctx context.Context, rvio *runmv1.RuncIO) (runtime.IO, error) {
 	var err error
