@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -30,6 +31,7 @@ import (
 
 type OCIVMConfig struct {
 	ID           string
+	Bundle       string
 	RootfsMounts []process.Mount
 	// StderrWriter io.Writer
 	// StdoutWriter io.Writer
@@ -119,6 +121,12 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 		return nil, errors.Errorf("creating ec1 block device: %w", err)
 	}
 
+	bundleDev, err := virtio.VirtioFsNew(ctrconfig.Bundle, constants.BundleVirtioTag)
+	if err != nil {
+		return nil, errors.Errorf("creating bundle virtio device: %w", err)
+	}
+
+	devices = append(devices, bundleDev)
 	devices = append(devices, ec1Dev)
 	devices = append(devices, mountDevices...)
 
@@ -138,10 +146,22 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 
 	switch ctrconfig.Platform {
 	case units.PlatformLinuxARM64:
+		cfgs := []string{
+			"console=hvc0",
+			"systemd.unified_cgroup_hierarchy=1",
+			"vm.compact_memory=1",
+			"user.max_user_namespaces=15000",
+			"pid_max=100000",
+			"--",
+			"-bundle-source=" + ctrconfig.Bundle,
+			"-runm-mode=oci",
+			"-container-id=" + ctrconfig.ID,
+		}
+
 		bootloader = &virtio.LinuxBootloader{
 			InitrdPath:    filepath.Join(linuxRuntimeBuildDir, "initramfs.cpio.gz"),
 			VmlinuzPath:   filepath.Join(linuxRuntimeBuildDir, "kernel"),
-			KernelCmdLine: "console=hvc0 systemd.unified_cgroup_hierarchy=1 -- -runm-mode=oci -container-id=" + ctrconfig.ID,
+			KernelCmdLine: strings.Join(cfgs, " "),
 		}
 	default:
 		return nil, errors.Errorf("unsupported OS: %s", ctrconfig.Platform.OS())

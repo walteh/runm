@@ -19,7 +19,6 @@ package runm
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -38,6 +37,7 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go"
+	"gitlab.com/tozd/go/errors"
 
 	"github.com/walteh/run"
 	"github.com/walteh/runm/cmd/containerd-shim-runm-v2/process"
@@ -57,7 +57,7 @@ func NewContainer(
 ) (_ *Container, retErr error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("create namespace: %w", err)
+		return nil, errors.Errorf("create namespace: %w", err)
 	}
 
 	opts := &options.Options{}
@@ -132,7 +132,7 @@ func NewContainer(
 		}
 	}()
 	if err := mount.All(mounts, rootfs); err != nil {
-		return nil, fmt.Errorf("failed to mount rootfs component: %w", err)
+		return nil, errors.Errorf("failed to mount rootfs component: %w", err)
 	}
 
 	defer func() {
@@ -148,9 +148,10 @@ func NewContainer(
 		Rootfs:              rootfs,
 		Mounts:              pmounts,
 		OciSpec:             spec,
+		Bundle:              r.Bundle,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create runtime: %w", err)
+		return nil, errors.Errorf("failed to create runtime: %w", err)
 	}
 
 	slog.InfoContext(ctx, "created container runtime", "id", r.ID)
@@ -390,13 +391,13 @@ func (c *Container) Process(id string) (process.Process, error) {
 	defer c.mu.Unlock()
 	if id == "" {
 		if c.process == nil {
-			return nil, fmt.Errorf("container must be created: %w", errdefs.ErrFailedPrecondition)
+			return nil, errors.Errorf("container must be created: %w", errdefs.ErrFailedPrecondition)
 		}
 		return c.process, nil
 	}
 	p, ok := c.processes[id]
 	if !ok {
-		return nil, fmt.Errorf("process does not exist %s: %w", id, errdefs.ErrNotFound)
+		return nil, errors.Errorf("process does not exist %s: %w", id, errdefs.ErrNotFound)
 	}
 	return p, nil
 }
@@ -534,7 +535,7 @@ func (c *Container) CloseIO(ctx context.Context, r *task.CloseIORequest) error {
 	}
 	if stdin := p.Stdin(); stdin != nil {
 		if err := stdin.Close(); err != nil {
-			return fmt.Errorf("close stdin: %w", err)
+			return errors.Errorf("close stdin: %w", err)
 		}
 	}
 	return nil

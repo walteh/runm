@@ -37,13 +37,15 @@ import (
 )
 
 var (
-	containerId string
-	runmMode    string
+	containerId  string
+	runmMode     string
+	bundleSource string
 )
 
 func init() {
 	flag.StringVar(&containerId, "container-id", "", "the container id")
 	flag.StringVar(&runmMode, "runm-mode", "", "the runm mode")
+	flag.StringVar(&bundleSource, "bundle-source", "", "the bundle source")
 	flag.Parse()
 }
 
@@ -113,7 +115,7 @@ func runGrpcVsockServer(ctx context.Context) error {
 	// ExecCmdForwardingStdio(ctx, "ls", "-la", "/mbin")
 
 	realRuntime := goruncruntime.WrapdGoRuncRuntime(&gorunc.Runc{
-		Command:      "/mbin/runc",
+		Command:      "/mbin/crun",
 		Log:          filepath.Join(constants.Ec1AbsPath, runtime.LogFileBase),
 		LogFormat:    gorunc.JSON,
 		PdeathSignal: unix.SIGKILL,
@@ -143,6 +145,7 @@ func runGrpcVsockServer(ctx context.Context) error {
 		realSocketAllocator,
 		realEventHandler,
 		cgroupAdapter,
+		server.WithBundleSource(bundleSource),
 	)
 
 	serverz.RegisterGrpcServer(grpcVsockServer)

@@ -2,7 +2,9 @@ package grpcruntime
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -254,13 +256,22 @@ func (c *GRPCClientRuntime) NewPipeIO(ctx context.Context, ioUID, ioGID int, opt
 func (c *GRPCClientRuntime) Create(ctx context.Context, id, bundle string, options *gorunc.CreateOpts) error {
 	conv, err := conversion.ConvertCreateOptsToProto(ctx, options)
 	if err != nil {
-		return err
+		return errors.Errorf("creating container - %T: %w", err, err)
 	}
 
 	req := &runmv1.RuncCreateRequest{}
 	req.SetId(id)
 	req.SetBundle(bundle)
 	req.SetOptions(conv)
+
+	// cat the contents of the pid file
+	pid, err := os.ReadDir(filepath.Dir(conv.GetPidFile()))
+	if err != nil {
+		return errors.Errorf("reading pid file: %w", err)
+	}
+	for _, p := range pid {
+		fmt.Printf("pid file contents %s\n", p.Name())
+	}
 
 	slog.InfoContext(ctx, "creating container", "id", id, "bundle", bundle)
 

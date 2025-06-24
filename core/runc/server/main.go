@@ -18,6 +18,7 @@ type Server struct {
 	socketAllocator runtime.SocketAllocator
 	eventHandler    runtime.EventHandler
 	cgroupAdapter   runtime.CgroupAdapter
+	bundleSource    string
 
 	state *state.State
 }
@@ -25,6 +26,13 @@ type Server struct {
 type ServerOpt func(*ServerOpts)
 
 type ServerOpts struct {
+	BundleSource string
+}
+
+func WithBundleSource(bundleSource string) ServerOpt {
+	return func(opts *ServerOpts) {
+		opts.BundleSource = bundleSource
+	}
 }
 
 func NewServer(
@@ -46,6 +54,7 @@ func NewServer(
 		socketAllocator: socketAllocator,
 		eventHandler:    eventHandler,
 		cgroupAdapter:   cgroupAdapter,
+		bundleSource:    optz.BundleSource,
 		state:           state.NewState(),
 	}
 

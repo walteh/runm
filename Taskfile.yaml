@@ -16,6 +16,7 @@ vars:
       - ../go-errors
       - ../nerdctl
       - ../containerd
+      - ../runc
     BUILD_OUT_DIR: gen/build
 
 env:

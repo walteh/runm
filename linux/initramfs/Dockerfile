@@ -154,6 +154,81 @@ RUN strip misc/mke2fs
 RUN cp misc/mke2fs /bin/
 
 ########################################################
+# crun builder
+########################################################
+
+# Stage 1: Build with Nix
+FROM nixos/nix AS crun-static-builder-nix
+
+# Clone & build via the nix expression
+RUN git clone --recursive https://github.com/containers/crun.git /src
+WORKDIR /src
+RUN nix build -f nix -L --extra-experimental-features nix-command
+
+RUN strip ./result/bin/crun
+RUN cp ./result/bin/crun /bin/crun
+
+FROM debian-ref AS crun-static-builder-debian
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+	git build-essential autoconf automake libtool pkg-config \
+	musl-tools \
+	libyajl-dev \
+	libseccomp-dev \
+	libcap-dev \
+	ca-certificates \
+	python3 \
+	&& rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+RUN git clone --recursive https://github.com/containers/crun.git .
+
+# Configure and compile statically against musl
+RUN CC=musl-gcc \
+	CFLAGS="-O2 -static" \
+	LDFLAGS="-static" \
+	./autogen.sh \
+	&& ./configure --disable-shared \
+	&& make
+
+RUN strip /src/crun
+RUN cp /src/crun /bin/crun
+
+########################################################
+# crun builder
+########################################################
+
+FROM alpine-ref AS crun-static-builder-alpine
+
+RUN apk add --no-cache \
+	git build-base autoconf automake libtool pkgconf \
+	musl-dev go-md2man \
+	libcap-dev libseccomp-dev yajl-dev yajl-static argp-standalone \
+	python3
+
+WORKDIR /src
+RUN git clone --depth 1 --recurse-submodules \
+	https://github.com/containers/crun.git . \
+	&& git submodule update --init --recursive
+
+
+RUN apk add --no-cache \
+	libcap-dev libcap-static
+
+RUN apk add --no-cache \
+	libseccomp-dev libseccomp-static
+
+
+RUN ./autogen.sh \
+	&& CFLAGS="-O2 -static" \
+		LDFLAGS="-static" \
+		./configure --disable-shared --disable-systemd \
+	&& make
+
+RUN strip /src/crun
+RUN cp /src/crun /bin/crun
+
+########################################################
 # runc builder
 ########################################################
 
@@ -174,9 +249,17 @@ RUN apt-get update \
 		libseccomp2 \
 	&& rm -rf /var/lib/apt/lists/*
 
-RUN git clone --depth 1 --branch ${RUNC_GIT_REF} https://github.com/opencontainers/runc.git /src
-WORKDIR /src
-RUN make static
+COPY --from=forks / /app/
+
+# RUN git clone --depth 1 --branch ${RUNC_GIT_REF} https://github.com/opencontainers/runc.git /src
+# WORKDIR /src
+
+WORKDIR /app/runc
+
+RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/go/pkg/mod <<EOF
+make static
+EOF
+
 RUN strip runc
 RUN cp runc /bin/runc
 
@@ -256,6 +339,7 @@ FROM scratch AS mbin-files
 # COPY --from=e2fsprogs-static-builder /bin/mke2fs /mbin/mke2fs
 # COPY --from=lshw-static-builder /bin/lshw /mbin/lshw
 COPY --from=runc-static-builder /bin/runc /runc
+COPY --from=crun-static-builder-alpine /bin/crun /crun
 COPY --from=runm-linux-init-builder /out/runm-linux-init /runm-linux-init
 
 

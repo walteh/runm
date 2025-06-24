@@ -53,6 +53,7 @@ func NewRunmVMRuntime[VM vmm.VirtualMachine](
 		StartingMemory: strongunits.MiB(64).ToBytes(),
 		VCPUs:          1,
 		Platform:       units.PlatformLinuxARM64,
+		Bundle:         opts.Bundle,
 	}
 
 	vm, err := vmm.NewOCIVirtualMachine(ctx, hpv, cfg)

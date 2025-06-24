@@ -31,11 +31,13 @@ import (
 var (
 	containerIdFlag string
 	runmModeFlag    string
+	bundleSource    string
 )
 
 func init() {
 	flag.StringVar(&containerIdFlag, "container-id", "", "the container id")
 	flag.StringVar(&runmModeFlag, "runm-mode", "", "the runm mode")
+	flag.StringVar(&bundleSource, "bundle-source", "", "the bundle source")
 	flag.Parse()
 }
 
@@ -130,6 +132,14 @@ func mount(ctx context.Context) error {
 		return errors.Errorf("problem mounting proc: %w", err)
 	}
 
+	if err := ExecCmdForwardingStdio(ctx, "sysctl", "-w", "kernel.pid_max=100000"); err != nil {
+		return errors.Errorf("problem setting pid_max: %w", err)
+	}
+
+	if err := ExecCmdForwardingStdio(ctx, "sysctl", "-w", "user.max_user_namespaces=15000"); err != nil {
+		return errors.Errorf("problem setting user.max_user_namespaces: %w", err)
+	}
+
 	// Mount the unified cgroup v2 hierarchy
 	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "cgroup2", "none", "/sys/fs/cgroup", "-o", "nsdelegate"); err != nil {
 		return errors.Errorf("problem mounting cgroup2: %w", err)
@@ -157,6 +167,17 @@ func mount(ctx context.Context) error {
 	err := ExecCmdForwardingStdio(ctx, "mount", "-t", "virtiofs", constants.Ec1VirtioTag, constants.Ec1AbsPath)
 	if err != nil {
 		return errors.Errorf("problem mounting ec1 virtiofs: %w", err)
+	}
+
+	if bundleSource != "" {
+		if err = os.MkdirAll(bundleSource, 0755); err != nil {
+			return errors.Errorf("problem creating bundle source: %w", err)
+		}
+
+		err = ExecCmdForwardingStdio(ctx, "mount", "-t", "virtiofs", constants.BundleVirtioTag, bundleSource)
+		if err != nil {
+			return errors.Errorf("problem mounting ec1 virtiofs: %w", err)
+		}
 	}
 
 	if _, err := os.Stat(constants.NewRootAbsPath); os.IsNotExist(err) {
@@ -394,11 +415,7 @@ func switchRoot(ctx context.Context) error {
 
 	env := os.Environ()
 	argc := "/mbin/runm-linux-init"
-	argv := []string{
-		argc,
-		"-container-id=" + containerIdFlag,
-		"-runm-mode=" + runmModeFlag,
-	}
+	argv := append([]string{argc}, os.Args[1:]...)
 	// env = append(env, "PATH=/usr/sbin:/usr/bin:/sbin:/bin:/hbin")
 
 	// argc := "/bin/busybox"

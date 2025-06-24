@@ -16,7 +16,12 @@ func GetRootError(err error) error {
 			return current
 		}
 		if _, ok := next.(errors.E); !ok {
-			return next
+			if z, ok := next.(*StackedEncodableError); ok {
+				next = z.Next
+			} else {
+				return next
+			}
+
 		}
 		current = next
 	}

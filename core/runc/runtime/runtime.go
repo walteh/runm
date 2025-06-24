@@ -29,6 +29,7 @@ type RuntimeOptions struct {
 	Namespace           string
 	Publisher           events.Publisher
 	OciSpec             *oci.Spec
+	Bundle              string
 }
 
 type RuntimeCreator interface {

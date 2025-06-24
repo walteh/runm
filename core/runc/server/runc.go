@@ -13,6 +13,7 @@ import (
 
 	"github.com/walteh/runm/core/runc/conversion"
 	"github.com/walteh/runm/core/runc/runtime"
+	"github.com/walteh/runm/pkg/logging"
 
 	runmv1 "github.com/walteh/runm/proto/v1"
 )
@@ -89,6 +90,17 @@ func (s *Server) Create(ctx context.Context, req *runmv1.RuncCreateRequest) (*ru
 	if err != nil {
 		return nil, errors.Errorf("failed to convert create opts: %w", err)
 	}
+
+	if opts.IO != nil {
+		opts.IO = runtime.NewIoLogProxy(opts.IO, logging.GetDefaultLogWriter())
+	}
+
+	slog.Info("creating container",
+		"id", req.GetId(),
+		"bundle", req.GetBundle(),
+		"detach", opts.Detach,
+		"opts", opts,
+	)
 
 	err = s.runtime.Create(ctx, req.GetId(), req.GetBundle(), opts)
 	if err != nil {

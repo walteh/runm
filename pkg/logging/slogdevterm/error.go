@@ -105,7 +105,7 @@ func buildErrorTraces(err error, styles *Styles, render renderFunc, hyperlink Hy
 		if enhancedSource != nil {
 			location = RenderEnhancedSource(enhancedSource, styles, render, hyperlink)
 		} else {
-			break
+			location = "unknown"
 		}
 
 		// Extract wrapper message
