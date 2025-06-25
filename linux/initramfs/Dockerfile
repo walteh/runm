@@ -204,26 +204,18 @@ RUN apk add --no-cache \
 	git build-base autoconf automake libtool pkgconf \
 	musl-dev go-md2man \
 	libcap-dev libseccomp-dev yajl-dev yajl-static argp-standalone \
-	python3
+	python3 libcap-dev libcap-static libseccomp-dev libseccomp-static
 
 WORKDIR /src
 RUN git clone --depth 1 --recurse-submodules \
 	https://github.com/containers/crun.git . \
 	&& git submodule update --init --recursive
 
+RUN ./autogen.sh
 
-RUN apk add --no-cache \
-	libcap-dev libcap-static
+RUN CFLAGS="-O2 -static" LDFLAGS="-static" ./configure --disable-shared --disable-systemd --enable-static
 
-RUN apk add --no-cache \
-	libseccomp-dev libseccomp-static
-
-
-RUN ./autogen.sh \
-	&& CFLAGS="-O2 -static" \
-		LDFLAGS="-static" \
-		./configure --disable-shared --disable-systemd \
-	&& make
+RUN make V=1 LDFLAGS="-static -all-static" -j$(nproc)
 
 RUN strip /src/crun
 RUN cp /src/crun /bin/crun
