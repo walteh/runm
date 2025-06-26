@@ -40,7 +40,7 @@ func TestBasicClientServer(t *testing.T) {
 	}
 
 	// Create and register our RuncServer service
-	runcServer := server.NewServer(mockRuntime, nil, nil) // Using default runc configuration
+	runcServer := server.NewServer(mockRuntime, nil, nil, nil, nil) // Using default runc configuration
 	runmv1.RegisterRuncServiceServer(s, runcServer)
 
 	// Start the server

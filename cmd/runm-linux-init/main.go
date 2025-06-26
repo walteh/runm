@@ -15,19 +15,18 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mdlayher/vsock"
 	"gitlab.com/tozd/go/errors"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
 
+	"github.com/mdlayher/vsock"
 	slogctx "github.com/veqryn/slog-context"
 
 	"github.com/walteh/runm/core/runc/runtime"
 	goruncruntime "github.com/walteh/runm/core/runc/runtime/gorunc"
 	"github.com/walteh/runm/core/runc/server"
 	"github.com/walteh/runm/linux/constants"
-	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/pkg/logging"
 
 	"github.com/containerd/containerd/v2/pkg/oci"
@@ -115,7 +114,7 @@ func runGrpcVsockServer(ctx context.Context) error {
 	// ExecCmdForwardingStdio(ctx, "ls", "-la", "/mbin")
 
 	realRuntime := goruncruntime.WrapdGoRuncRuntime(&gorunc.Runc{
-		Command:      "/mbin/crun",
+		Command:      "/mbin/runc",
 		Log:          filepath.Join(constants.Ec1AbsPath, runtime.LogFileBase),
 		LogFormat:    gorunc.JSON,
 		PdeathSignal: unix.SIGKILL,
@@ -128,6 +127,13 @@ func runGrpcVsockServer(ctx context.Context) error {
 
 	realSocketAllocator := runtime.NewGuestVsockSocketAllocator(3, 2300)
 
+	vsockOtel, err := runtime.NewGuestAllocatedVsockSocket(ctx, 3, constants.VsockOtelPort)
+	if err != nil {
+		return errors.Errorf("failed to allocate vsock socket: %w", err)
+	}
+
+	defer vsockOtel.Close()
+
 	cgroupAdapter, err := goruncruntime.NewCgroupV2Adapter(ctx, containerId)
 	if err != nil {
 		return errors.Errorf("failed to create cgroup adapter: %w", err)
@@ -135,7 +141,16 @@ func runGrpcVsockServer(ctx context.Context) error {
 
 	var mockRuntimeExtras = &runtimemock.MockRuntimeExtras{}
 
-	grpcVsockServer := grpc.NewServer(grpc.UnaryInterceptor(grpcerr.UnaryServerInterceptor()))
+	otelInstances, err := logging.NewGRPCOtelInstances(ctx, vsockOtel, "runm-linux-init")
+	if err != nil {
+		return errors.Errorf("failed to setup OTel SDK: %w", err)
+	}
+
+	defer otelInstances.Shutdown(ctx)
+
+	grpcVsockServer := grpc.NewServer(
+		otelInstances.GetGrpcServerOpts()...,
+	)
 
 	realEventHandler := goruncruntime.NewGoRuncEventHandler()
 

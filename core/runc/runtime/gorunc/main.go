@@ -92,3 +92,7 @@ func (c *GoRuncRuntimeCreator) Create(ctx context.Context, opts *runtime.Runtime
 	})
 	return r, nil
 }
+
+func (r *GoRuncRuntime) Create(ctx context.Context, id, bundle string, options *gorunc.CreateOpts) error {
+	return r.Runc.Create(ctx, id, bundle, options)
+}

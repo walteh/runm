@@ -45,7 +45,8 @@ func newMockServer() *server.Server {
 			return 1234, nil
 		},
 	}
-	return server.NewServer(mockRuntime, mockRuntimeExtras, mockSocketAllocator)
+
+	return server.NewServer(mockRuntime, mockRuntimeExtras, mockSocketAllocator, nil, nil)
 }
 
 func newRealServer(ctx context.Context) *server.Server {
@@ -58,19 +59,22 @@ func newRealServer(ctx context.Context) *server.Server {
 
 	realRuntimeCreator := goruncruntime.GoRuncRuntimeCreator{}
 
-	realRuntime := realRuntimeCreator.Create(ctx, wrkDir, &runtime.RuntimeOptions{
+	realRuntime, err := realRuntimeCreator.Create(ctx, &runtime.RuntimeOptions{
 		// Root:          filepath.Join(wrkDir, "root"),
 		// Path:          filepath.Join(wrkDir, "path"),
 		// Namespace:     "runm",
 		// Runtime:       "runc",
 		// SystemdCgroup: true,
 	})
+	if err != nil {
+		panic(err)
+	}
 
 	realSocketAllocator := runtime.NewGuestUnixSocketAllocator(wrkDir)
 
 	var mockRuntimeExtras = &runtimemock.MockRuntimeExtras{}
 
-	return server.NewServer(realRuntime, mockRuntimeExtras, realSocketAllocator)
+	return server.NewServer(realRuntime, mockRuntimeExtras, realSocketAllocator, nil, nil)
 }
 
 var realServer *server.Server

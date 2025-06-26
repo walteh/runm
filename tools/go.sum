@@ -1415,6 +1415,8 @@ github.com/wagoodman/go-progress v0.0.0-20230925121702-07e42b3cdba0 h1:0KGbf+0SM
 github.com/wagoodman/go-progress v0.0.0-20230925121702-07e42b3cdba0/go.mod h1:jLXFoL31zFaHKAAyZUh+sxiTDFe1L1ZHrcK2T1itVKA=
 github.com/walteh/goimports-reviser/v3 v3.9.2 h1:0RHMlxN1TshcuvQrR5BDp/2hFie6st5fCCq/ppYKghE=
 github.com/walteh/goimports-reviser/v3 v3.9.2/go.mod h1:cnJLNHe3IddVORi9xNkobT/z0ghBovh6qf9Fb0937ZA=
+github.com/walteh/protoc-gen v0.0.0-20250625195119-16fd06a5435a h1:kPvTTYc6ZxKV5CpDPzqwuS3Fg8fkwdZA00cAutCfy2s=
+github.com/walteh/protoc-gen v0.0.0-20250625195119-16fd06a5435a/go.mod h1:dp9/gTtSaI90ZTaC7xe9m4pO5Zba1PXcf9QLIJsZ6Xs=
 github.com/walteh/retab/v2 v2.10.2 h1:cgz6OlTu2Pk1n54GNdSu7K4JeQnyhxpfYoTeFl/UwBA=
 github.com/walteh/retab/v2 v2.10.2/go.mod h1:F9Q2DAK4fbSRwxWnotpmWNxpmA3ZOboSGDr5XUC9WFk=
 github.com/walteh/yaml v0.0.0-20250409173318-a722555a2a54 h1:hppd8dyDSq5NnFtgXBE/LnayHstxq3/l/bLg5zVc8ko=

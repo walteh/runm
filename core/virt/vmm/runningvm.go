@@ -29,8 +29,9 @@ import (
 type RunningVM[VM VirtualMachine] struct {
 	// streamExecReady bool
 	// manager                *VSockManager
-	runtime    *grpcruntime.GRPCClientRuntime
-	bootloader virtio.Bootloader
+	runtime       *grpcruntime.GRPCClientRuntime
+	otelForwarder *grpc.Server
+	bootloader    virtio.Bootloader
 
 	// streamexec   *streamexec.Client
 	portOnHostIP uint16
@@ -213,6 +214,15 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 		return nil
 	})
 
+	errgrp.Go(func() error {
+		err = rvm.SetupOtelForwarder(ctx)
+		if err != nil {
+			slog.ErrorContext(ctx, "error setting up otel forwarder", "error", err)
+			return errors.Errorf("setting up otel forwarder: %w", err)
+		}
+		return nil
+	})
+
 	// errgrp.Go(func() error {
 	// 	err = rvm.ForwardStdio(ctx, rvm.stdin, rvm.stdout, rvm.stderr)
 	// 	if err != nil {
@@ -288,6 +298,74 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 	slog.InfoContext(ctx, "time sync", "response", response)
 
 	return nil
+}
+
+func (rvm *RunningVM[VM]) SetupOtelForwarder(ctx context.Context) error {
+	// 1️⃣ Listen on the VM’s VSOCK port
+	vsockListener, err := rvm.vm.VSockListen(ctx, uint32(constants.VsockOtelPort))
+	if err != nil {
+		slog.ErrorContext(ctx, "vsock listen failed", "err", err)
+		return errors.Errorf("listening on vsock: %w", err)
+	}
+	defer vsockListener.Close()
+
+	// 2️⃣ Prepare the UNIX socket listener
+	sockPath := filepath.Join(rvm.workingDir, "otel-forwarder.sock")
+	// Remove any old socket file
+	if err := os.RemoveAll(sockPath); err != nil {
+		slog.WarnContext(ctx, "failed to remove stale socket", "path", sockPath, "err", err)
+	}
+	unixAddr := &net.UnixAddr{Name: sockPath, Net: "unix"}
+	unixListener, err := net.ListenUnix("unix", unixAddr)
+	if err != nil {
+		slog.ErrorContext(ctx, "unix listen failed", "err", err)
+		return errors.Errorf("listening on unix socket: %w", err)
+	}
+	defer func() {
+		unixListener.Close()
+		os.Remove(sockPath)
+	}()
+
+	slog.InfoContext(ctx, "Otel forwarder started", "vsockPort", constants.VsockOtelPort, "unixSocket", sockPath)
+
+	// 3️⃣ Accept loop: for each VSOCK conn, dial the UNIX socket, then proxy both ways
+	for {
+		select {
+		case <-ctx.Done():
+			// Parent context canceled: shut down
+			slog.InfoContext(ctx, "shutting down Otel forwarder")
+			return ctx.Err()
+		default:
+		}
+
+		vConn, err := vsockListener.Accept()
+		if err != nil {
+			slog.ErrorContext(ctx, "vsock accept failed", "err", err)
+			return errors.Errorf("vsock accept: %w", err)
+		}
+
+		// Dial the local Otel forwarder via UNIX socket
+		uConn, err := net.DialUnix("unix", nil, unixAddr)
+		if err != nil {
+			slog.ErrorContext(ctx, "unix dial failed", "err", err)
+			vConn.Close()
+			continue
+		}
+
+		// Proxy both directions
+		go proxy(ctx, vConn, uConn)
+		go proxy(ctx, uConn, vConn)
+	}
+}
+
+// proxy copies from src to dst, logs errors, and closes both ends when done.
+func proxy(ctx context.Context, src net.Conn, dst net.Conn) {
+	defer src.Close()
+	defer dst.Close()
+
+	if _, err := io.Copy(dst, src); err != nil && !errors.Is(err, net.ErrClosed) {
+		slog.ErrorContext(ctx, "proxy copy error", "err", err)
+	}
 }
 
 func bootVM[VM VirtualMachine](ctx context.Context, vm VM) error {

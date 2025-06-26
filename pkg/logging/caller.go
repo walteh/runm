@@ -5,10 +5,26 @@ import (
 	"log/slog"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
 )
+
+var currentMainGoPackage string
+
+func init() {
+
+	inf, ok := debug.ReadBuildInfo()
+	if ok {
+		currentMainGoPackage = inf.Main.Path
+	}
+
+}
+
+func Domain() string {
+	return currentMainGoPackage
+}
 
 type CallerURI struct {
 	Package  string

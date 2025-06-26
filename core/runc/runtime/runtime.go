@@ -15,6 +15,7 @@ import (
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-spec/specs-go/features"
 	"github.com/walteh/runm/core/runc/process"
+	"golang.org/x/net/proxy"
 )
 
 const (
@@ -184,6 +185,7 @@ type AllocatedSocketReference interface {
 
 type AllocatedSocket interface {
 	isAllocatedSocket()
+	proxy.ContextDialer
 	io.Closer
 	Conn() FileConn
 	Ready() error

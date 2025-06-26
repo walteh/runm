@@ -25,8 +25,6 @@ type FileConn interface {
 	Close() error
 }
 
-var _ AllocatedSocket = &HostAllocatedSocket{}
-
 type HostAllocatedSocket struct {
 	conn        *net.UnixConn
 	path        string
@@ -49,6 +47,10 @@ func (h *HostAllocatedSocket) Path() string {
 
 func (h *HostAllocatedSocket) Ready() error {
 	return nil
+}
+
+func (h *HostAllocatedSocket) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	return h.conn, nil
 }
 
 func NewHostAllocatedVsockSocket(ctx context.Context, port uint32, refId string, proxier VsockProxier) (*HostAllocatedSocket, error) {
@@ -372,4 +374,20 @@ func (g *GuestVsockSocketAllocator) AllocateSocket(ctx context.Context) (Allocat
 		return nil, errors.Errorf("failed to allocate vsock socket: %w", err)
 	}
 	return sock, nil
+}
+
+func (g *GuestAllocatedVsockSocket) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	err := g.Ready()
+	if err != nil {
+		return nil, err
+	}
+	return g.conn, nil
+}
+
+func (g *GuestAllocatedUnixSocket) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	err := g.Ready()
+	if err != nil {
+		return nil, err
+	}
+	return g.conn, nil
 }

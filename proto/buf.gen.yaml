@@ -32,13 +32,13 @@ plugins:
       - prefix=TTRPC
 
   - out: .
-    local: ["go", "tool", "github.com/walteh/runm/tools/cmd/protoc-gen-go-opaque"]
+    local: ["go", "tool", "github.com/walteh/protoc-gen/protoc-gen-go-opaque"]
     opt:
       - paths=source_relative
       - enable_protovalidate=true
 
   - out: .
-    local: ["go", "tool", "github.com/walteh/runm/tools/cmd/protoc-gen-go-slog"]
+    local: ["go", "tool", "github.com/walteh/protoc-gen/protoc-gen-go-slog"]
     opt:
       - paths=source_relative
 

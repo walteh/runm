@@ -24,4 +24,5 @@ const (
 	VsockStdinPort                = 2020
 	VsockStdoutPort               = 2021
 	VsockStderrPort               = 2022
+	VsockOtelPort                 = 3098
 )

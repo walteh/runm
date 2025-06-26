@@ -1,6 +1,6 @@
 module github.com/walteh/runm/tools
 
-go 1.24.3
+go 1.24.4
 
 // conflicts with newer pkg versions like
 // - google.golang.org/grpc ./stats/opentelemetry
@@ -13,8 +13,6 @@ replace buf.build/go/protovalidate => buf.build/go/protovalidate v0.12.1-0.20250
 tool (
 	github.com/walteh/runm/tools/cmd/codesign
 	github.com/walteh/runm/tools/cmd/goshim
-	github.com/walteh/runm/tools/cmd/protoc-gen-go-opaque
-	github.com/walteh/runm/tools/cmd/protoc-gen-go-slog
 )
 
 tool (
@@ -27,6 +25,8 @@ tool (
 	github.com/kazhuravlev/options-gen/cmd/options-gen
 	github.com/oligot/go-mod-upgrade
 	github.com/vektra/mockery/v3
+	github.com/walteh/protoc-gen/protoc-gen-go-opaque
+	github.com/walteh/protoc-gen/protoc-gen-go-slog
 	github.com/walteh/retab/v2/cmd/retab
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc
 	google.golang.org/protobuf/cmd/protoc-gen-go
@@ -40,7 +40,6 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/veqryn/slog-context v0.8.0
 	gitlab.com/tozd/go/errors v0.10.0
-	google.golang.org/protobuf v1.36.6
 )
 
 require (
@@ -565,6 +564,7 @@ require (
 	github.com/wagoodman/go-partybus v0.0.0-20230516145632-8ccac152c651 // indirect
 	github.com/wagoodman/go-progress v0.0.0-20230925121702-07e42b3cdba0 // indirect
 	github.com/walteh/goimports-reviser/v3 v3.9.2 // indirect
+	github.com/walteh/protoc-gen v0.0.0-20250625195119-16fd06a5435a // indirect
 	github.com/walteh/retab/v2 v2.10.2 // indirect
 	github.com/whyrusleeping/cbor-gen v0.1.3-0.20240731173018-74d74643234c // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.9-0.20240815153524-6ea36470d1bd // indirect
@@ -630,6 +630,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250603155806-513f23925822 // indirect
 	google.golang.org/grpc v1.72.2 // indirect
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.5.1 // indirect
+	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/mail.v2 v2.3.1 // indirect

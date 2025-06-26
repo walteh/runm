@@ -1,6 +1,7 @@
 package logging
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -13,6 +14,8 @@ import (
 	"github.com/walteh/runm/pkg/logging/slogdevterm"
 	"github.com/walteh/runm/pkg/logging/sloghclog"
 	"github.com/walteh/runm/pkg/logging/sloglogrus"
+
+	"go.opentelemetry.io/contrib/bridges/otelslog"
 )
 
 //go:opts
@@ -27,11 +30,13 @@ type LoggerOpts struct {
 	interceptHclog    bool
 	values            []slog.Attr
 	globalLogWriter   io.Writer
+	otlpInstances     *OTelInstances
 
 	delayedHandlerCreatorOpts []OptLoggerOptsSetter `opts:"-"`
 }
 
 func NewDefaultDevLogger(name string, writer io.Writer, opts ...OptLoggerOptsSetter) *slog.Logger {
+
 	opts = append(opts,
 		WithDevTermHanlder(writer),
 		WithProcessName(name),
@@ -41,6 +46,27 @@ func NewDefaultDevLogger(name string, writer io.Writer, opts ...OptLoggerOptsSet
 		WithInterceptHclog(true),
 		WithMakeDefaultLogger(true),
 		WithGlobalLogWriter(writer),
+		WithHandlerOptions(&slog.HandlerOptions{
+			Level:     slog.LevelDebug,
+			AddSource: true,
+		}),
+	)
+	return NewLogger(opts...)
+}
+
+func NewDefaultDevLoggerWithOtel(ctx context.Context, name string, rawLogWriter io.Writer, instances *OTelInstances, opts ...OptLoggerOptsSetter) *slog.Logger {
+
+	opts = append(opts,
+		WithDevTermHanlder(rawLogWriter),
+		WithProcessName(name),
+		WithGlobalRedactor(),
+		WithErrorStackTracer(),
+		WithInterceptLogrus(true),
+		WithInterceptHclog(true),
+		WithMakeDefaultLogger(true),
+		WithGlobalLogWriter(rawLogWriter),
+		WithOtelInstances(instances),
+		WithOtelHandler(),
 		WithHandlerOptions(&slog.HandlerOptions{
 			Level:     slog.LevelDebug,
 			AddSource: true,
@@ -129,6 +155,9 @@ func NewLogger(opts ...OptLoggerOptsSetter) *slog.Logger {
 
 	if copts.makeDefaultLogger {
 		slog.SetDefault(l)
+		if copts.otlpInstances != nil {
+			copts.otlpInstances.EnableGlobally()
+		}
 	}
 
 	if copts.interceptLogrus {
@@ -156,6 +185,21 @@ func WithDevTermHanlder(writer io.Writer) OptLoggerOptsSetter {
 				slogdevterm.WithProfile(termenv.ANSI256),
 				slogdevterm.WithRenderOption(termenv.WithTTY(true)),
 				slogdevterm.WithLoggerName(o.processName),
+			))
+		})
+	}
+}
+
+func WithOtelHandler() OptLoggerOptsSetter {
+	return func(o *LoggerOpts) {
+		o.delayedHandlerCreatorOpts = append(o.delayedHandlerCreatorOpts, func(o *LoggerOpts) {
+			if o.otlpInstances == nil {
+				panic("otlpInstances is nil, use WithOtelInstances to set it")
+			}
+			o.handlers = append(o.handlers, otelslog.NewHandler(
+				Domain(),
+				otelslog.WithSource(true),
+				otelslog.WithLoggerProvider(o.otlpInstances.LoggerProvider),
 			))
 		})
 	}
