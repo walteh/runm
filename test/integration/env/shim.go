@@ -2,13 +2,11 @@ package env
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"slices"
@@ -35,36 +33,52 @@ func ShimReexecInit() {
 	reexec.Register(ShimSimlinkPath(), ShimMain)
 }
 
-type simpleUnixDialer struct {
-	// conn net.Conn
+type simpleOtelDialer struct {
+	port    uint32
+	network string
 }
 
-// func (d *simpleUnixDialer) DialContext(ctx context.Context, _, _ string) (net.Conn, error) {
-// 	slog.Info("dialing unix socket", "path", d.path)
-// 	c, err := net.Dial("unix", d.path)
-// 	if err != nil {
-// 		slog.Error("failed to dial unix socket", "error", err)
-// 		return nil, err
-// 	}
-// 	slog.Info("dialed unix socket", "conn", c)
-// 	return c, nil
-// }
+func (d *simpleOtelDialer) DialContext(ctx context.Context, _, _ string) (net.Conn, error) {
+	return net.Dial(d.network, fmt.Sprintf(":%d", d.port))
+}
 
-func (d *simpleUnixDialer) DialContext(ctx context.Context, _, _ string) (net.Conn, error) {
-	// dial tcp 5909: connect: connection refused
-	return net.Dial("tcp", ":4317")
+var mode = guessShimMode()
+
+func setupOtel(ctx context.Context) (*slog.Logger, func() error, error) {
+
+	shimName := fmt.Sprintf("shim-%s", mode)
+
+	logProxySock, err := net.Dial("unix", ShimLogProxySockPath())
+	if err != nil {
+		slog.Error("Failed to dial log proxy socket", "error", err, "path", ShimLogProxySockPath())
+		return nil, nil, err
+	}
+	// attempt to listen on the port 5909
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", MagicHostOtlpGRPCPort()))
+	if err == nil {
+		listener.Close()
+		l := logging.NewDefaultDevLogger(shimName, logProxySock)
+		l.Debug("logger created without otel, the host otel grpc port is free", "port", MagicHostOtlpGRPCPort())
+		return l, func() error {
+			logProxySock.Close()
+			return nil
+		}, nil
+	}
+
+	otelInstances, err := logging.NewGRPCOtelInstances(ctx, &simpleOtelDialer{port: MagicHostOtlpGRPCPort(), network: "tcp"}, shimName)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return logging.NewDefaultDevLoggerWithOtel(ctx, shimName, logProxySock, otelInstances), func() error {
+		logProxySock.Close()
+		return otelInstances.Shutdown(ctx)
+	}, nil
 }
 
 func ShimMain() {
 
 	ctx := context.Background()
-
-	logProxySock, err := net.Dial("unix", ShimLogProxySockPath())
-	if err != nil {
-		slog.Error("Failed to dial log proxy socket", "error", err, "path", ShimLogProxySockPath())
-		return
-	}
-	defer logProxySock.Close()
 
 	// slog.Info("dialed log proxy socket", "conn", logProxySock)
 
@@ -77,19 +91,12 @@ func ShimMain() {
 
 	// slog.Info("dialed otel proxy socket", "conn", otelProxySock)
 
-	mode := guessShimMode()
-
-	otelInstances, err := logging.NewGRPCOtelInstances(ctx, &simpleUnixDialer{}, fmt.Sprintf("shim-%s", mode))
+	logger, sd, err := setupOtel(ctx)
 	if err != nil {
-		slog.Error("Failed to create otel instances", "error", err)
-		return
+		slog.Error("Failed to setup otel", "error", err)
+		os.Exit(1)
 	}
-
-	defer otelInstances.Shutdown(ctx)
-
-	logger := logging.NewDefaultDevLoggerWithOtel(ctx, fmt.Sprintf("shim-%s", mode), logProxySock, otelInstances)
-
-	slog.Info("created otel instances", "otelInstances", otelInstances)
+	defer sd()
 
 	ctx = slogctx.NewCtx(ctx, logger)
 
@@ -195,13 +202,7 @@ func RunShim(ctx context.Context) error {
 	taskplugin.Reregister()
 	vfruntimeplugin.Reregister()
 
-	// get abs path of current go file (not working directory)
-	_, filename, _, ok := runtime.Caller(1)
-	if !ok {
-		return errors.New("failed to get caller")
-	}
-
-	os.Setenv("LINUX_RUNTIME_BUILD_DIR", filepath.Join(filepath.Dir(filename), "..", "..", "..", "gen", "build", "linux_vf_offline_arm64"))
+	os.Setenv("LINUX_RUNTIME_BUILD_DIR", LinuxRuntimeBuildDir())
 
 	shim.Run(ctx, manager.NewDebugManager(manager.NewShimManager("io.containerd.runc.v2")), func(c *shim.Config) {
 		c.NoReaper = true

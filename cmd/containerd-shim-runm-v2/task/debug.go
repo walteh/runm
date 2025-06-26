@@ -9,7 +9,9 @@ import (
 	"time"
 
 	taskv3 "github.com/containerd/containerd/api/runtime/task/v3"
+	"github.com/containerd/otelttrpc"
 	"github.com/containerd/ttrpc"
+	"github.com/walteh/runm/pkg/logging"
 	"gitlab.com/tozd/go/errors"
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -21,6 +23,7 @@ import (
 var _ taskv3.TTRPCTaskService = &errTaskService{}
 var _ cruntime.TaskServiceClient = &errTaskService{}
 
+var _ shim.TTRPCServerUnaryOptioner = &errTaskService{}
 var _ shim.TTRPCService = &errTaskService{}
 
 type errTaskService struct {
@@ -34,6 +37,18 @@ func (e *errTaskService) RegisterTTRPC(s *ttrpc.Server) error {
 	s.SetDebugging(true)
 	taskv3.RegisterTTRPCTaskService(s, e)
 	return nil
+}
+
+func (e *errTaskService) UnaryServerInterceptor() ttrpc.UnaryServerInterceptor {
+	otelInstances := logging.GetGlobalOtelInstances()
+	if otelInstances == nil {
+		return otelttrpc.UnaryServerInterceptor()
+	}
+	return otelttrpc.UnaryServerInterceptor(
+		otelttrpc.WithTracerProvider(otelInstances.TracerProvider),
+		otelttrpc.WithPropagators(otelInstances.Propagator),
+		otelttrpc.WithMeterProvider(otelInstances.MeterProvider),
+	)
 }
 
 func NewDebugTaskService(s cruntime.TaskServiceClient, enableLogErrors, enableLogSuccess bool) cruntime.TaskServiceClient {

@@ -17,6 +17,16 @@ import (
 	"github.com/walteh/runm/pkg/logging/sloglogrus"
 )
 
+var globalOtelInstances *OTelInstances
+
+func SetGlobalOtelInstances(instances *OTelInstances) {
+	globalOtelInstances = instances
+}
+
+func GetGlobalOtelInstances() *OTelInstances {
+	return globalOtelInstances
+}
+
 //go:opts
 type LoggerOpts struct {
 	handlerOptions    *slog.HandlerOptions
@@ -156,6 +166,7 @@ func NewLogger(opts ...OptLoggerOptsSetter) *slog.Logger {
 		slog.SetDefault(l)
 		if copts.otlpInstances != nil {
 			copts.otlpInstances.EnableGlobally()
+			SetGlobalOtelInstances(copts.otlpInstances)
 		}
 	}
 

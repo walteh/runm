@@ -41,6 +41,7 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	"gitlab.com/tozd/go/errors"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 
 	eventstypes "github.com/containerd/containerd/api/events"
@@ -147,7 +148,7 @@ type service struct {
 }
 
 func (s *service) serveGrpc(ctx context.Context, cid string) (func() error, func() error, error) {
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(grpc.StatsHandler(otelgrpc.NewServerHandler()))
 	runmv1.RegisterShimServiceServer(grpcServer, s)
 
 	runmSocketAddress := filepath.Join("tmp", "runm", cid[:16], "runm-shim.sock")

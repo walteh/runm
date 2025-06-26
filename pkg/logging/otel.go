@@ -48,28 +48,43 @@ func (i *OTelInstances) EnableGlobally() {
 	otel.SetErrorHandler(i.ErrorHandler)
 }
 
-func (i *OTelInstances) GetGrpcServerOpts() []grpc.ServerOption {
+func (i *OTelInstances) GetGrpcServerOpts() grpc.ServerOption {
 	handler := otelgrpc.NewServerHandler(
 		otelgrpc.WithTracerProvider(i.TracerProvider),
 		otelgrpc.WithMeterProvider(i.MeterProvider),
 		otelgrpc.WithPropagators(i.Propagator),
 	)
-	return []grpc.ServerOption{
-		grpc.StatsHandler(handler),
-	}
+	return grpc.StatsHandler(handler)
+}
+
+func (i *OTelInstances) GetGrpcClientOpts() grpc.DialOption {
+	return grpc.WithStatsHandler(otelgrpc.NewClientHandler(
+		otelgrpc.WithTracerProvider(i.TracerProvider),
+		otelgrpc.WithMeterProvider(i.MeterProvider),
+		otelgrpc.WithPropagators(i.Propagator),
+	))
 }
 
 func (i *OTelInstances) Shutdown(ctx context.Context) error {
 	var err error
 	for _, fn := range []func(context.Context) error{
 		func(ctx context.Context) error {
-			return i.TracerProvider.Shutdown(ctx)
+			if i.TracerProvider != nil {
+				return i.TracerProvider.Shutdown(ctx)
+			}
+			return nil
 		},
 		func(ctx context.Context) error {
-			return i.MeterProvider.Shutdown(ctx)
+			if i.MeterProvider != nil {
+				return i.MeterProvider.Shutdown(ctx)
+			}
+			return nil
 		},
 		func(ctx context.Context) error {
-			return i.LoggerProvider.Shutdown(ctx)
+			if i.LoggerProvider != nil {
+				return i.LoggerProvider.Shutdown(ctx)
+			}
+			return nil
 		},
 	} {
 		err = errors.Join(err, fn(ctx))
@@ -118,12 +133,23 @@ func NewGRPCOtelInstances(ctx context.Context, grpcDialer proxy.ContextDialer, s
 		return nil, errors.Errorf("initializing resource: %w", err)
 	}
 
+	var filterFunc func(sdktrace.SpanExporter) sdktrace.SpanExporter
+	if serviceName == "containerd" {
+		filterFunc = func(exporter sdktrace.SpanExporter) sdktrace.SpanExporter {
+			return &containerdTaskFilteringExporter{next: exporter}
+		}
+	} else {
+		filterFunc = func(exporter sdktrace.SpanExporter) sdktrace.SpanExporter {
+			return exporter
+		}
+	}
+
 	// Set up propagator.
 	instances.Propagator = newPropagator()
 	// otel.SetTextMapPropagator(prop)
 
 	// Set up trace provider.
-	instances.TracerProvider, err = initTracerProvider(ctx, instances.Resource, instances.Conn)
+	instances.TracerProvider, err = initTracerProvider(ctx, instances.Resource, instances.Conn, filterFunc)
 	if err != nil {
 		return nil, errors.Errorf("initializing tracer provider: %w", err)
 	}
@@ -175,7 +201,7 @@ func initConn(ctx context.Context, dialer proxy.ContextDialer) (*grpc.ClientConn
 }
 
 // Initializes an OTLP exporter, and configures the corresponding trace provider.
-func initTracerProvider(ctx context.Context, res *resource.Resource, conn *grpc.ClientConn) (*sdktrace.TracerProvider, error) {
+func initTracerProvider(ctx context.Context, res *resource.Resource, conn *grpc.ClientConn, filterFunc func(sdktrace.SpanExporter) sdktrace.SpanExporter) (*sdktrace.TracerProvider, error) {
 	// Set up a trace exporter
 	traceExporter, err := otlptracegrpc.New(ctx, otlptracegrpc.WithGRPCConn(conn))
 	if err != nil {
@@ -184,12 +210,14 @@ func initTracerProvider(ctx context.Context, res *resource.Resource, conn *grpc.
 
 	// Register the trace exporter with a TracerProvider, using a batch
 	// span processor to aggregate spans before export.
-	bsp := sdktrace.NewBatchSpanProcessor(traceExporter)
+	bsp := sdktrace.NewBatchSpanProcessor(filterFunc(traceExporter))
+
 	tracerProvider := sdktrace.NewTracerProvider(
 		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 		sdktrace.WithResource(res),
 		sdktrace.WithSpanProcessor(bsp),
 	)
+
 	// otel.SetTracerProvider(tracerProvider)
 
 	// Set global propagator to tracecontext (the default is no-op).
@@ -226,4 +254,27 @@ func newLoggerProvider(ctx context.Context, res *resource.Resource, conn *grpc.C
 		log.WithResource(res),
 	)
 	return loggerProvider, nil
+}
+
+// filteringExporter wraps a SpanExporter and drops non-ttrpc spans.
+type containerdTaskFilteringExporter struct {
+	next sdktrace.SpanExporter
+}
+
+func (fe *containerdTaskFilteringExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpan) error {
+	var filtered []sdktrace.ReadOnlySpan
+	for _, span := range spans {
+		// Only export spans from the ttrpc instrumentation library:
+		if strings.HasPrefix(span.Name(), "containerd.task.v3.Task") {
+			filtered = append(filtered, span)
+		}
+	}
+	if len(filtered) == 0 {
+		return nil
+	}
+	return fe.next.ExportSpans(ctx, filtered)
+}
+
+func (fe *containerdTaskFilteringExporter) Shutdown(ctx context.Context) error {
+	return fe.next.Shutdown(ctx)
 }

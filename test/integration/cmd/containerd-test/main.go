@@ -1,6 +1,8 @@
 package main
 
 import (
+	"net"
+
 	_ "github.com/containerd/containerd/v2/cmd/containerd/builtins"
 
 	"context"
@@ -27,6 +29,15 @@ func init() {
 
 var ctrCommands = FlagArray[string]{}
 
+type simpleDialer struct {
+	network string
+	address string
+}
+
+func (d simpleDialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	return net.Dial(d.network, d.address)
+}
+
 func main() {
 
 	env.ShimReexecInit()
@@ -45,6 +56,21 @@ func main() {
 	flag.Parse()
 
 	var ctx context.Context
+
+	// // dial otel grpc
+	// conn, err := net.Dial("tcp", "localhost:4317")
+	// if err != nil {
+	// 	slog.ErrorContext(ctx, "Failed to dial otel grpc", "error", err)
+	// 	os.Exit(1)
+	// }
+	// defer conn.Close()
+
+	// otelInstances, err := logging.NewGRPCOtelInstances(ctx, simpleDialer{network: "tcp", address: "localhost:4317"}, "containerd")
+	// if err != nil {
+	// 	slog.ErrorContext(ctx, "Failed to create otel instances", "error", err)
+	// 	os.Exit(1)
+	// }
+	// otelInstances.EnableGlobally()
 
 	if json {
 		logger := logging.NewDefaultJSONLogger("containerd", os.Stdout)

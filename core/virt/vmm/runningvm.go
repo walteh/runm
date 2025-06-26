@@ -32,9 +32,9 @@ import (
 type RunningVM[VM VirtualMachine] struct {
 	// streamExecReady bool
 	// manager                *VSockManager
-	runtime       *grpcruntime.GRPCClientRuntime
-	otelForwarder *grpc.Server
-	bootloader    virtio.Bootloader
+	runtime      *grpcruntime.GRPCClientRuntime
+	hostOtlpPort uint32
+	bootloader   virtio.Bootloader
 
 	// streamexec   *streamexec.Client
 	portOnHostIP uint16
@@ -42,9 +42,9 @@ type RunningVM[VM VirtualMachine] struct {
 	vm           VM
 	netdev       gvnet.Proxy
 	workingDir   string
-	stdin        io.Reader
-	stdout       io.Writer
-	stderr       io.Writer
+	// stdin        io.Reader
+	// stdout       io.Writer
+	// stderr       io.Writer
 	// connStatus      <-chan VSockManagerState
 	start time.Time
 }
@@ -71,14 +71,19 @@ func (r *RunningVM[VM]) GuestService(ctx context.Context) (*grpcruntime.GRPCClie
 				lastError = err
 				continue
 			}
-			grpcConn, err := grpc.NewClient("passthrough:target",
+			opts := []grpc.DialOption{
 				grpc.WithTransportCredentials(insecure.NewCredentials()),
 				grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
 					slog.InfoContext(ctx, "dialing vsock", "port", constants.RunmVsockPort, "ignored_addr", addr)
 					return conn, nil
 				}),
 				grpc.WithUnaryInterceptor(grpcerr.UnaryClientInterceptor()),
-			)
+				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024 * 1024 * 10)),
+			}
+			if logging.GetGlobalOtelInstances() != nil {
+				opts = append(opts, logging.GetGlobalOtelInstances().GetGrpcClientOpts())
+			}
+			grpcConn, err := grpc.NewClient("passthrough:target", opts...)
 			if err != nil {
 				lastError = err
 				continue
@@ -217,14 +222,16 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 		return nil
 	})
 
-	errgrp.Go(func() error {
-		err = rvm.SetupOtelForwarder(ctx)
-		if err != nil {
-			slog.ErrorContext(ctx, "error setting up otel forwarder", "error", err)
-			return errors.Errorf("setting up otel forwarder: %w", err)
-		}
-		return nil
-	})
+	if rvm.hostOtlpPort != 0 {
+		errgrp.Go(func() error {
+			err = rvm.SetupOtelForwarder(ctx)
+			if err != nil {
+				slog.ErrorContext(ctx, "error setting up otel forwarder", "error", err)
+				return errors.Errorf("setting up otel forwarder: %w", err)
+			}
+			return nil
+		})
+	}
 
 	// errgrp.Go(func() error {
 	// 	err = rvm.ForwardStdio(ctx, rvm.stdin, rvm.stdout, rvm.stderr)
@@ -315,7 +322,7 @@ func (rvm *RunningVM[VM]) SetupOtelForwarder(ctx context.Context) error {
 	slog.InfoContext(ctx, "vsock listener started", "port", constants.VsockOtelPort)
 
 	// dial tcp localhost:5909
-	conn, err := net.Dial("tcp", ":4317")
+	conn, err := net.Dial("tcp", fmt.Sprintf(":%d", rvm.hostOtlpPort))
 	if err != nil {
 		slog.ErrorContext(ctx, "unix dial failed", "err", err)
 		return errors.Errorf("dialing unix socket: %w", err)

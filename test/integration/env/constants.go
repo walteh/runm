@@ -2,6 +2,7 @@ package env
 
 import (
 	"path/filepath"
+	"runtime"
 	"time"
 )
 
@@ -37,3 +38,18 @@ func ContainerdContentDir() string     { return filepath.Join(PersistentWorkDir(
 func ContainerdSnapshotsDir() string   { return filepath.Join(PersistentWorkDir(), "snapshots") }
 func PullPolicy() string               { return pullPolicy }
 func Snapshotter() string              { return snapshotter }
+
+func MagicHostOtlpGRPCPort() uint32 {
+	return 5909
+}
+
+func LinuxRuntimeBuildDir() string {
+	// get abs path of current go file (not working directory)
+	_, filename, _, ok := runtime.Caller(1)
+	if !ok {
+		panic("failed to get caller")
+	}
+
+	return filepath.Join(filepath.Dir(filename), "..", "..", "..", "gen", "build", "linux_vf_offline_arm64")
+
+}

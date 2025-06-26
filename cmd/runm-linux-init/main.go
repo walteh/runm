@@ -41,16 +41,20 @@ var (
 	containerId  string
 	runmMode     string
 	bundleSource string
+	enableOtel   bool
+)
+
+const (
+	serviceName = "runm-linux-init"
 )
 
 func init() {
 	flag.StringVar(&containerId, "container-id", "", "the container id")
 	flag.StringVar(&runmMode, "runm-mode", "", "the runm mode")
 	flag.StringVar(&bundleSource, "bundle-source", "", "the bundle source")
+	flag.BoolVar(&enableOtel, "enable-otel", false, "enable otel")
 	flag.Parse()
 }
-
-var otelInstances *logging.OTelInstances
 
 type simpleVsockDialer struct {
 	port uint32
@@ -68,15 +72,17 @@ func (d *simpleVsockDialer) DialContext(ctx context.Context, _, _ string) (net.C
 }
 
 func setupLogger(ctx context.Context) (context.Context, error) {
+	var logger *slog.Logger
+	if enableOtel {
+		otelInstancez, err := logging.NewGRPCOtelInstances(ctx, &simpleVsockDialer{port: uint32(constants.VsockOtelPort)}, serviceName)
+		if err != nil {
+			return nil, errors.Errorf("failed to setup OTel SDK: %w", err)
+		}
 
-	otelInstancez, err := logging.NewGRPCOtelInstances(ctx, &simpleVsockDialer{port: uint32(constants.VsockOtelPort)}, "runm-linux-init")
-	if err != nil {
-		return nil, errors.Errorf("failed to setup OTel SDK: %w", err)
+		logger = logging.NewDefaultDevLoggerWithOtel(ctx, serviceName, os.Stdout, otelInstancez)
+	} else {
+		logger = logging.NewDefaultDevLogger(serviceName, os.Stdout)
 	}
-
-	otelInstances = otelInstancez
-
-	logger := logging.NewDefaultDevLoggerWithOtel(ctx, "runm-linux-init", os.Stdout, otelInstances)
 
 	return slogctx.NewCtx(ctx, logger), nil
 }
@@ -156,11 +162,15 @@ func runGrpcVsockServer(ctx context.Context) error {
 		grpc.ChainUnaryInterceptor(grpcerr.UnaryServerInterceptor()),
 	}
 
-	if otelInstances != nil {
-		serveropts = append(serveropts, otelInstances.GetGrpcServerOpts()...)
-		defer otelInstances.Shutdown(ctx)
-	}
+	if enableOtel {
+		if logging.GetGlobalOtelInstances() != nil {
+			serveropts = append(serveropts, logging.GetGlobalOtelInstances().GetGrpcServerOpts())
+			defer logging.GetGlobalOtelInstances().Shutdown(ctx)
+		} else {
+			slog.WarnContext(ctx, "no otel instances found, not enabling otel")
+		}
 
+	}
 	grpcVsockServer := grpc.NewServer(serveropts...)
 
 	cgroupAdapter, err := goruncruntime.NewCgroupV2Adapter(ctx, containerId)

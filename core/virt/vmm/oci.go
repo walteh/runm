@@ -40,6 +40,7 @@ type OCIVMConfig struct {
 	StartingMemory strongunits.B
 	VCPUs          uint64
 	Platform       units.Platform
+	HostOtlpPort   uint32
 }
 
 func appendContext(ctx context.Context, id string) context.Context {
@@ -144,6 +145,12 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 
 	var bootloader virtio.Bootloader
 
+	var otelString string = ""
+
+	if ctrconfig.HostOtlpPort != 0 {
+		otelString = "-enable-otlp"
+	}
+
 	switch ctrconfig.Platform {
 	case units.PlatformLinuxARM64:
 		cfgs := []string{
@@ -156,6 +163,7 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 			"-bundle-source=" + ctrconfig.Bundle,
 			"-runm-mode=oci",
 			"-container-id=" + ctrconfig.ID,
+			otelString,
 		}
 
 		bootloader = &virtio.LinuxBootloader{
@@ -211,6 +219,7 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 
 	runner := &RunningVM[VM]{
 		bootloader:   bootloader,
+		hostOtlpPort: ctrconfig.HostOtlpPort,
 		start:        startTime,
 		vm:           vm,
 		portOnHostIP: hostIPPort,
