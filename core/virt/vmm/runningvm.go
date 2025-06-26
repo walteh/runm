@@ -315,7 +315,7 @@ func (rvm *RunningVM[VM]) SetupOtelForwarder(ctx context.Context) error {
 	slog.InfoContext(ctx, "vsock listener started", "port", constants.VsockOtelPort)
 
 	// dial tcp localhost:5909
-	conn, err := net.Dial("tcp", "localhost:5909")
+	conn, err := net.Dial("tcp", ":4317")
 	if err != nil {
 		slog.ErrorContext(ctx, "unix dial failed", "err", err)
 		return errors.Errorf("dialing unix socket: %w", err)

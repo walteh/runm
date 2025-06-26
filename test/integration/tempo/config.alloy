@@ -17,30 +17,28 @@ otelcol.processor.batch "primary" {
     logs    = [otelcol.exporter.loki.grafana_cloud_logs.input]
     traces  = [
 		otelcol.exporter.otlp.grafana_cloud_traces.input,
-		 otelcol.connector.servicegraph.default.input,
+		otelcol.connector.servicegraph.default.input,
 	]
   }
 }
 
 otelcol.exporter.otlp "grafana_cloud_traces" {
   client {
-    endpoint = "http://tempo:4317"
-     tls {
-			insecure = true
-		}
+    endpoint = "tempo:4317"
+    tls {
+      insecure = true
+    }
   }
 }
 
-
-
 otelcol.exporter.prometheus "grafana_cloud_metrics" {
-        forward_to = [prometheus.remote_write.grafana_cloud_metrics.receiver]
-    }
+  forward_to = [prometheus.remote_write.grafana_cloud_metrics.receiver]
+}
 
 prometheus.remote_write "grafana_cloud_metrics" {
-    endpoint {
-        url = "http://prometheus:9090/api/v1/write"
-    }
+  endpoint {
+    url = "http://prometheus:9090/api/v1/write"
+  }
 }
 
 otelcol.exporter.loki "grafana_cloud_logs" {

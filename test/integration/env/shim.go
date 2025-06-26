@@ -35,20 +35,61 @@ func ShimReexecInit() {
 	reexec.Register(ShimSimlinkPath(), ShimMain)
 }
 
+type simpleUnixDialer struct {
+	// conn net.Conn
+}
+
+// func (d *simpleUnixDialer) DialContext(ctx context.Context, _, _ string) (net.Conn, error) {
+// 	slog.Info("dialing unix socket", "path", d.path)
+// 	c, err := net.Dial("unix", d.path)
+// 	if err != nil {
+// 		slog.Error("failed to dial unix socket", "error", err)
+// 		return nil, err
+// 	}
+// 	slog.Info("dialed unix socket", "conn", c)
+// 	return c, nil
+// }
+
+func (d *simpleUnixDialer) DialContext(ctx context.Context, _, _ string) (net.Conn, error) {
+	// dial tcp 5909: connect: connection refused
+	return net.Dial("tcp", ":4317")
+}
+
 func ShimMain() {
 
 	ctx := context.Background()
 
-	proxySock, err := net.Dial("unix", ShimLogProxySockPath())
+	logProxySock, err := net.Dial("unix", ShimLogProxySockPath())
 	if err != nil {
 		slog.Error("Failed to dial log proxy socket", "error", err, "path", ShimLogProxySockPath())
 		return
 	}
-	defer proxySock.Close()
+	defer logProxySock.Close()
+
+	// slog.Info("dialed log proxy socket", "conn", logProxySock)
+
+	// otelProxySock, err := net.Dial("unix", ShimOtelProxySockPath())
+	// if err != nil {
+	// 	slog.Error("Failed to dial otel proxy socket", "error", err, "path", ShimOtelProxySockPath())
+	// 	return
+	// }
+	// defer otelProxySock.Close()
+
+	// slog.Info("dialed otel proxy socket", "conn", otelProxySock)
 
 	mode := guessShimMode()
 
-	logger := logging.NewDefaultDevLogger(fmt.Sprintf("shim-%s", mode), proxySock)
+	otelInstances, err := logging.NewGRPCOtelInstances(ctx, &simpleUnixDialer{}, fmt.Sprintf("shim-%s", mode))
+	if err != nil {
+		slog.Error("Failed to create otel instances", "error", err)
+		return
+	}
+
+	defer otelInstances.Shutdown(ctx)
+
+	logger := logging.NewDefaultDevLoggerWithOtel(ctx, fmt.Sprintf("shim-%s", mode), logProxySock, otelInstances)
+
+	slog.Info("created otel instances", "otelInstances", otelInstances)
 
 	ctx = slogctx.NewCtx(ctx, logger)
 

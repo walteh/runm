@@ -3,8 +3,10 @@ distributor:
     receivers:
         otlp:
             protocols:
-                grpc: # gRPC ingestion on port 4317
-                http: # HTTP ingestion on port 4318
+                grpc:
+                    endpoint: "0.0.0.0:4317" # gRPC ingestion on port 4317
+                http:
+                    endpoint: "0.0.0.0:4318" # HTTP ingestion on port 4318
 
 # (Optional) Expose the Tempo query API on port 3200
 server:
@@ -25,6 +27,9 @@ metrics_generator:
     processor:
         span_metrics: {} # Enable span-metrics processor
         service_graphs: {} # Enable service-graphs processor
+        local_blocks:
+            flush_to_storage: true
+            filter_server_spans: false # Run TraceQL metrics queries against all spans
     registry:
         external_labels:
             source: tempo
@@ -42,3 +47,10 @@ overrides:
             processors:
               - span-metrics # Activate span-metrics for the default tenant
               - service-graphs # Activate service-graphs for the default tenant
+              - local-blocks # Enable local-blocks processor for TraceQL metrics
+
+# Configure TraceQL metrics query options
+query_frontend:
+    metrics:
+        concurrent_jobs: 8
+        target_bytes_per_job: 1.25e+09 # ~1.25GB

@@ -27,6 +27,7 @@ func ShimSimlinkPath() string          { return filepath.Join(WorkDir(), "reexec
 func ShimRuncSimlinkPath() string      { return filepath.Join(WorkDir(), "reexec", "runc") }
 func CtrSimlinkPath() string           { return filepath.Join(WorkDir(), "reexec", "ctr") }
 func ShimLogProxySockPath() string     { return filepath.Join(WorkDir(), "reexec-log-proxy.sock") }
+func ShimOtelProxySockPath() string    { return filepath.Join(WorkDir(), "reexec-otel-proxy.sock") }
 func ShimRuntimeID() string            { return shimRuntimeID }
 func ShimName() string                 { return shimName }
 func Timeout() time.Duration           { return timeout }

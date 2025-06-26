@@ -35,37 +35,19 @@ func SetupReexec(ctx context.Context, justSymlinks bool) error {
 		os.Exit(1)
 	}
 
-	// // drop the permissions on the proxy socket
-	// if err := os.Chown(CtrSimlinkPath(), 1000, 1000); err != nil {
-	// 	slog.Error("Failed to drop permissions on log proxy socket", "error", err, "path", ShimLogProxySockPath())
-	// 	os.Exit(1)
-	// }
-
-	// if err := os.Chown(ShimSimlinkPath(), 1000, 1000); err != nil {
-	// 	slog.Error("Failed to drop permissions on log proxy socket", "error", err, "path", ShimLogProxySockPath())
-	// 	os.Exit(1)
-	// }
-
-	// // drop the privileges on the proxy socket
-
-	// // drop the privileges on myself now
-	// if err := os.Chown(self, 1000, 1000); err != nil {
-	// 	slog.Error("Failed to drop permissions on myself", "error", err, "path", self)
-	// 	os.Exit(1)
-	// }
-
 	if justSymlinks {
 		return nil
+	}
+
+	otelProxySock, err := net.Listen("unix", ShimOtelProxySockPath())
+	if err != nil {
+		slog.Error("Failed to create otel proxy socket", "error", err, "path", ShimOtelProxySockPath())
+		os.Exit(1)
 	}
 
 	proxySock, err := net.Listen("unix", ShimLogProxySockPath())
 	if err != nil {
 		slog.Error("Failed to create log proxy socket", "error", err, "path", ShimLogProxySockPath())
-		os.Exit(1)
-	}
-
-	if err := os.Chown(ShimLogProxySockPath(), 1000, 1000); err != nil {
-		slog.Error("Failed to drop privileges on log proxy socket", "error", err, "path", ShimLogProxySockPath())
 		os.Exit(1)
 	}
 
@@ -79,6 +61,34 @@ func SetupReexec(ctx context.Context, justSymlinks bool) error {
 				return
 			}
 			go func() { _, _ = io.Copy(os.Stdout, conn) }()
+		}
+	}()
+
+	tcpconn, err := net.Dial("tcp", ":4317")
+	if err != nil {
+		slog.Error("failed to dial otel proxy FAILED", "error", err)
+	} else {
+		slog.Info("dialed otel proxy SUCCESS", "conn", tcpconn)
+	}
+
+	go func() {
+		defer otelProxySock.Close()
+		defer tcpconn.Close()
+		for {
+			conn, err := otelProxySock.Accept()
+			if err != nil {
+				slog.Error("Failed to accept otel proxy connection", "error", err)
+				return
+			}
+			slog.Info("accepted otel proxy connection", "conn", conn)
+			if tcpconn != nil {
+				go func() {
+					_, _ = io.Copy(tcpconn, conn)
+					_, _ = io.Copy(conn, tcpconn)
+				}()
+			} else {
+				slog.Error("no otel proxy connection", "conn", conn)
+			}
 		}
 	}()
 
