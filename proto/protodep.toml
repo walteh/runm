@@ -1,0 +1,13 @@
+proto_outdir = "./deps"
+
+
+[[dependencies]]
+	target = "github.com/containerd/containerd/api/runtime/task/v3"
+	path   = "containerd/api/runtime/task/v3"
+	branch = "main"
+
+[[dependencies]]
+	target   = "github.com/containerd/containerd/api/types"
+	path     = "containerd/api/types"
+	branch   = "main"
+	includes = ["**/api/types/mount.proto", "**/api/types/task/task.proto"]

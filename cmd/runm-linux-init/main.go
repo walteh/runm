@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -29,6 +30,7 @@ import (
 	"github.com/walteh/runm/core/runc/runtime"
 	"github.com/walteh/runm/core/runc/server"
 	"github.com/walteh/runm/linux/constants"
+	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/pkg/logging"
 
 	goruncruntime "github.com/walteh/runm/core/runc/runtime/gorunc"
@@ -48,6 +50,37 @@ func init() {
 	flag.Parse()
 }
 
+var otelInstances *logging.OTelInstances
+
+type simpleVsockDialer struct {
+	port uint32
+}
+
+func (d *simpleVsockDialer) DialContext(ctx context.Context, _, _ string) (net.Conn, error) {
+	slog.InfoContext(ctx, "dialing vsock for otel", "port", d.port)
+	c, err := vsock.Dial(2, d.port, nil)
+	if err != nil {
+		slog.ErrorContext(ctx, "problem dialing vsock for otel", "error", err)
+		return nil, errors.Errorf("dialing vsock: %w", err)
+	}
+	slog.InfoContext(ctx, "dialed vsock for otel", "conn", c)
+	return c, nil
+}
+
+func setupLogger(ctx context.Context) (context.Context, error) {
+
+	otelInstancez, err := logging.NewGRPCOtelInstances(ctx, &simpleVsockDialer{port: uint32(constants.VsockOtelPort)}, "runm-linux-init")
+	if err != nil {
+		return nil, errors.Errorf("failed to setup OTel SDK: %w", err)
+	}
+
+	otelInstances = otelInstancez
+
+	logger := logging.NewDefaultDevLoggerWithOtel(ctx, "runm-linux-init", os.Stdout, otelInstances)
+
+	return slogctx.NewCtx(ctx, logger), nil
+}
+
 func main() {
 
 	pid := os.Getpid()
@@ -55,13 +88,15 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	logger := logging.NewDefaultDevLogger("runm-linux-init", os.Stdout)
-
-	ctx = slogctx.NewCtx(ctx, logger)
+	ctx, err := setupLogger(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to setup logger", "error", err)
+		os.Exit(1)
+	}
 
 	ctx = slogctx.Append(ctx, slog.Int("pid", pid))
 
-	err := recoveryMain(ctx)
+	err = recoveryMain(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "error in main", "error", err)
 		os.Exit(1)
@@ -105,34 +140,28 @@ func runGrpcVsockServer(ctx context.Context) error {
 		return errors.Errorf("container-id flag is required")
 	}
 
-	// wrkDir := constants.Ec1AbsPath
-
-	// ls -la /mbin/runc
-
-	// fmt.Println("YOOOOO ls -la /mbin")
-
-	// ExecCmdForwardingStdio(ctx, "ls", "-la", "/mbin")
-
 	realRuntime := goruncruntime.WrapdGoRuncRuntime(&gorunc.Runc{
-		Command:      "/mbin/runc",
-		Log:          filepath.Join(constants.Ec1AbsPath, runtime.LogFileBase),
-		LogFormat:    gorunc.JSON,
-		PdeathSignal: unix.SIGKILL,
-		Debug:        true,
-
-		// Root:          filepath.Join(opts.ProcessCreateConfig.Options.Root, opts.Namespace),
+		Command:       "/mbin/runc",
+		Log:           filepath.Join(constants.Ec1AbsPath, runtime.LogFileBase),
+		LogFormat:     gorunc.JSON,
+		PdeathSignal:  unix.SIGKILL,
+		Debug:         true,
 		Root:          constants.NewRootAbsPath,
 		SystemdCgroup: false,
 	})
 
 	realSocketAllocator := runtime.NewGuestVsockSocketAllocator(3, 2300)
 
-	vsockOtel, err := runtime.NewGuestAllocatedVsockSocket(ctx, 3, constants.VsockOtelPort)
-	if err != nil {
-		return errors.Errorf("failed to allocate vsock socket: %w", err)
+	serveropts := []grpc.ServerOption{
+		grpc.ChainUnaryInterceptor(grpcerr.UnaryServerInterceptor()),
 	}
 
-	defer vsockOtel.Close()
+	if otelInstances != nil {
+		serveropts = append(serveropts, otelInstances.GetGrpcServerOpts()...)
+		defer otelInstances.Shutdown(ctx)
+	}
+
+	grpcVsockServer := grpc.NewServer(serveropts...)
 
 	cgroupAdapter, err := goruncruntime.NewCgroupV2Adapter(ctx, containerId)
 	if err != nil {
@@ -140,17 +169,6 @@ func runGrpcVsockServer(ctx context.Context) error {
 	}
 
 	var mockRuntimeExtras = &runtimemock.MockRuntimeExtras{}
-
-	otelInstances, err := logging.NewGRPCOtelInstances(ctx, vsockOtel, "runm-linux-init")
-	if err != nil {
-		return errors.Errorf("failed to setup OTel SDK: %w", err)
-	}
-
-	defer otelInstances.Shutdown(ctx)
-
-	grpcVsockServer := grpc.NewServer(
-		otelInstances.GetGrpcServerOpts()...,
-	)
 
 	realEventHandler := goruncruntime.NewGoRuncEventHandler()
 

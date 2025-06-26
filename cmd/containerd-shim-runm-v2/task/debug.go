@@ -8,24 +8,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/containerd/api/runtime/task/v3"
-	"github.com/containerd/containerd/v2/pkg/shim"
+	taskv3 "github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/ttrpc"
 	"gitlab.com/tozd/go/errors"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	cruntime "github.com/containerd/containerd/v2/core/runtime/v2"
+	"github.com/containerd/containerd/v2/pkg/shim"
 	slogctx "github.com/veqryn/slog-context"
 )
 
-type taskService interface {
-	task.TTRPCTaskService
-	cruntime.TaskServiceClient
-	shim.TTRPCService
-}
-
-var _ task.TTRPCTaskService = &errTaskService{}
+var _ taskv3.TTRPCTaskService = &errTaskService{}
 var _ cruntime.TaskServiceClient = &errTaskService{}
+
 var _ shim.TTRPCService = &errTaskService{}
 
 type errTaskService struct {
@@ -37,7 +32,7 @@ type errTaskService struct {
 // RegisterTTRPC implements shim.TTRPCService.
 func (e *errTaskService) RegisterTTRPC(s *ttrpc.Server) error {
 	s.SetDebugging(true)
-	task.RegisterTTRPCTaskService(s, e)
+	taskv3.RegisterTTRPCTaskService(s, e)
 	return nil
 }
 
@@ -120,87 +115,87 @@ func wrap[I, O any](e *errTaskService, f func(context.Context, I) (O, error)) fu
 	}
 }
 
-// Checkpoint implements task.TTRPCTaskService.
-func (e *errTaskService) Checkpoint(ctx context.Context, req *task.CheckpointTaskRequest) (*emptypb.Empty, error) {
+// Checkpoint implements taskv3.TTRPCTaskService.
+func (e *errTaskService) Checkpoint(ctx context.Context, req *taskv3.CheckpointTaskRequest) (*emptypb.Empty, error) {
 	return wrap(e, e.ref.Checkpoint)(ctx, req)
 }
 
-// CloseIO implements task.TTRPCTaskService.
-func (e *errTaskService) CloseIO(ctx context.Context, req *task.CloseIORequest) (*emptypb.Empty, error) {
+// CloseIO implements taskv3.TTRPCTaskService.
+func (e *errTaskService) CloseIO(ctx context.Context, req *taskv3.CloseIORequest) (*emptypb.Empty, error) {
 	return wrap(e, e.ref.CloseIO)(ctx, req)
 }
 
-// Connect implements task.TTRPCTaskService.
-func (e *errTaskService) Connect(ctx context.Context, req *task.ConnectRequest) (*task.ConnectResponse, error) {
+// Connect implements taskv3.TTRPCTaskService.
+func (e *errTaskService) Connect(ctx context.Context, req *taskv3.ConnectRequest) (*taskv3.ConnectResponse, error) {
 	return wrap(e, e.ref.Connect)(ctx, req)
 }
 
-// Create implements task.TTRPCTaskService.
-func (e *errTaskService) Create(ctx context.Context, req *task.CreateTaskRequest) (*task.CreateTaskResponse, error) {
+// Create implements taskv3.TTRPCTaskService.
+func (e *errTaskService) Create(ctx context.Context, req *taskv3.CreateTaskRequest) (*taskv3.CreateTaskResponse, error) {
 	return wrap(e, e.ref.Create)(ctx, req)
 }
 
-// Delete implements task.TTRPCTaskService.
-func (e *errTaskService) Delete(ctx context.Context, req *task.DeleteRequest) (*task.DeleteResponse, error) {
+// Delete implements taskv3.TTRPCTaskService.
+func (e *errTaskService) Delete(ctx context.Context, req *taskv3.DeleteRequest) (*taskv3.DeleteResponse, error) {
 	return wrap(e, e.ref.Delete)(ctx, req)
 }
 
-// Exec implements task.TTRPCTaskService.
-func (e *errTaskService) Exec(ctx context.Context, req *task.ExecProcessRequest) (*emptypb.Empty, error) {
+// Exec implements taskv3.TTRPCTaskService.
+func (e *errTaskService) Exec(ctx context.Context, req *taskv3.ExecProcessRequest) (*emptypb.Empty, error) {
 	return wrap(e, e.ref.Exec)(ctx, req)
 }
 
-// Kill implements task.TTRPCTaskService.
-func (e *errTaskService) Kill(ctx context.Context, req *task.KillRequest) (*emptypb.Empty, error) {
+// Kill implements taskv3.TTRPCTaskService.
+func (e *errTaskService) Kill(ctx context.Context, req *taskv3.KillRequest) (*emptypb.Empty, error) {
 	return wrap(e, e.ref.Kill)(ctx, req)
 }
 
-// Pause implements task.TTRPCTaskService.
-func (e *errTaskService) Pause(ctx context.Context, req *task.PauseRequest) (*emptypb.Empty, error) {
+// Pause implements taskv3.TTRPCTaskService.
+func (e *errTaskService) Pause(ctx context.Context, req *taskv3.PauseRequest) (*emptypb.Empty, error) {
 	return wrap(e, e.ref.Pause)(ctx, req)
 }
 
-// Pids implements task.TTRPCTaskService.
-func (e *errTaskService) Pids(ctx context.Context, req *task.PidsRequest) (*task.PidsResponse, error) {
+// Pids implements taskv3.TTRPCTaskService.
+func (e *errTaskService) Pids(ctx context.Context, req *taskv3.PidsRequest) (*taskv3.PidsResponse, error) {
 	return wrap(e, e.ref.Pids)(ctx, req)
 }
 
-// ResizePty implements task.TTRPCTaskService.
-func (e *errTaskService) ResizePty(ctx context.Context, req *task.ResizePtyRequest) (*emptypb.Empty, error) {
+// ResizePty implements taskv3.TTRPCTaskService.
+func (e *errTaskService) ResizePty(ctx context.Context, req *taskv3.ResizePtyRequest) (*emptypb.Empty, error) {
 	return wrap(e, e.ref.ResizePty)(ctx, req)
 }
 
-// Resume implements task.TTRPCTaskService.
-func (e *errTaskService) Resume(ctx context.Context, req *task.ResumeRequest) (*emptypb.Empty, error) {
+// Resume implements taskv3.TTRPCTaskService.
+func (e *errTaskService) Resume(ctx context.Context, req *taskv3.ResumeRequest) (*emptypb.Empty, error) {
 	return wrap(e, e.ref.Resume)(ctx, req)
 }
 
-// Shutdown implements task.TTRPCTaskService.
-func (e *errTaskService) Shutdown(ctx context.Context, req *task.ShutdownRequest) (*emptypb.Empty, error) {
+// Shutdown implements taskv3.TTRPCTaskService.
+func (e *errTaskService) Shutdown(ctx context.Context, req *taskv3.ShutdownRequest) (*emptypb.Empty, error) {
 	return wrap(e, e.ref.Shutdown)(ctx, req)
 }
 
-// Start implements task.TTRPCTaskService.
-func (e *errTaskService) Start(ctx context.Context, req *task.StartRequest) (*task.StartResponse, error) {
+// Start implements taskv3.TTRPCTaskService.
+func (e *errTaskService) Start(ctx context.Context, req *taskv3.StartRequest) (*taskv3.StartResponse, error) {
 	return wrap(e, e.ref.Start)(ctx, req)
 }
 
-// State implements task.TTRPCTaskService.
-func (e *errTaskService) State(ctx context.Context, req *task.StateRequest) (*task.StateResponse, error) {
+// State implements taskv3.TTRPCTaskService.
+func (e *errTaskService) State(ctx context.Context, req *taskv3.StateRequest) (*taskv3.StateResponse, error) {
 	return wrap(e, e.ref.State)(ctx, req)
 }
 
-// Stats implements task.TTRPCTaskService.
-func (e *errTaskService) Stats(ctx context.Context, req *task.StatsRequest) (*task.StatsResponse, error) {
+// Stats implements taskv3.TTRPCTaskService.
+func (e *errTaskService) Stats(ctx context.Context, req *taskv3.StatsRequest) (*taskv3.StatsResponse, error) {
 	return wrap(e, e.ref.Stats)(ctx, req)
 }
 
-// Update implements task.TTRPCTaskService.
-func (e *errTaskService) Update(ctx context.Context, req *task.UpdateTaskRequest) (*emptypb.Empty, error) {
+// Update implements taskv3.TTRPCTaskService.
+func (e *errTaskService) Update(ctx context.Context, req *taskv3.UpdateTaskRequest) (*emptypb.Empty, error) {
 	return wrap(e, e.ref.Update)(ctx, req)
 }
 
-// Wait implements task.TTRPCTaskService.
-func (e *errTaskService) Wait(ctx context.Context, req *task.WaitRequest) (*task.WaitResponse, error) {
+// Wait implements taskv3.TTRPCTaskService.
+func (e *errTaskService) Wait(ctx context.Context, req *taskv3.WaitRequest) (*taskv3.WaitResponse, error) {
 	return wrap(e, e.ref.Wait)(ctx, req)
 }

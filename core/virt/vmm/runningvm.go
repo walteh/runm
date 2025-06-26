@@ -312,24 +312,18 @@ func (rvm *RunningVM[VM]) SetupOtelForwarder(ctx context.Context) error {
 	}
 	defer vsockListener.Close()
 
-	// 2️⃣ Prepare the UNIX socket listener
-	sockPath := filepath.Join(rvm.workingDir, "otel-forwarder.sock")
-	// Remove any old socket file
-	if err := os.RemoveAll(sockPath); err != nil {
-		slog.WarnContext(ctx, "failed to remove stale socket", "path", sockPath, "err", err)
-	}
-	unixAddr := &net.UnixAddr{Name: sockPath, Net: "unix"}
-	unixListener, err := net.ListenUnix("unix", unixAddr)
-	if err != nil {
-		slog.ErrorContext(ctx, "unix listen failed", "err", err)
-		return errors.Errorf("listening on unix socket: %w", err)
-	}
-	defer func() {
-		unixListener.Close()
-		os.Remove(sockPath)
-	}()
+	slog.InfoContext(ctx, "vsock listener started", "port", constants.VsockOtelPort)
 
-	slog.InfoContext(ctx, "Otel forwarder started", "vsockPort", constants.VsockOtelPort, "unixSocket", sockPath)
+	// dial tcp localhost:5909
+	conn, err := net.Dial("tcp", "localhost:5909")
+	if err != nil {
+		slog.ErrorContext(ctx, "unix dial failed", "err", err)
+		return errors.Errorf("dialing unix socket: %w", err)
+	}
+
+	defer conn.Close()
+
+	slog.InfoContext(ctx, "dialed otel unix socket", "conn", conn)
 
 	// 3️⃣ Accept loop: for each VSOCK conn, dial the UNIX socket, then proxy both ways
 	for {
@@ -347,17 +341,11 @@ func (rvm *RunningVM[VM]) SetupOtelForwarder(ctx context.Context) error {
 			return errors.Errorf("vsock accept: %w", err)
 		}
 
-		// Dial the local Otel forwarder via UNIX socket
-		uConn, err := net.DialUnix("unix", nil, unixAddr)
-		if err != nil {
-			slog.ErrorContext(ctx, "unix dial failed", "err", err)
-			vConn.Close()
-			continue
-		}
+		slog.InfoContext(ctx, "vsock accepted for otel forwarder")
 
 		// Proxy both directions
-		go proxy(ctx, vConn, uConn)
-		go proxy(ctx, uConn, vConn)
+		go proxy(ctx, vConn, conn)
+		go proxy(ctx, conn, vConn)
 	}
 }
 

@@ -39,13 +39,12 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/log"
-	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
 	"gitlab.com/tozd/go/errors"
 	"google.golang.org/grpc"
 
 	eventstypes "github.com/containerd/containerd/api/events"
-	taskAPI "github.com/containerd/containerd/api/runtime/task/v3"
+	taskv3 "github.com/containerd/containerd/api/runtime/task/v3"
 	containerdruntime "github.com/containerd/containerd/v2/core/runtime"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	gorunc "github.com/containerd/go-runc"
@@ -60,12 +59,12 @@ import (
 )
 
 var (
-	_     = shim.TTRPCService(&service{})
+	_     = taskv3.TTRPCTaskService(&service{})
 	empty = &ptypes.Empty{}
 )
 
 // NewTaskService creates a new instance of a task service
-func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.Service, rtc runtime.RuntimeCreator) (taskAPI.TTRPCTaskService, error) {
+func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.Service, rtc runtime.RuntimeCreator) (taskv3.TTRPCTaskService, error) {
 
 	s := &service{
 		context:              ctx,
@@ -302,7 +301,7 @@ func (s *service) preStart(c *runm.Container) (handleStarted func(*runm.Containe
 }
 
 // Create a new initial process and container with the underlying OCI runtime
-func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *taskAPI.CreateTaskResponse, err error) {
+func (s *service) Create(ctx context.Context, r *taskv3.CreateTaskRequest) (_ *taskv3.CreateTaskResponse, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -368,18 +367,18 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 
 	slog.InfoContext(ctx, "done creating container")
 
-	return &taskAPI.CreateTaskResponse{
+	return &taskv3.CreateTaskResponse{
 		Pid: uint32(container.Pid()),
 	}, nil
 }
 
-func (s *service) RegisterTTRPC(server *ttrpc.Server) error {
-	taskAPI.RegisterTTRPCTaskService(server, s)
-	return nil
-}
+// func (s *service) RegisterTTRPC(server *ttrpc.Server) error {
+// 	taskv3.RegisterTTRPCTaskService(server, s)
+// 	return nil
+// }
 
 // Start a process
-func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.StartResponse, error) {
+func (s *service) Start(ctx context.Context, r *taskv3.StartRequest) (*taskv3.StartResponse, error) {
 	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
@@ -459,13 +458,13 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 		})
 	}
 	handleStarted(container, p)
-	return &taskAPI.StartResponse{
+	return &taskv3.StartResponse{
 		Pid: uint32(p.Pid()),
 	}, nil
 }
 
 // Delete the initial process and container
-func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAPI.DeleteResponse, error) {
+func (s *service) Delete(ctx context.Context, r *taskv3.DeleteRequest) (*taskv3.DeleteResponse, error) {
 	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
@@ -489,7 +488,7 @@ func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAP
 		delete(s.containerInitExit, container)
 		s.lifecycleMu.Unlock()
 	}
-	return &taskAPI.DeleteResponse{
+	return &taskv3.DeleteResponse{
 		ExitStatus: uint32(p.ExitStatus()),
 		ExitedAt:   protobuf.ToTimestamp(p.ExitedAt()),
 		Pid:        uint32(p.Pid()),
@@ -497,7 +496,7 @@ func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAP
 }
 
 // Exec an additional process inside the container
-func (s *service) Exec(ctx context.Context, r *taskAPI.ExecProcessRequest) (*ptypes.Empty, error) {
+func (s *service) Exec(ctx context.Context, r *taskv3.ExecProcessRequest) (*ptypes.Empty, error) {
 	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
@@ -520,7 +519,7 @@ func (s *service) Exec(ctx context.Context, r *taskAPI.ExecProcessRequest) (*pty
 }
 
 // ResizePty of a process
-func (s *service) ResizePty(ctx context.Context, r *taskAPI.ResizePtyRequest) (*ptypes.Empty, error) {
+func (s *service) ResizePty(ctx context.Context, r *taskv3.ResizePtyRequest) (*ptypes.Empty, error) {
 	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
@@ -532,7 +531,7 @@ func (s *service) ResizePty(ctx context.Context, r *taskAPI.ResizePtyRequest) (*
 }
 
 // State returns runtime state information for a process
-func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.StateResponse, error) {
+func (s *service) State(ctx context.Context, r *taskv3.StateRequest) (*taskv3.StateResponse, error) {
 	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
@@ -559,7 +558,7 @@ func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.
 		status = task.Status_PAUSING
 	}
 	sio := p.Stdio()
-	return &taskAPI.StateResponse{
+	return &taskv3.StateResponse{
 		ID:         p.ID(),
 		Bundle:     container.Bundle,
 		Pid:        uint32(p.Pid()),
@@ -574,7 +573,7 @@ func (s *service) State(ctx context.Context, r *taskAPI.StateRequest) (*taskAPI.
 }
 
 // Pause the container
-func (s *service) Pause(ctx context.Context, r *taskAPI.PauseRequest) (*ptypes.Empty, error) {
+func (s *service) Pause(ctx context.Context, r *taskv3.PauseRequest) (*ptypes.Empty, error) {
 	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
@@ -589,7 +588,7 @@ func (s *service) Pause(ctx context.Context, r *taskAPI.PauseRequest) (*ptypes.E
 }
 
 // Resume the container
-func (s *service) Resume(ctx context.Context, r *taskAPI.ResumeRequest) (*ptypes.Empty, error) {
+func (s *service) Resume(ctx context.Context, r *taskv3.ResumeRequest) (*ptypes.Empty, error) {
 	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
@@ -604,7 +603,7 @@ func (s *service) Resume(ctx context.Context, r *taskAPI.ResumeRequest) (*ptypes
 }
 
 // Kill a process with the provided signal
-func (s *service) Kill(ctx context.Context, r *taskAPI.KillRequest) (*ptypes.Empty, error) {
+func (s *service) Kill(ctx context.Context, r *taskv3.KillRequest) (*ptypes.Empty, error) {
 	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
@@ -616,7 +615,7 @@ func (s *service) Kill(ctx context.Context, r *taskAPI.KillRequest) (*ptypes.Emp
 }
 
 // Pids returns all pids inside the container
-func (s *service) Pids(ctx context.Context, r *taskAPI.PidsRequest) (*taskAPI.PidsResponse, error) {
+func (s *service) Pids(ctx context.Context, r *taskv3.PidsRequest) (*taskv3.PidsResponse, error) {
 	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
@@ -645,13 +644,13 @@ func (s *service) Pids(ctx context.Context, r *taskAPI.PidsRequest) (*taskAPI.Pi
 		}
 		processes = append(processes, &pInfo)
 	}
-	return &taskAPI.PidsResponse{
+	return &taskv3.PidsResponse{
 		Processes: processes,
 	}, nil
 }
 
 // CloseIO of a process
-func (s *service) CloseIO(ctx context.Context, r *taskAPI.CloseIORequest) (*ptypes.Empty, error) {
+func (s *service) CloseIO(ctx context.Context, r *taskv3.CloseIORequest) (*ptypes.Empty, error) {
 	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
@@ -663,7 +662,7 @@ func (s *service) CloseIO(ctx context.Context, r *taskAPI.CloseIORequest) (*ptyp
 }
 
 // Checkpoint the container
-func (s *service) Checkpoint(ctx context.Context, r *taskAPI.CheckpointTaskRequest) (*ptypes.Empty, error) {
+func (s *service) Checkpoint(ctx context.Context, r *taskv3.CheckpointTaskRequest) (*ptypes.Empty, error) {
 	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
@@ -675,7 +674,7 @@ func (s *service) Checkpoint(ctx context.Context, r *taskAPI.CheckpointTaskReque
 }
 
 // Update a running container
-func (s *service) Update(ctx context.Context, r *taskAPI.UpdateTaskRequest) (*ptypes.Empty, error) {
+func (s *service) Update(ctx context.Context, r *taskv3.UpdateTaskRequest) (*ptypes.Empty, error) {
 	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
@@ -687,7 +686,7 @@ func (s *service) Update(ctx context.Context, r *taskAPI.UpdateTaskRequest) (*pt
 }
 
 // Wait for a process to exit
-func (s *service) Wait(ctx context.Context, r *taskAPI.WaitRequest) (*taskAPI.WaitResponse, error) {
+func (s *service) Wait(ctx context.Context, r *taskv3.WaitRequest) (*taskv3.WaitResponse, error) {
 	container, err := s.getContainer(r.ID)
 	if err != nil {
 		return nil, err
@@ -698,25 +697,25 @@ func (s *service) Wait(ctx context.Context, r *taskAPI.WaitRequest) (*taskAPI.Wa
 	}
 	p.Wait()
 
-	return &taskAPI.WaitResponse{
+	return &taskv3.WaitResponse{
 		ExitStatus: uint32(p.ExitStatus()),
 		ExitedAt:   protobuf.ToTimestamp(p.ExitedAt()),
 	}, nil
 }
 
 // Connect returns shim information such as the shim's pid
-func (s *service) Connect(ctx context.Context, r *taskAPI.ConnectRequest) (*taskAPI.ConnectResponse, error) {
+func (s *service) Connect(ctx context.Context, r *taskv3.ConnectRequest) (*taskv3.ConnectResponse, error) {
 	var pid int
 	if container, err := s.getContainer(r.ID); err == nil {
 		pid = container.Pid()
 	}
-	return &taskAPI.ConnectResponse{
+	return &taskv3.ConnectResponse{
 		ShimPid: uint32(os.Getpid()),
 		TaskPid: uint32(pid),
 	}, nil
 }
 
-func (s *service) Shutdown(ctx context.Context, r *taskAPI.ShutdownRequest) (*ptypes.Empty, error) {
+func (s *service) Shutdown(ctx context.Context, r *taskv3.ShutdownRequest) (*ptypes.Empty, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -732,7 +731,7 @@ func (s *service) Shutdown(ctx context.Context, r *taskAPI.ShutdownRequest) (*pt
 	return empty, nil
 }
 
-func (s *service) Stats(ctx context.Context, r *taskAPI.StatsRequest) (*taskAPI.StatsResponse, error) {
+func (s *service) Stats(ctx context.Context, r *taskv3.StatsRequest) (*taskv3.StatsResponse, error) {
 
 	container, err := s.getContainer(r.ID)
 	if err != nil {
@@ -768,7 +767,7 @@ func (s *service) Stats(ctx context.Context, r *taskAPI.StatsRequest) (*taskAPI.
 	if err != nil {
 		return nil, err
 	}
-	return &taskAPI.StatsResponse{
+	return &taskv3.StatsResponse{
 		Stats: typeurl.MarshalProto(data),
 	}, nil
 }

@@ -155,10 +155,10 @@ func mount(ctx context.Context) error {
 		return errors.Errorf("failed to create child cgroup: %w", err)
 	}
 
-	// List the new cgroup directory to verify memory.events is present
-	if err := ExecCmdForwardingStdio(ctx, "ls", "-lah", "/sys/fs/cgroup/"+containerIdFlag); err != nil {
-		return errors.Errorf("problem listing child cgroup: %w", err)
-	}
+	// // List the new cgroup directory to verify memory.events is present
+	// if err := ExecCmdForwardingStdio(ctx, "ls", "-lah", "/sys/fs/cgroup/"+containerIdFlag); err != nil {
+	// 	return errors.Errorf("problem listing child cgroup: %w", err)
+	// }
 
 	// cmds = append(cmds, []string{"mkdir", "-p", prefix + "/dev/pts"})
 	// cmds = append(cmds, []string{"mount", "-t", "devpts", "devpts", prefix + "/dev/pts", "-o", "gid=5,mode=620,ptmxmode=666"})
@@ -293,7 +293,7 @@ func mountRootfsPrimary(ctx context.Context) error {
 	// 	return errors.Errorf("mounting rootfs: %w", err)
 	// }
 
-	_ = ExecCmdForwardingStdio(ctx, "ls", "-lah", "/newroot")
+	// _ = ExecCmdForwardingStdio(ctx, "ls", "-lah", "/newroot")
 
 	// if err := os.MkdirAll(filepath.Join(constants.NewRootAbsPath), 0755); err != nil {
 	// 	return errors.Errorf("making directories: %w", err)
@@ -390,7 +390,7 @@ func mountRootfsSecondary(ctx context.Context, prefix string, customMounts []spe
 		}
 	}
 
-	ExecCmdForwardingStdio(ctx, "ls", "-lah", "/app/scripts")
+	// ExecCmdForwardingStdio(ctx, "ls", "-lah", "/app/scripts")
 
 	return nil
 }

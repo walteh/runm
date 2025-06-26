@@ -62,6 +62,10 @@ func WithGlobalLogWriter(opt io.Writer) OptLoggerOptsSetter {
 	return func(o *LoggerOpts) { o.globalLogWriter = opt }
 }
 
+func WithOtlpInstances(opt *OTelInstances) OptLoggerOptsSetter {
+	return func(o *LoggerOpts) { o.otlpInstances = opt }
+}
+
 func WithDelayedHandlerCreatorOpts(opt []OptLoggerOptsSetter) OptLoggerOptsSetter {
 	return func(o *LoggerOpts) { o.delayedHandlerCreatorOpts = opt }
 }

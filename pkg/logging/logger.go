@@ -64,7 +64,7 @@ func NewDefaultDevLoggerWithOtel(ctx context.Context, name string, rawLogWriter 
 		WithInterceptHclog(true),
 		WithMakeDefaultLogger(true),
 		WithGlobalLogWriter(rawLogWriter),
-		WithOtelInstances(instances),
+		WithOtlpInstances(instances),
 		WithOtelHandler(),
 		WithHandlerOptions(&slog.HandlerOptions{
 			Level:     slog.LevelDebug,

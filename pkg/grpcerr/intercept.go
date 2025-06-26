@@ -77,5 +77,17 @@ func UnaryClientInterceptor() grpc.UnaryClientInterceptor {
 	}
 }
 
+func StreamServerInterceptor() grpc.StreamServerInterceptor {
+	return func(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		return handler(srv, stream)
+	}
+}
+
+func StreamClientInterceptor() grpc.StreamClientInterceptor {
+	return func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+		return streamer(ctx, desc, cc, method, opts...)
+	}
+}
+
 // FromError inspects a gRPC error, extracts any DebugInfo detail,
 // and returns a new Tozd error containing the full %+v stack trace.
