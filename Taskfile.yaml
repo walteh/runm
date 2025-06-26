@@ -77,6 +77,13 @@ tasks:
         cmds:
           - cmd: open -a Terminal $(pwd)
 
+    tempo:run:
+        desc: runs tempo
+        dir: test/integration/tempo
+        cmds:
+          - cmd: docker compose -f docker-compose.yaml up -d --build --force-recreate
+          - cmd: docker compose ps
+
     zellij:
         desc: opens zellij
         platforms: [darwin]

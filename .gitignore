@@ -79,3 +79,5 @@ __debug*
 gen/build
 
 .task/checksum/linux-*
+
+tempo-data
