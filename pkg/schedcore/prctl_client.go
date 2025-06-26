@@ -20,7 +20,7 @@ import (
 	"context"
 	"errors"
 
-	runmv1 "github.com/walteh/runm/proto/runm/v1"
+	runmv1 "github.com/walteh/runm/proto/v1"
 )
 
 type PrctlClient struct {

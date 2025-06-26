@@ -20,6 +20,8 @@ import (
 	"context"
 
 	"github.com/containerd/containerd/v2/pkg/schedcore"
+
+	runmv1 "github.com/walteh/runm/proto/v1"
 )
 
 var _ runmv1.TTRPCPrctlServiceService = (*PrctlServer)(nil)

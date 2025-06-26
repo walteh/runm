@@ -77,9 +77,14 @@ tasks:
         cmds:
           - cmd: open -a Terminal $(pwd)
 
-    tempo:run:
+    otel:tui:run:
+        desc: runs the otel tui
+        cmds:
+          - cmd: otel-tui
+
+    otel:grafana:run:
         desc: runs tempo
-        dir: test/integration/tempo
+        dir: test/integration/grafana
         cmds:
           - cmd: docker compose up -d --build --force-recreate --always-recreate-deps --remove-orphans --renew-anon-volumes
           - cmd: docker compose ps
