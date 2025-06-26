@@ -49,12 +49,13 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	slogctx "github.com/veqryn/slog-context"
 
 	ncdefaults "github.com/containerd/nerdctl/v2/pkg/defaults"
+	slogctx "github.com/veqryn/slog-context"
+
+	"github.com/walteh/runm/test/integration/env"
 
 	ec1logging "github.com/walteh/runm/pkg/logging"
-	"github.com/walteh/runm/test/integration/env"
 )
 
 func init() {

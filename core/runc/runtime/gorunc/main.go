@@ -10,8 +10,9 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	gorunc "github.com/containerd/go-runc"
 	"github.com/opencontainers/runtime-spec/specs-go/features"
+
+	gorunc "github.com/containerd/go-runc"
 
 	"github.com/walteh/runm/core/runc/runtime"
 )

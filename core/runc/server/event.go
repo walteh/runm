@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"log/slog"
 
-	"github.com/walteh/runm/core/runc/runtime"
-	runmv1 "github.com/walteh/runm/proto/v1"
 	"gitlab.com/tozd/go/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	"github.com/walteh/runm/core/runc/runtime"
+
+	runmv1 "github.com/walteh/runm/proto/v1"
 )
 
 var _ runmv1.EventServiceServer = (*Server)(nil)

@@ -25,9 +25,10 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/errdefs"
-	"github.com/walteh/runm/core/runc/process"
 
 	google_protobuf "github.com/containerd/containerd/v2/pkg/protobuf/types"
+
+	"github.com/walteh/runm/core/runc/process"
 )
 
 type deletedState struct {

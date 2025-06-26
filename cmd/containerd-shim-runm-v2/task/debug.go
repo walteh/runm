@@ -8,14 +8,14 @@ import (
 	"strings"
 	"time"
 
-	cruntime "github.com/containerd/containerd/v2/core/runtime/v2"
+	"github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/ttrpc"
-	slogctx "github.com/veqryn/slog-context"
 	"gitlab.com/tozd/go/errors"
-
-	"github.com/containerd/containerd/api/runtime/task/v3"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	cruntime "github.com/containerd/containerd/v2/core/runtime/v2"
+	slogctx "github.com/veqryn/slog-context"
 )
 
 type taskService interface {

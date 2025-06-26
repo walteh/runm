@@ -24,10 +24,11 @@ import (
 	slogctx "github.com/veqryn/slog-context"
 
 	"github.com/walteh/runm/cmd/containerd-shim-runm-v2/manager"
-	taskplugin "github.com/walteh/runm/cmd/containerd-shim-runm-v2/task/plugin"
-	vfruntimeplugin "github.com/walteh/runm/core/runc/runtime/virt/plugins/vf"
 	"github.com/walteh/runm/pkg/logging"
 	"github.com/walteh/runm/pkg/logging/sloglogrus"
+
+	taskplugin "github.com/walteh/runm/cmd/containerd-shim-runm-v2/task/plugin"
+	vfruntimeplugin "github.com/walteh/runm/core/runc/runtime/virt/plugins/vf"
 )
 
 func ShimReexecInit() {

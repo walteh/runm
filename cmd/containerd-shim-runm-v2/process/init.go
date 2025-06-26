@@ -30,7 +30,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"gitlab.com/tozd/go/errors"
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/console"
@@ -38,11 +37,12 @@ import (
 	"github.com/containerd/containerd/v2/pkg/stdio"
 	"github.com/containerd/fifo"
 	"github.com/containerd/log"
-	slogctx "github.com/veqryn/slog-context"
+	"gitlab.com/tozd/go/errors"
 
 	google_protobuf "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	gorunc "github.com/containerd/go-runc"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	slogctx "github.com/veqryn/slog-context"
 
 	"github.com/walteh/runm/core/runc/process"
 	"github.com/walteh/runm/core/runc/runtime"

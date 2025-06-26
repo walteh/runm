@@ -15,23 +15,23 @@ import (
 	"syscall"
 	"time"
 
-	"gitlab.com/tozd/go/errors"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/mdlayher/vsock"
+	"gitlab.com/tozd/go/errors"
 	"google.golang.org/grpc"
 
-	"github.com/mdlayher/vsock"
+	gorunc "github.com/containerd/go-runc"
 	slogctx "github.com/veqryn/slog-context"
 
 	"github.com/walteh/runm/core/runc/runtime"
-	goruncruntime "github.com/walteh/runm/core/runc/runtime/gorunc"
 	"github.com/walteh/runm/core/runc/server"
 	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/logging"
 
-	"github.com/containerd/containerd/v2/pkg/oci"
-	gorunc "github.com/containerd/go-runc"
-
+	goruncruntime "github.com/walteh/runm/core/runc/runtime/gorunc"
 	runtimemock "github.com/walteh/runm/gen/mocks/core/runc/runtime"
 )
 

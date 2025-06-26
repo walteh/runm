@@ -2,7 +2,6 @@ package main
 
 import (
 	_ "github.com/containerd/containerd/v2/cmd/containerd/builtins"
-	slogctx "github.com/veqryn/slog-context"
 
 	"context"
 	"flag"
@@ -15,6 +14,8 @@ import (
 	"syscall"
 
 	"github.com/moby/sys/reexec"
+
+	slogctx "github.com/veqryn/slog-context"
 
 	"github.com/walteh/runm/pkg/logging"
 	"github.com/walteh/runm/test/integration/env"

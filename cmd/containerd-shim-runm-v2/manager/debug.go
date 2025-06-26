@@ -11,8 +11,9 @@ import (
 
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/v2/pkg/shim"
-	slogctx "github.com/veqryn/slog-context"
 	"gitlab.com/tozd/go/errors"
+
+	slogctx "github.com/veqryn/slog-context"
 )
 
 type debugManager struct {

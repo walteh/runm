@@ -8,10 +8,11 @@ import (
 	"runtime"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/Code-Hex/vz/v3"
 	"github.com/containers/common/pkg/strongunits"
 	"gitlab.com/tozd/go/errors"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/walteh/runm/core/virt/virtio"
 	"github.com/walteh/runm/core/virt/vmm"

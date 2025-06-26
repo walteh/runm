@@ -7,13 +7,13 @@ import (
 	"path/filepath"
 
 	"golang.org/x/sync/errgroup"
-	"gvisor.dev/gvisor/pkg/tcpip/stack"
 
 	"github.com/containers/gvisor-tap-vsock/pkg/types"
 	"github.com/containers/gvisor-tap-vsock/pkg/virtualnetwork"
 	"github.com/soheilhy/cmux"
 	"github.com/walteh/run"
 	"gitlab.com/tozd/go/errors"
+	"gvisor.dev/gvisor/pkg/tcpip/stack"
 
 	slogctx "github.com/veqryn/slog-context"
 

@@ -12,18 +12,21 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/nxadm/tail"
+	"gitlab.com/tozd/go/errors"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
 	"github.com/walteh/runm/core/gvnet"
-	grpcruntime "github.com/walteh/runm/core/runc/runtime/grpc"
 	"github.com/walteh/runm/core/virt/virtio"
 	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/pkg/logging"
+
+	grpcruntime "github.com/walteh/runm/core/runc/runtime/grpc"
 	runmv1 "github.com/walteh/runm/proto/v1"
-	"gitlab.com/tozd/go/errors"
-	"golang.org/x/sync/errgroup"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 type RunningVM[VM VirtualMachine] struct {

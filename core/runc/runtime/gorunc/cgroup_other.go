@@ -6,8 +6,9 @@ import (
 	"context"
 
 	"github.com/containerd/cgroups/v3/cgroup2/stats"
-	"github.com/walteh/runm/core/runc/runtime"
 	"gitlab.com/tozd/go/errors"
+
+	"github.com/walteh/runm/core/runc/runtime"
 )
 
 var _ runtime.CgroupAdapter = (*CgroupV2Adapter)(nil)

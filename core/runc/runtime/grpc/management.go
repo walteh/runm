@@ -7,9 +7,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/walteh/runm/core/runc/runtime"
-	runmv1 "github.com/walteh/runm/proto/v1"
 	"gitlab.com/tozd/go/errors"
+
+	"github.com/walteh/runm/core/runc/runtime"
+
+	runmv1 "github.com/walteh/runm/proto/v1"
 )
 
 var _ runtime.GuestManagement = &GRPCClientRuntime{}

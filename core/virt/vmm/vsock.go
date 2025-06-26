@@ -14,8 +14,9 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/containers/gvisor-tap-vsock/pkg/tcpproxy"
-	slogctx "github.com/veqryn/slog-context"
 	"gitlab.com/tozd/go/errors"
+
+	slogctx "github.com/veqryn/slog-context"
 
 	"github.com/walteh/runm/core/virt/host"
 	"github.com/walteh/runm/core/virt/virtio"

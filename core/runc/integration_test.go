@@ -18,7 +18,6 @@ import (
 
 	grpcruntime "github.com/walteh/runm/core/runc/runtime/grpc"
 	runtimemock "github.com/walteh/runm/gen/mocks/core/runc/runtime"
-
 	runmv1 "github.com/walteh/runm/proto/v1"
 )
 

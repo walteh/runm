@@ -28,13 +28,13 @@ import (
 	"syscall"
 	"time"
 
-	"gitlab.com/tozd/go/errors"
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/v2/pkg/stdio"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/fifo"
+	"gitlab.com/tozd/go/errors"
 
 	gorunc "github.com/containerd/go-runc"
 	specs "github.com/opencontainers/runtime-spec/specs-go"

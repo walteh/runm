@@ -6,11 +6,12 @@ import (
 
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/walteh/run"
-	"github.com/walteh/runm/core/runc/runtime"
 	"gitlab.com/tozd/go/errors"
 
 	eventstypes "github.com/containerd/containerd/api/events"
 	coreruntime "github.com/containerd/containerd/v2/core/runtime"
+
+	"github.com/walteh/runm/core/runc/runtime"
 )
 
 var _ run.Runnable = (*Watcher)(nil)

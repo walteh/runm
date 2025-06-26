@@ -9,13 +9,12 @@ import (
 	"path/filepath"
 
 	"github.com/muesli/termenv"
+	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"gopkg.in/natefinch/lumberjack.v2"
 
 	"github.com/walteh/runm/pkg/logging/slogdevterm"
 	"github.com/walteh/runm/pkg/logging/sloghclog"
 	"github.com/walteh/runm/pkg/logging/sloglogrus"
-
-	"go.opentelemetry.io/contrib/bridges/otelslog"
 )
 
 //go:opts

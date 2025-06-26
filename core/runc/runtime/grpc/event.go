@@ -4,9 +4,11 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/walteh/runm/core/runc/runtime"
-	runmv1 "github.com/walteh/runm/proto/v1"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	"github.com/walteh/runm/core/runc/runtime"
+
+	runmv1 "github.com/walteh/runm/proto/v1"
 )
 
 var _ runtime.EventHandler = (*GRPCClientRuntime)(nil)

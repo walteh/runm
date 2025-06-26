@@ -65,26 +65,26 @@ func GetDecompressed(checkSum string) (io.Reader, error) {
 	registryMutex.RLock()
 	entry, exists := registry[checkSum]
 	registryMutex.RUnlock()
-	
+
 	if !exists {
 		return nil, errors.Errorf("binary not found: %s", checkSum)
 	}
-	
+
 	// For uncompressed data, return immediately
 	if !entry.isCompressed {
 		return bytes.NewReader(entry.decompressed), nil
 	}
-	
+
 	// Lazy decompression with sync.Once ensures thread safety
 	// and prevents duplicate decompression work
 	entry.decompressOnce.Do(func() {
 		entry.decompressed, entry.decompressErr = decompressBinary(entry.compressed, entry.decompressor)
 	})
-	
+
 	if entry.decompressErr != nil {
 		return nil, errors.Errorf("decompressing binary %s: %w", checkSum, entry.decompressErr)
 	}
-	
+
 	return bytes.NewReader(entry.decompressed), nil
 }
 

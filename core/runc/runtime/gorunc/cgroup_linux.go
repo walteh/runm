@@ -4,13 +4,14 @@ package goruncruntime
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/containerd/cgroups/v3/cgroup2"
 	"github.com/containerd/cgroups/v3/cgroup2/stats"
 	"github.com/moby/sys/userns"
-	"github.com/walteh/runm/core/runc/runtime"
 	"gitlab.com/tozd/go/errors"
-	"kraftkit.sh/log"
+
+	"github.com/walteh/runm/core/runc/runtime"
 )
 
 var _ runtime.CgroupAdapter = (*CgroupV2Adapter)(nil)
@@ -57,7 +58,7 @@ func (me *CgroupV2Adapter) OpenEventChan(ctx context.Context) (<-chan runtime.Cg
 func (me *CgroupV2Adapter) ToggleControllers(ctx context.Context) error {
 	allControllers, err := me.cgroup.RootControllers()
 	if err != nil {
-		log.G(ctx).WithError(err).Error("failed to get root controllers")
+		slog.ErrorContext(ctx, "failed to get root controllers", "error", err)
 	} else {
 		if err := me.cgroup.ToggleControllers(allControllers, cgroup2.Enable); err != nil {
 			if userns.RunningInUserNS() {

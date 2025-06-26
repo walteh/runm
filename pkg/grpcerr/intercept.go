@@ -7,11 +7,12 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/walteh/runm/pkg/stackerr"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/walteh/runm/pkg/stackerr"
 )
 
 // UnaryServerInterceptor returns a grpc.UnaryServerInterceptor that

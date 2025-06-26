@@ -4,10 +4,12 @@ import (
 	"context"
 
 	"github.com/containerd/cgroups/v3/cgroup2/stats"
+	"gitlab.com/tozd/go/errors"
+
 	"github.com/walteh/runm/core/runc/conversion"
 	"github.com/walteh/runm/core/runc/runtime"
+
 	runmv1 "github.com/walteh/runm/proto/v1"
-	"gitlab.com/tozd/go/errors"
 )
 
 var _ runtime.CgroupAdapter = (*GRPCClientRuntime)(nil)

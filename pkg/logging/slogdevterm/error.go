@@ -8,9 +8,10 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/list"
-	"github.com/walteh/runm/pkg/stackerr"
 	"gitlab.com/tozd/go/errors"
 	"google.golang.org/grpc/status"
+
+	"github.com/walteh/runm/pkg/stackerr"
 )
 
 // stackTracer interface matches the one from pkg/errors for extracting stack traces

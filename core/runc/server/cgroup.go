@@ -3,10 +3,11 @@ package server
 import (
 	"context"
 
-	runmv1 "github.com/walteh/runm/proto/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
+
+	runmv1 "github.com/walteh/runm/proto/v1"
 )
 
 var _ runmv1.CgroupAdapterServiceServer = (*Server)(nil)

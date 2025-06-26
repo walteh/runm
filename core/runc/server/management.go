@@ -10,10 +10,12 @@ import (
 	"syscall"
 	"time"
 
-	runmv1 "github.com/walteh/runm/proto/v1"
 	"golang.org/x/sys/unix"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	runmv1 "github.com/walteh/runm/proto/v1"
 )
 
 var _ runmv1.GuestManagementServiceServer = (*Server)(nil)

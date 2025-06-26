@@ -7,15 +7,18 @@ import (
 	"os/exec"
 	"time"
 
+	"golang.org/x/net/proxy"
+
 	"github.com/containerd/cgroups/v3/cgroup2/stats"
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/pkg/oci"
-	gorunc "github.com/containerd/go-runc"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-spec/specs-go/features"
+
+	gorunc "github.com/containerd/go-runc"
+
 	"github.com/walteh/runm/core/runc/process"
-	"golang.org/x/net/proxy"
 )
 
 const (
