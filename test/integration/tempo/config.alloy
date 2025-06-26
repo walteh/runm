@@ -1,0 +1,61 @@
+otelcol.receiver.otlp "primary" {
+  grpc {endpoint = "0.0.0.0:4317"}
+
+  http {endpoint = "0.0.0.0:4318"}
+
+
+  output {
+    metrics = [otelcol.processor.batch.primary.input]
+    logs    = [otelcol.processor.batch.primary.input]
+    traces  = [otelcol.processor.batch.primary.input]
+  }
+}
+
+otelcol.processor.batch "primary" {
+  output {
+    metrics = [otelcol.exporter.prometheus.grafana_cloud_metrics.input]
+    logs    = [otelcol.exporter.loki.grafana_cloud_logs.input]
+    traces  = [
+		otelcol.exporter.otlp.grafana_cloud_traces.input,
+		 otelcol.connector.servicegraph.default.input,
+	]
+  }
+}
+
+otelcol.exporter.otlp "grafana_cloud_traces" {
+  client {
+    endpoint = "http://tempo:4317"
+     tls {
+			insecure = true
+		}
+  }
+}
+
+
+
+otelcol.exporter.prometheus "grafana_cloud_metrics" {
+        forward_to = [prometheus.remote_write.grafana_cloud_metrics.receiver]
+    }
+
+prometheus.remote_write "grafana_cloud_metrics" {
+    endpoint {
+        url = "http://prometheus:9090/api/v1/write"
+    }
+}
+
+otelcol.exporter.loki "grafana_cloud_logs" {
+  forward_to = [loki.write.grafana_cloud_logs.receiver]
+}
+
+loki.write "grafana_cloud_logs" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+
+otelcol.connector.servicegraph "default" {
+  dimensions = ["http.method", "http.target"]
+  output {
+    metrics = [otelcol.exporter.prometheus.grafana_cloud_metrics.input]
+  }
+}

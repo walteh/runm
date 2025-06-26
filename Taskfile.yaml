@@ -81,7 +81,7 @@ tasks:
         desc: runs tempo
         dir: test/integration/tempo
         cmds:
-          - cmd: docker compose -f docker-compose.yaml up -d --build --force-recreate
+          - cmd: docker compose up -d --build --force-recreate --always-recreate-deps --remove-orphans --renew-anon-volumes
           - cmd: docker compose ps
 
     zellij:

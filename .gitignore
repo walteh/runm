@@ -81,3 +81,4 @@ gen/build
 .task/checksum/linux-*
 
 tempo-data
+loki-data
