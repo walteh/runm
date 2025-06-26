@@ -143,6 +143,16 @@ func NewContainer(
 	if ctx.Err() != nil {
 		slog.ErrorContext(ctx, "context done before creating container runtime", "id", r.ID)
 	}
+
+	otlpPortEnv := os.Getenv("RUNM_SHIM_HOST_OTLP_PORT")
+	var otlpPort uint64 = 0
+	if otlpPortEnv != "" {
+		otlpPort, err = strconv.ParseUint(otlpPortEnv, 10, 32)
+		if err != nil {
+			return nil, errors.Errorf("failed to parse RUNM_SHIM_HOST_OTLP_PORT: %w", err)
+		}
+	}
+
 	rt, err := rtc.Create(ctx, &runtime.RuntimeOptions{
 		Namespace:           ns,
 		ProcessCreateConfig: config,
@@ -150,6 +160,7 @@ func NewContainer(
 		Mounts:              pmounts,
 		OciSpec:             spec,
 		Bundle:              r.Bundle,
+		HostOtlpPort:        uint32(otlpPort),
 	})
 	if err != nil {
 		return nil, errors.Errorf("failed to create runtime: %w", err)

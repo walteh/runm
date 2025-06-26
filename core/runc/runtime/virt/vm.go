@@ -55,6 +55,7 @@ func NewRunmVMRuntime[VM vmm.VirtualMachine](
 		VCPUs:          1,
 		Platform:       units.PlatformLinuxARM64,
 		Bundle:         opts.Bundle,
+		HostOtlpPort:   opts.HostOtlpPort,
 	}
 
 	vm, err := vmm.NewOCIVirtualMachine(ctx, hpv, cfg)

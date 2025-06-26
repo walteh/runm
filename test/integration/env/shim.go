@@ -202,6 +202,10 @@ func RunShim(ctx context.Context) error {
 	taskplugin.Reregister()
 	vfruntimeplugin.Reregister()
 
+	if logging.GetGlobalOtelInstances() != nil {
+		os.Setenv("RUNM_SHIM_HOST_OTLP_PORT", strconv.Itoa(int(MagicHostOtlpGRPCPort())))
+	}
+
 	os.Setenv("LINUX_RUNTIME_BUILD_DIR", LinuxRuntimeBuildDir())
 
 	shim.Run(ctx, manager.NewDebugManager(manager.NewShimManager("io.containerd.runc.v2")), func(c *shim.Config) {

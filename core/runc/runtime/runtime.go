@@ -34,6 +34,7 @@ type RuntimeOptions struct {
 	Publisher           events.Publisher
 	OciSpec             *oci.Spec
 	Bundle              string
+	HostOtlpPort        uint32
 }
 
 type RuntimeCreator interface {
