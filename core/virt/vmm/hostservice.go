@@ -10,7 +10,7 @@ import (
 )
 
 func (rvm *RunningVM[VM]) ForkExecProxy(ctx context.Context, r *runmv1.ForkExecProxyRequest) (*runmv1.ForkExecProxyResponse, error) {
-	slog.InfoContext(ctx, "forking exec proxy", "argc", r.GetArgc(), "argv", r.GetArgv(), "env", r.GetEnv())
+	slog.InfoContext(ctx, "forking exec proxy", "argc", r.GetArgc(), "argv", r.GetArgv())
 
 	stdoutz := bytes.NewBuffer(nil)
 	stderrz := bytes.NewBuffer(nil)

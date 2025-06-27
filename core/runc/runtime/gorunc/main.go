@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	"golang.org/x/sys/unix"
 
@@ -155,6 +156,24 @@ func (r *GoRuncRuntime) Create(ctx context.Context, id, bundle string, options *
 			slog.InfoContext(ctx, "created symlink", "path", hook.Path)
 		}
 	}
+
+	// options.NoPivot = true
+
+	done := false
+	defer func() {
+		done = true
+		slog.InfoContext(ctx, "done runc create")
+	}()
+	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		for !done {
+			select {
+			case <-ticker.C:
+				slog.InfoContext(ctx, "still running runc create")
+			}
+		}
+	}()
 
 	return r.Runc.Create(ctx, id, bundle, options)
 }
