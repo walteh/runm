@@ -22,8 +22,8 @@ func register() {
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			return virt.NewRunmVMRuntimeCreator(
 				vf.NewHypervisor(),
-				strongunits.MiB(64), // max memory
-				1,                   // vcpu
+				strongunits.MiB(128), // max memory
+				1,                    // vcpu
 			), nil
 		},
 	})

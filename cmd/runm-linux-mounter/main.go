@@ -190,21 +190,23 @@ func mount(ctx context.Context) error {
 		ExecCmdForwardingStdio(ctx, "ls", "-la", bundleSource)
 	}
 
-	if _, err := os.Stat(constants.NewRootAbsPath); os.IsNotExist(err) {
-		os.MkdirAll(constants.NewRootAbsPath, 0755)
-	}
+	disableNewRoot := true
 
-	err = ExecCmdForwardingStdio(ctx, "mount", "-t", "virtiofs", constants.RootfsVirtioTag, constants.NewRootAbsPath)
-	if err != nil {
-		return errors.Errorf("problem mounting rootfs virtiofs: %w", err)
-	}
+	if !disableNewRoot {
 
-	// Add debugging for rootfs mount
-	slog.InfoContext(ctx, "DEBUG: Rootfs virtiofs mount completed", "tag", constants.RootfsVirtioTag, "path", constants.NewRootAbsPath)
-	ExecCmdForwardingStdio(ctx, "ls", "-la", constants.NewRootAbsPath)
+		if _, err := os.Stat(constants.NewRootAbsPath); os.IsNotExist(err) {
+			os.MkdirAll(constants.NewRootAbsPath, 0755)
+		}
 
-	if _, err := os.Stat(constants.MbinAbsPath); os.IsNotExist(err) {
-		os.MkdirAll(constants.MbinAbsPath, 0755)
+		err = ExecCmdForwardingStdio(ctx, "mount", "-t", "virtiofs", constants.RootfsVirtioTag, constants.NewRootAbsPath)
+		if err != nil {
+			return errors.Errorf("problem mounting rootfs virtiofs: %w", err)
+		}
+
+		// Add debugging for rootfs mount
+		slog.InfoContext(ctx, "DEBUG: Rootfs virtiofs mount completed", "tag", constants.RootfsVirtioTag, "path", constants.NewRootAbsPath)
+		ExecCmdForwardingStdio(ctx, "ls", "-la", constants.NewRootAbsPath)
+
 	}
 
 	// err = ExecCmdForwardingStdio(ctx, "ls", "-lah", "/proc")
@@ -232,7 +234,9 @@ func mount(ctx context.Context) error {
 	// if err != nil {
 	// 	return errors.Errorf("problem mounting mbin: %w", err)
 	// }
-
+	if _, err := os.Stat(constants.MbinAbsPath); os.IsNotExist(err) {
+		os.MkdirAll(constants.MbinAbsPath, 0755)
+	}
 	err = ExecCmdForwardingStdio(ctx, "mount", "-t", constants.MbinFSType, "-o", "ro", constants.MbinVirtioTag, constants.MbinAbsPath)
 	if err != nil {
 		return errors.Errorf("problem mounting mbin: %w", err)

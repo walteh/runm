@@ -51,7 +51,7 @@ func NewRunmVMRuntime[VM vmm.VirtualMachine](
 		ID:             opts.ProcessCreateConfig.ID,
 		Spec:           opts.OciSpec,
 		RootfsMounts:   opts.Mounts,
-		StartingMemory: strongunits.MiB(64).ToBytes(),
+		StartingMemory: maxMemory.ToBytes(),
 		VCPUs:          1,
 		Platform:       units.PlatformLinuxARM64,
 		Bundle:         opts.Bundle,

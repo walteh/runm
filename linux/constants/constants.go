@@ -20,9 +20,10 @@ const (
 	ContainerTimesyncFile         = "/timesync"
 	ContainerReadyFile            = "/ready"
 	TempVirtioTag                 = "temp"
-	RunmVsockPort                 = 2019
+	RunmGuestServerVsockPort      = 2019
 	VsockStdinPort                = 2020
 	VsockStdoutPort               = 2021
 	VsockStderrPort               = 2022
 	VsockOtelPort                 = 3098
+	RunmHostServerVsockPort       = 2023
 )

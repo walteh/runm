@@ -49,6 +49,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"github.com/walteh/runm/test/integration/cmd/nerdctl-test/internal"
 
 	ncdefaults "github.com/containerd/nerdctl/v2/pkg/defaults"
 	slogctx "github.com/veqryn/slog-context"
@@ -368,7 +369,7 @@ Config file ($NERDCTL_TOML): %s
 		// #endregion
 
 		// Internal
-		// internal.Command(),
+		internal.Command(),
 
 		// login
 		login.Command(),

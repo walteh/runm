@@ -131,6 +131,7 @@ func recoveryMain(ctx context.Context) (err error) {
 func runGrpcVsockServer(ctx context.Context) error {
 
 	ticker := time.NewTicker(1 * time.Second)
+	ticks := 0
 	defer ticker.Stop()
 
 	go func() {
@@ -138,7 +139,10 @@ func runGrpcVsockServer(ctx context.Context) error {
 			if ctx.Err() != nil {
 				return
 			}
-			slog.InfoContext(ctx, "still running in rootfs, waiting to be killed", "tick", tick)
+			ticks++
+			if ticks < 5 || ticks%60 == 0 {
+				slog.InfoContext(ctx, "still running in rootfs, waiting to be killed", "tick", tick)
+			}
 		}
 	}()
 
@@ -146,13 +150,16 @@ func runGrpcVsockServer(ctx context.Context) error {
 		return errors.Errorf("container-id flag is required")
 	}
 
+	namespace := "default"
+	runcRoot := "/run/containerd/runc"
+
 	realRuntime := goruncruntime.WrapdGoRuncRuntime(&gorunc.Runc{
 		Command:       "/mbin/runc",
 		Log:           filepath.Join(constants.Ec1AbsPath, runtime.LogFileBase),
 		LogFormat:     gorunc.JSON,
 		PdeathSignal:  unix.SIGKILL,
 		Debug:         true,
-		Root:          constants.NewRootAbsPath,
+		Root:          filepath.Join(runcRoot, namespace), // 		Root:         filepath.Join(opts.ProcessCreateConfig.Options.Root, opts.Namespace),
 		SystemdCgroup: false,
 	})
 
@@ -193,9 +200,9 @@ func runGrpcVsockServer(ctx context.Context) error {
 
 	serverz.RegisterGrpcServer(grpcVsockServer)
 
-	slog.InfoContext(ctx, "listening on vsock", "port", constants.RunmVsockPort)
+	slog.InfoContext(ctx, "listening on vsock", "port", constants.RunmGuestServerVsockPort)
 
-	listener, err := vsock.ListenContextID(3, uint32(constants.RunmVsockPort), nil)
+	listener, err := vsock.ListenContextID(3, uint32(constants.RunmGuestServerVsockPort), nil)
 	if err != nil {
 		slog.ErrorContext(ctx, "problem listening vsock", "error", err)
 		return errors.Errorf("problem listening vsock: %w", err)
@@ -204,7 +211,7 @@ func runGrpcVsockServer(ctx context.Context) error {
 	egroup := errgroup.Group{}
 
 	egroup.Go(func() error {
-		slog.InfoContext(ctx, "serving grpc vsock server", "port", constants.RunmVsockPort)
+		slog.InfoContext(ctx, "serving grpc vsock server", "port", constants.RunmGuestServerVsockPort)
 		if err := grpcVsockServer.Serve(listener); err != nil {
 			return errors.Errorf("problem serving grpc vsock server: %w", err)
 		}

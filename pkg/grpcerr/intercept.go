@@ -91,3 +91,25 @@ func StreamClientInterceptor() grpc.StreamClientInterceptor {
 
 // FromError inspects a gRPC error, extracts any DebugInfo detail,
 // and returns a new Tozd error containing the full %+v stack trace.
+
+// var _ stats.Handler = (*serverHandler)(nil)
+
+// type serverHandler struct{}
+
+// // HandleConn implements stats.Handler.
+// func (s *serverHandler) HandleConn(context.Context, stats.ConnStats) {
+// }
+
+// // HandleRPC implements stats.Handler.
+// func (s *serverHandler) HandleRPC(context.Context, stats.RPCStats) {
+// }
+
+// // TagConn implements stats.Handler.
+// func (s *serverHandler) TagConn(context.Context, *stats.ConnTagInfo) context.Context {
+// 	panic("unimplemented")
+// }
+
+// // TagRPC implements stats.Handler.
+// func (s *serverHandler) TagRPC(context.Context, *stats.RPCTagInfo) context.Context {
+// 	panic("unimplemented")
+// }

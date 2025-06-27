@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/nxadm/tail"
@@ -65,8 +66,8 @@ func (r *RunningVM[VM]) GuestService(ctx context.Context) (*grpcruntime.GRPCClie
 	for {
 		select {
 		case <-ticker.C:
-			slog.InfoContext(ctx, "connecting to vsock", "port", constants.RunmVsockPort)
-			conn, err := r.vm.VSockConnect(ctx, uint32(constants.RunmVsockPort))
+			slog.InfoContext(ctx, "connecting to vsock", "port", constants.RunmGuestServerVsockPort)
+			conn, err := r.vm.VSockConnect(ctx, uint32(constants.RunmGuestServerVsockPort))
 			if err != nil {
 				lastError = err
 				continue
@@ -74,7 +75,7 @@ func (r *RunningVM[VM]) GuestService(ctx context.Context) (*grpcruntime.GRPCClie
 			opts := []grpc.DialOption{
 				grpc.WithTransportCredentials(insecure.NewCredentials()),
 				grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
-					slog.InfoContext(ctx, "dialing vsock", "port", constants.RunmVsockPort, "ignored_addr", addr)
+					slog.InfoContext(ctx, "dialing vsock", "port", constants.RunmGuestServerVsockPort, "ignored_addr", addr)
 					return conn, nil
 				}),
 				grpc.WithUnaryInterceptor(grpcerr.UnaryClientInterceptor()),
@@ -222,6 +223,15 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 		return nil
 	})
 
+	errgrp.Go(func() error {
+		err = rvm.SetupHostService(ctx)
+		if err != nil {
+			slog.ErrorContext(ctx, "error setting up host service", "error", err)
+			return errors.Errorf("setting up host service: %w", err)
+		}
+		return nil
+	})
+
 	if rvm.hostOtlpPort != 0 {
 		errgrp.Go(func() error {
 			err = rvm.SetupOtelForwarder(ctx)
@@ -306,6 +316,32 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 	}
 
 	slog.InfoContext(ctx, "time sync", "response", response)
+
+	return nil
+}
+
+func (rvm *RunningVM[VM]) SetupHostService(ctx context.Context) error {
+
+	vsockListener, err := rvm.vm.VSockListen(ctx, uint32(constants.RunmHostServerVsockPort))
+	if err != nil {
+		slog.ErrorContext(ctx, "vsock listen failed", "err", err)
+		return errors.Errorf("listening on vsock: %w", err)
+	}
+	defer vsockListener.Close()
+
+	grpcServer := grpc.NewServer(
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
+		grpc.ChainUnaryInterceptor(grpcerr.UnaryServerInterceptor()),
+		grpc.ChainStreamInterceptor(grpcerr.StreamServerInterceptor()),
+	)
+
+	runmv1.RegisterHostServiceServer(grpcServer, rvm)
+
+	err = grpcServer.Serve(vsockListener)
+	if err != nil {
+		slog.ErrorContext(ctx, "error serving grpc server", "err", err)
+		return errors.Errorf("serving grpc server: %w", err)
+	}
 
 	return nil
 }

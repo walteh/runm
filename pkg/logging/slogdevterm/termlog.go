@@ -2,11 +2,13 @@ package slogdevterm
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"io"
 	"log/slog"
 	"os"
+	"reflect"
 	"strings"
 	"time"
 
@@ -237,14 +239,7 @@ func (l *TermLogger) Handle(ctx context.Context, r slog.Record) error {
 
 			var valColored string
 
-			// if pv, ok := a.Value.Any().(valuelog.PrettyRawJSONValue); ok {
-			// 	appendageBuilder.WriteString(JSONToTree(a.Key, pv.RawJSON(), l.styles, l.renderFunc))
-			// 	appendageBuilder.WriteString("\n")
-			// 	valColored = l.render(l.styles.ValueAppendage, "󰘦 "+a.Key)
-			// } else if pv, ok := a.Value.Any().(valuelog.PrettyAnyValue); ok {
-			// 	appendageBuilder.WriteString(StructToTreeWithTitle(pv.Any(), a.Key, l.styles, l.renderFunc))
-			// 	appendageBuilder.WriteString("\n")
-			// 	valColored = l.render(l.styles.ValueAppendage, "󰙅 "+a.Key)
+			// Check for errors first - they get special handling
 			if (a.Key == "error" || a.Key == "err" || a.Key == "error.payload") && r.Level > slog.LevelWarn {
 				// Special handling for error values - use beautiful error trace display
 				if err, ok := a.Value.Any().(error); ok {
@@ -261,6 +256,20 @@ func (l *TermLogger) Handle(ctx context.Context, r slog.Record) error {
 					val := fmt.Sprintf("type: %T - %v", a.Value.Any(), a.Value.Any())
 					valColored = l.render(valStyle, val)
 				}
+				// } else if jsonData, isJSON := isJSONString(a.Value.Any()); isJSON {
+				// 	// Check for JSON strings or bytes that should be pretty-printed
+				// 	appendageBuilder.WriteString(JSONToTreeWithTitle([]byte(jsonData), a.Key, l.styles, l.renderFunc))
+				// 	appendageBuilder.WriteString("\n")
+				// 	valColored = l.render(l.styles.ValueAppendage, "󰘦 "+a.Key)
+				// } else if isStructLike(a.Value.Any()) {
+				// 	// Handle structs, maps, slices, and other complex types
+				// 	// Option 1: Tree-style display (original)
+				// 	appendageBuilder.WriteString(StructToTreeWithTitle(a.Value.Any(), a.Key, l.styles, l.renderFunc))
+
+				// 	// Option 2: GoBoxDump display
+				// 	// appendageBuilder.WriteString(GoBoxDump(a.Value.Any(), a.Key, l.styles, l.renderFunc))
+				// 	appendageBuilder.WriteString("\n")
+				// 	valColored = l.render(l.styles.ValueAppendage, "󰙅 "+a.Key)
 			} else {
 				// Value styling (supports per-key overrides).
 				valStyle, ok := l.styles.Values[a.Key]
@@ -311,4 +320,61 @@ func (l *TermLogger) WithAttrs(attrs []slog.Attr) slog.Handler {
 
 func (l *TermLogger) WithGroup(name string) slog.Handler {
 	return l
+}
+
+// isJSONString checks if a string/bytes value looks like JSON
+// by checking for the [nospace{] prefix mentioned by the user
+func isJSONString(v interface{}) (string, bool) {
+	var data string
+
+	switch val := v.(type) {
+	case string:
+		data = val
+	case []byte:
+		data = string(val)
+	default:
+		return "", false
+	}
+
+	// Check for JSON-like patterns (object or array)
+	trimmed := strings.TrimSpace(data)
+	if (strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}")) ||
+		(strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]")) {
+
+		// Try to validate it's actually valid JSON
+		var temp interface{}
+		if err := json.Unmarshal([]byte(trimmed), &temp); err == nil {
+			return trimmed, true
+		}
+	}
+
+	return "", false
+}
+
+// isStructLike checks if a value is a struct, map, slice, or other complex type worth dumping
+func isStructLike(v interface{}) bool {
+	if v == nil {
+		return false
+	}
+
+	val := reflect.ValueOf(v)
+
+	// Dereference pointers
+	for val.Kind() == reflect.Ptr {
+		if val.IsNil() {
+			return false
+		}
+		val = val.Elem()
+	}
+
+	switch val.Kind() {
+	case reflect.Struct, reflect.Map, reflect.Slice, reflect.Array:
+		return true
+	case reflect.Interface:
+		if !val.IsNil() {
+			return isStructLike(val.Interface())
+		}
+	}
+
+	return false
 }

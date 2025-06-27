@@ -298,6 +298,19 @@ RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/g
 GOOS=linux GOARCH=${ARCH} go build -x -ldflags="-s -w -extldflags=-static" -trimpath -o /out/runm-linux-init ./cmd/runm-linux-init
 EOF
 
+########################################################
+# runm-linux-init builder
+########################################################
+
+FROM runm-linux-go-base-builder AS runm-linux-host-fork-exec-proxy-builder
+
+WORKDIR /app/runm
+
+ARG ARCH 
+
+RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/go/pkg/mod <<EOF
+GOOS=linux GOARCH=${ARCH} go build -x -ldflags="-s -w -extldflags=-static" -trimpath -o /out/runm-linux-host-fork-exec-proxy ./cmd/runm-linux-host-fork-exec-proxy
+EOF
 
 ########################################################
 # initramfs builder
@@ -333,7 +346,7 @@ FROM scratch AS mbin-files
 COPY --from=runc-static-builder /bin/runc /runc
 COPY --from=crun-static-builder-alpine /bin/crun /crun
 COPY --from=runm-linux-init-builder /out/runm-linux-init /runm-linux-init
-
+COPY --from=runm-linux-host-fork-exec-proxy-builder /out/runm-linux-host-fork-exec-proxy /runm-linux-host-fork-exec-proxy
 
 ########################################################
 # initramfs cpio builder

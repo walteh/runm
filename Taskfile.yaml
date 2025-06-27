@@ -345,6 +345,10 @@ tasks:
             GOOS=linux GOARCH=${ARCH} go build \
                 -ldflags="-s -w -extldflags=-static" \
                  -o {{.TMP_DIR}}/mbin/runm-linux-init ./cmd/runm-linux-init
+          - |-
+            GOOS=linux GOARCH=${ARCH} go build \
+                -ldflags="-s -w -extldflags=-static" \
+                 -o {{.TMP_DIR}}/mbin/runm-linux-host-fork-exec-proxy ./cmd/runm-linux-host-fork-exec-proxy
 
           - mksquashfs {{.TMP_DIR}}/mbin/* {{.TMP_DIR}}/mbin-new.squashfs  -quiet
           - |-
