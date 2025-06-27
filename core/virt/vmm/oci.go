@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -257,19 +258,43 @@ func bindMountToVirtioFs(ctx context.Context, mount specs.Mount, containerId str
 
 	} else {
 
-		base := filepath.Base(mount.Source)
-		dir := filepath.Base(filepath.Dir(mount.Source))
+		// run a quick ls -la in the dir for fun
 
-		if base == "resolv.conf" || base == "hosts" {
-			if dir == containerId {
-				slog.WarnContext(ctx, "skipping mount of file", "file", mount.Source)
-
-				// mount.Type = "copy"
-				return nil, nil, nil
-			}
+		dir := filepath.Dir(mount.Source)
+		ls, err := exec.Command("ls", "-lah", dir).Output()
+		if err != nil {
+			return nil, nil, errors.Errorf("listing source: %w", err)
+		}
+		slog.InfoContext(ctx, "ls -lah", "ls", string(ls))
+		hash := sha256.Sum256([]byte(dir))
+		tag := "bind-" + hex.EncodeToString(hash[:8])
+		// create a new fs direcotry share
+		shareDev, err := virtio.VirtioFsNew(dir, tag)
+		if err != nil {
+			return nil, nil, errors.Errorf("creating share device: %w", err)
 		}
 
-		return nil, nil, errors.Errorf("unsupported bind mount file: %s", mount.Source)
+		// Don't change the destination - keep the original file path
+		mount.Destination = dir
+		mount.Type = "virtiofs"
+		mount.Source = tag
+		mount.Options = []string{}
+
+		return &mount, shareDev, nil
+
+		// base := filepath.Base(mount.Source)
+		// dir := filepath.Base(filepath.Dir(mount.Source))
+
+		// if base == "resolv.conf" || base == "hosts" {
+		// 	if dir == containerId {
+		// 		slog.WarnContext(ctx, "skipping mount of file", "file", mount.Source)
+
+		// 		// mount.Type = "copy"
+		// 		return nil, nil, nil
+		// 	}
+		// }
+
+		// return nil, nil, errors.Errorf("unsupported bind mount file: %s", mount.Source)
 
 		// this is probably a security issue, but for now d
 	}

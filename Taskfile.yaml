@@ -25,6 +25,7 @@ env:
     GOSUMDB: sum.golang.org
     GOPRIVATE: github.com/walteh
     DOCKER_BUILDKIT: 1
+    PAGER: less
 
 tasks:
     go:tidy:
@@ -55,9 +56,6 @@ tasks:
     go:lint:
         desc: runs the linters
         vars:
-            # GO_FILES: "./cmd/containerd-shim-runm-v2/manager/manager.go"
-
-            # skip .gen and .pb.go files
             GO_FILES:
                 sh: find . -type f -name '*.go' -not -path '*/gen/*' -not -path '*/proto/*'
         cmds:

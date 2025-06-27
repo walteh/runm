@@ -169,6 +169,12 @@ func mount(ctx context.Context) error {
 		return errors.Errorf("problem mounting ec1 virtiofs: %w", err)
 	}
 
+	// Add debugging for ec1 mount
+	slog.InfoContext(ctx, "DEBUG: EC1 virtiofs mount completed", "tag", constants.Ec1VirtioTag, "path", constants.Ec1AbsPath)
+	ExecCmdForwardingStdio(ctx, "ls", "-la", constants.Ec1AbsPath)
+	ExecCmdForwardingStdio(ctx, "cat", "/proc/mounts", "|", "grep", "virtiofs")
+	ExecCmdForwardingStdio(ctx, "df", "-h")
+
 	if bundleSource != "" {
 		if err = os.MkdirAll(bundleSource, 0755); err != nil {
 			return errors.Errorf("problem creating bundle source: %w", err)
@@ -178,6 +184,10 @@ func mount(ctx context.Context) error {
 		if err != nil {
 			return errors.Errorf("problem mounting ec1 virtiofs: %w", err)
 		}
+
+		// Add debugging for bundle mount
+		slog.InfoContext(ctx, "DEBUG: Bundle virtiofs mount completed", "tag", constants.BundleVirtioTag, "path", bundleSource)
+		ExecCmdForwardingStdio(ctx, "ls", "-la", bundleSource)
 	}
 
 	if _, err := os.Stat(constants.NewRootAbsPath); os.IsNotExist(err) {
@@ -188,6 +198,10 @@ func mount(ctx context.Context) error {
 	if err != nil {
 		return errors.Errorf("problem mounting rootfs virtiofs: %w", err)
 	}
+
+	// Add debugging for rootfs mount
+	slog.InfoContext(ctx, "DEBUG: Rootfs virtiofs mount completed", "tag", constants.RootfsVirtioTag, "path", constants.NewRootAbsPath)
+	ExecCmdForwardingStdio(ctx, "ls", "-la", constants.NewRootAbsPath)
 
 	if _, err := os.Stat(constants.MbinAbsPath); os.IsNotExist(err) {
 		os.MkdirAll(constants.MbinAbsPath, 0755)
@@ -252,6 +266,9 @@ func mount(ctx context.Context) error {
 	if err != nil {
 		return errors.Errorf("problem mounting rootfs: %w", err)
 	}
+
+	// ls -larh /var/lib/runm/ec1
+	ExecCmdForwardingStdio(ctx, "ls", "-larh", "/var")
 
 	err = switchRoot(ctx)
 	if err != nil {
@@ -348,6 +365,12 @@ func mountRootfsSecondary(ctx context.Context, prefix string, customMounts []spe
 			continue
 		}
 
+		// Skip mounts that are already handled in initramfs
+		if mount.Destination == "/proc" || mount.Destination == "/sys" || mount.Destination == "/run" ||
+			mount.Destination == "/dev/pts" || mount.Destination == "/dev/shm" || mount.Destination == "/dev/mqueue" {
+			continue
+		}
+
 		slog.InfoContext(ctx, "mounting", "dest", dest, "mount", mount)
 		cmds = append(cmds, []string{"mkdir", "-p", dest})
 		// if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
@@ -361,9 +384,10 @@ func mountRootfsSecondary(ctx context.Context, prefix string, customMounts []spe
 		opd := strings.Join(mount.Options, ",")
 		opd = strings.TrimSuffix(opd, ",")
 
-		opts := []string{"-o", opd}
-		if len(mount.Options) == 1 {
-			opts = []string{}
+		opts := []string{}
+
+		if opd != "" {
+			opts = append(opts, "-o", opd)
 		}
 
 		// if mount.Destination == "/dev" {
@@ -380,11 +404,13 @@ func mountRootfsSecondary(ctx context.Context, prefix string, customMounts []spe
 			allOpts = append(allOpts, opts...)
 			allOpts = append(allOpts, dest)
 			cmds = append(cmds, allOpts)
+
+			cmds = append(cmds, []string{"ls", "-lah", dest})
 		}
 	}
 
 	for _, cmd := range cmds {
-		err := ExecCmdForwardingStdioChroot(ctx, constants.NewRootAbsPath, cmd...)
+		err := ExecCmdForwardingStdio(ctx, cmd...)
 		if err != nil {
 			return errors.Errorf("running command: %v: %w", cmd, err)
 		}
