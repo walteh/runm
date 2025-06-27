@@ -107,6 +107,48 @@ func (r *GoRuncRuntime) Create(ctx context.Context, id, bundle string, options *
 	}
 	slog.InfoContext(ctx, "ls -lahr: "+string(output), "bundle", bundle)
 
+	// Handle the exec FIFO in a separate goroutine to ensure proper synchronization
+	// This is critical for container initialization
+	go func() {
+		// The FIFO is created in the container's state directory
+		stateDir := filepath.Join(r.Root, id)
+		fifoPath := filepath.Join(stateDir, "exec.fifo")
+
+		// Wait a bit to ensure the container has time to create the FIFO
+		time.Sleep(100 * time.Millisecond)
+
+		// Check if the FIFO exists
+		if _, err := os.Stat(fifoPath); err != nil {
+			slog.InfoContext(ctx, "Exec FIFO not found, skipping FIFO handling", "path", fifoPath, "error", err)
+			return
+		}
+
+		slog.InfoContext(ctx, "Opening exec FIFO to synchronize with container", "path", fifoPath)
+
+		// Open the FIFO with a timeout to avoid hanging indefinitely
+		openDone := make(chan struct{})
+		var openErr error
+
+		go func() {
+			// Open the FIFO for reading (O_RDONLY)
+			// This will block until the container writes to it
+			_, openErr = os.OpenFile(fifoPath, os.O_RDONLY, 0)
+			close(openDone)
+		}()
+
+		// Wait for either the open to complete or a timeout
+		select {
+		case <-openDone:
+			if openErr != nil {
+				slog.InfoContext(ctx, "Failed to open exec FIFO", "path", fifoPath, "error", openErr)
+			} else {
+				slog.InfoContext(ctx, "Successfully opened exec FIFO", "path", fifoPath)
+			}
+		case <-time.After(2 * time.Second):
+			slog.InfoContext(ctx, "Timeout waiting for exec FIFO", "path", fifoPath)
+		}
+	}()
+
 	files := []string{
 		"bootstrap.json",
 		"config.json",
@@ -156,8 +198,6 @@ func (r *GoRuncRuntime) Create(ctx context.Context, id, bundle string, options *
 			slog.InfoContext(ctx, "created symlink", "path", hook.Path)
 		}
 	}
-
-	// options.NoPivot = true
 
 	done := false
 	defer func() {

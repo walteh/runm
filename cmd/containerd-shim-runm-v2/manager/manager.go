@@ -48,8 +48,6 @@ import (
 
 	"github.com/walteh/runm/cmd/containerd-shim-runm-v2/runm"
 	"github.com/walteh/runm/core/runc/runtime"
-
-	runmv1 "github.com/walteh/runm/proto/v1"
 )
 
 // NewShimManager returns an implementation of the shim manager
@@ -101,9 +99,8 @@ type spec struct {
 }
 
 type manager struct {
-	name            string
-	shimGrpcService runmv1.ShimServiceClient
-	creator         runtime.RuntimeCreator
+	name    string
+	creator runtime.RuntimeCreator
 }
 
 func newCommand(ctx context.Context, id, containerdAddress, containerdTTRPCAddress string, debug bool) (*exec.Cmd, error) {
@@ -340,10 +337,10 @@ func (m manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {
 		return shim.StopStatus{}, err
 	}
 
-	_, err = m.shimGrpcService.ShimKill(ctx, &runmv1.ShimKillRequest{})
-	if err != nil {
-		return shim.StopStatus{}, err
-	}
+	// _, err = m.shimGrpcService.ShimKill(ctx, &runmv1.ShimKillRequest{})
+	// if err != nil {
+	// 	return shim.StopStatus{}, err
+	// }
 	// pid = int(killResponse.GetInitPid())
 
 	// kill the pid

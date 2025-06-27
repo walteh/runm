@@ -46,6 +46,7 @@ require (
 	github.com/crc-org/vfkit v0.6.2-0.20250415145558-4b7cae94e86a
 	github.com/creack/pty v1.1.24
 	github.com/fatih/color v1.18.0
+	github.com/goforj/godump v1.2.0
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/hashicorp/go-plugin v1.6.3
 	github.com/kr/pty v1.1.8
@@ -140,7 +141,6 @@ require (
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
-	github.com/goforj/godump v1.2.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
@@ -267,7 +267,7 @@ require (
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/cilium/ebpf v0.18.0 // indirect
 	github.com/containerd/continuity v0.4.5 // indirect
-	github.com/containerd/otelttrpc v0.1.0 // indirect
+	github.com/containerd/otelttrpc v0.1.0
 	github.com/coreos/go-systemd/v22 v22.5.1-0.20231103132048-7d375ecc2b09 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
