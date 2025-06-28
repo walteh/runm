@@ -104,7 +104,8 @@ func (s *DevContainerdServer) Start(ctx context.Context) error {
 	slog.InfoContext(ctx, "Starting containerd with args", "args", args)
 
 	app := command.App()
-	return app.Run(args)
+
+	return app.RunContext(ctx, args)
 }
 
 func (s *DevContainerdServer) StartBackground(ctx context.Context) error {
