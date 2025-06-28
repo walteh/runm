@@ -105,6 +105,15 @@ func New(id string, runtime runtime.Runtime, cgroupAdapter runtime.CgroupAdapter
 
 // Create the process with the provided config
 func (p *Init) Create(ctx context.Context, r *process.CreateConfig) error {
+
+	defer func() {
+		slog.InfoContext(ctx, "SHIM IS SHUTTING DOWN")
+		if r := recover(); r != nil {
+			slog.ErrorContext(ctx, "panic in Create", "error", r)
+			panic(r)
+		}
+	}()
+
 	var (
 		err     error
 		socket  runtime.ConsoleSocket
@@ -150,31 +159,44 @@ func (p *Init) Create(ctx context.Context, r *process.CreateConfig) error {
 	}
 	slog.InfoContext(ctx, "done calling runtime.Create")
 	if r.Stdin != "" {
+		slog.InfoContext(ctx, "opening stdin", "path", r.Stdin)
 		if err := p.openStdin(r.Stdin); err != nil {
 			return err
 		}
+		slog.InfoContext(ctx, "done opening stdin")
 	}
+
+	slog.InfoContext(ctx, "starting console copy")
+
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	if socket != nil {
+		slog.InfoContext(ctx, "receiving console master")
 		console, err := socket.ReceiveMaster()
 		if err != nil {
 			return errors.Errorf("failed to retrieve console master: %w", err)
 		}
+		slog.InfoContext(ctx, "starting console copy")
 		console, err = p.Platform.CopyConsole(ctx, console, p.id, r.Stdin, r.Stdout, r.Stderr, &p.wg)
 		if err != nil {
 			return errors.Errorf("failed to start console copy: %w", err)
 		}
+		slog.InfoContext(ctx, "done starting console copy")
 		p.console = console
 	} else {
+		slog.InfoContext(ctx, "starting io pipe copy", "pio_is_nil", pio == nil)
 		if err := pio.Copy(ctx, &p.wg); err != nil {
 			return errors.Errorf("failed to start io pipe copy: %w", err)
 		}
+		slog.InfoContext(ctx, "done starting io pipe copy")
 	}
+
+	slog.InfoContext(ctx, "reading pid file")
 	pid, err := p.runtime.ReadPidFile(ctx, pidFile.Path())
 	if err != nil {
 		return errors.Errorf("failed to retrieve OCI runtime container pid: %w", err)
 	}
+	slog.InfoContext(ctx, "done reading pid file", "pid", pid)
 	p.pid = pid
 	return nil
 }

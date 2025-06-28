@@ -6,7 +6,7 @@ exclude github.com/containerd/nerdctl/mod/tigron v0.0.0
 
 // forks
 replace (
-	// github.com/Code-Hex/vz/v3 => ../vz
+	github.com/Code-Hex/vz/v3 => ../vz
 	github.com/containerd/console => ../console
 	github.com/containerd/containerd/api => ../containerd/api
 	github.com/containerd/containerd/v2 => ../containerd

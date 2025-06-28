@@ -7,6 +7,122 @@ import (
 	protovalidate "buf.build/go/protovalidate"
 )
 
+// NewVsockPort creates a new VsockPort using the builder
+func NewVsockPort(b *VsockPort_builder) *VsockPort {
+	return b.Build()
+}
+
+// NewVsockPortE creates a new VsockPort using the builder with validation
+func NewVsockPortE(b *VsockPort_builder) (*VsockPort, error) {
+	m := b.Build()
+	if err := protovalidate.Validate(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// NewUnixSocketPath creates a new UnixSocketPath using the builder
+func NewUnixSocketPath(b *UnixSocketPath_builder) *UnixSocketPath {
+	return b.Build()
+}
+
+// NewUnixSocketPathE creates a new UnixSocketPath using the builder with validation
+func NewUnixSocketPathE(b *UnixSocketPath_builder) (*UnixSocketPath, error) {
+	m := b.Build()
+	if err := protovalidate.Validate(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// NewSocketType creates a new SocketType using the builder
+func NewSocketType(b *SocketType_builder) *SocketType {
+	return b.Build()
+}
+
+// NewSocketTypeE creates a new SocketType using the builder with validation
+func NewSocketTypeE(b *SocketType_builder) (*SocketType, error) {
+	m := b.Build()
+	if err := protovalidate.Validate(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// NewSocketType_WithVsockPort creates a new SocketType with the VsockPort field set using the builder
+func NewSocketType_WithVsockPort(innerBuilder *VsockPort_builder) *SocketType {
+	inner := NewVsockPort(innerBuilder)
+	return NewSocketType(&SocketType_builder{
+		VsockPort: inner,
+	})
+}
+
+// NewSocketType_WithVsockPortE creates a new SocketType with the VsockPort field set using the builder with validation
+func NewSocketType_WithVsockPortE(innerBuilder *VsockPort_builder) (*SocketType, error) {
+	inner, err := NewVsockPortE(innerBuilder)
+	if err != nil {
+		return nil, err
+	}
+	m := NewSocketType(&SocketType_builder{
+		VsockPort: inner,
+	})
+	if err := protovalidate.Validate(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// NewSocketType_WithUnixSocketPath creates a new SocketType with the UnixSocketPath field set using the builder
+func NewSocketType_WithUnixSocketPath(innerBuilder *UnixSocketPath_builder) *SocketType {
+	inner := NewUnixSocketPath(innerBuilder)
+	return NewSocketType(&SocketType_builder{
+		UnixSocketPath: inner,
+	})
+}
+
+// NewSocketType_WithUnixSocketPathE creates a new SocketType with the UnixSocketPath field set using the builder with validation
+func NewSocketType_WithUnixSocketPathE(innerBuilder *UnixSocketPath_builder) (*SocketType, error) {
+	inner, err := NewUnixSocketPathE(innerBuilder)
+	if err != nil {
+		return nil, err
+	}
+	m := NewSocketType(&SocketType_builder{
+		UnixSocketPath: inner,
+	})
+	if err := protovalidate.Validate(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// NewDialOpenListenerRequest creates a new DialOpenListenerRequest using the builder
+func NewDialOpenListenerRequest(b *DialOpenListenerRequest_builder) *DialOpenListenerRequest {
+	return b.Build()
+}
+
+// NewDialOpenListenerRequestE creates a new DialOpenListenerRequest using the builder with validation
+func NewDialOpenListenerRequestE(b *DialOpenListenerRequest_builder) (*DialOpenListenerRequest, error) {
+	m := b.Build()
+	if err := protovalidate.Validate(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// NewDialOpenListenerResponse creates a new DialOpenListenerResponse using the builder
+func NewDialOpenListenerResponse(b *DialOpenListenerResponse_builder) *DialOpenListenerResponse {
+	return b.Build()
+}
+
+// NewDialOpenListenerResponseE creates a new DialOpenListenerResponse using the builder with validation
+func NewDialOpenListenerResponseE(b *DialOpenListenerResponse_builder) (*DialOpenListenerResponse, error) {
+	m := b.Build()
+	if err := protovalidate.Validate(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // NewAllocateSocketStreamRequest creates a new AllocateSocketStreamRequest using the builder
 func NewAllocateSocketStreamRequest(b *AllocateSocketStreamRequest_builder) *AllocateSocketStreamRequest {
 	return b.Build()

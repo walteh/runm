@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -103,6 +104,10 @@ func (d *debugManager) Start(ctx context.Context, id string, opts shim.StartOpts
 // Stop implements shim.Manager
 func (d *debugManager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {
 	return wrap(func(ctx context.Context, id string) (shim.StopStatus, error) {
+		// When in delete mode, add context to logs
+		if os.Args[len(os.Args)-1] == "delete" {
+			ctx = slogctx.Append(ctx, slog.String("mode", "delete"))
+		}
 		return d.ref.Stop(ctx, id)
 	})(ctx, id)
 }

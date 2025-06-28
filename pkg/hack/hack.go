@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"runtime"
 	"unsafe"
+
+	"gitlab.com/tozd/go/errors"
 )
 
 func GetUnexportedFieldOf(obj any, field string) any {
@@ -12,6 +14,20 @@ func GetUnexportedFieldOf(obj any, field string) any {
 		val = val.Elem()
 	}
 	return GetUnexportedField(val.FieldByName(field))
+}
+
+func TryGetUnexportedFieldOf[T any](obj any, field string) (t T, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.Errorf("panic: %v", r)
+		}
+	}()
+	g := GetUnexportedFieldOf(obj, field)
+	t, ok := g.(T)
+	if !ok {
+		return *new(T), errors.Errorf("field %s is not of type %T", field, t)
+	}
+	return t, nil
 }
 
 func GetUnexportedField(field reflect.Value) any {

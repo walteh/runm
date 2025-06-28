@@ -23,6 +23,7 @@ import (
 	"github.com/walteh/runm/core/gvnet"
 	"github.com/walteh/runm/core/virt/virtio"
 	"github.com/walteh/runm/linux/constants"
+	"github.com/walteh/runm/pkg/conn"
 	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/pkg/logging"
 
@@ -110,6 +111,66 @@ func (r *RunningVM[VM]) GuestService(ctx context.Context) (*grpcruntime.GRPCClie
 	}
 }
 
+// open a new unix socket pair
+
+// // attempt to get the raw connection, otherwise proxy it
+
+// rc, err := hack.TryGetUnexportedFieldOf[net.Conn](conn, "rawConn")
+// if err != nil {
+// 	return nil, errors.Errorf("getting raw connection: %w", err)
+// }
+
+// unixConn, ok := rc.(*net.UnixConn)
+// if !ok {
+// 	return nil, errors.Errorf("raw connection is not a net.UnixConn")
+// }
+
+func (r *RunningVM[VM]) ListenAndAcceptSingleVsockConnection(ctx context.Context, port uint32, dialCallback func(ctx context.Context) error) (*net.UnixConn, error) {
+
+	lfunc := func(ctx context.Context) (net.Listener, error) {
+		return r.vm.VSockListen(ctx, uint32(port))
+	}
+
+	cz, err := conn.ListenAndAcceptSingleNetConn(ctx, lfunc, dialCallback)
+	if err != nil {
+		return nil, errors.Errorf("listening and accepting vsock connection: %w", err)
+	}
+
+	unixConn, err := conn.CreateUnixConnProxy(ctx, cz)
+	if err != nil {
+		return nil, errors.Errorf("creating unix conn proxy: %w", err)
+	}
+
+	// open a new unix socket pair
+
+	return unixConn, nil
+}
+
+// type filer interface {
+// 	File() (*os.File, error)
+// }
+
+// rawConn := hack.GetUnexportedFieldOf(conn, "rawConn")
+// rawConnf, ok := rawConn.(filer)
+// if !ok {
+// 	return nil, errors.Errorf("connection does not support File()")
+// }
+
+// file, err := rawConnf.File()
+// if err != nil {
+// 	return nil, errors.Errorf("getting file from connection: %w", err)
+// }
+// defer file.Close()
+
+// // Now use this fd with mdlayher/socket
+// sockConn, err := socket.FileConn(
+// 	file,
+// 	"custom",
+// )
+
+// return sockConn, nil
+// }
+
 func (r *RunningVM[VM]) ProxyVsock(ctx context.Context, port uint32) (*net.UnixConn, string, error) {
 	conn, err := r.vm.VSockConnect(ctx, uint32(port))
 	if err != nil {
@@ -121,20 +182,20 @@ func (r *RunningVM[VM]) ProxyVsock(ctx context.Context, port uint32) (*net.UnixC
 	// open a unix socket to the connection in a working directory
 	unixConn, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: unixSocketPath, Net: "unix"})
 	if err != nil {
-		return nil, "", err
+		return nil, "", errors.Errorf("dialing unix socket: %w", err)
 	}
 
 	// copy the connection to the unix socket
 	go func() {
 		_, err := io.Copy(unixConn, conn)
-		if err != nil {
+		if err != nil && !errors.Is(err, net.ErrClosed) && !errors.Is(err, io.EOF) {
 			slog.ErrorContext(ctx, "error copying connection to unix socket", "error", err)
 		}
 	}()
 
 	go func() {
 		_, err := io.Copy(conn, unixConn)
-		if err != nil {
+		if err != nil && !errors.Is(err, net.ErrClosed) && !errors.Is(err, io.EOF) {
 			slog.ErrorContext(ctx, "error copying connection to vsock", "error", err)
 		}
 	}()

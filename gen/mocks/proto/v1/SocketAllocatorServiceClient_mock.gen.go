@@ -52,6 +52,9 @@ var _ runmv1.SocketAllocatorServiceClient = &MockSocketAllocatorServiceClient{}
 //			CloseSocketsFunc: func(ctx context.Context, in *runmv1.CloseSocketsRequest, opts ...grpc.CallOption) (*runmv1.CloseSocketsResponse, error) {
 //				panic("mock out the CloseSockets method")
 //			},
+//			DialOpenListenerFunc: func(ctx context.Context, in *runmv1.DialOpenListenerRequest, opts ...grpc.CallOption) (*runmv1.DialOpenListenerResponse, error) {
+//				panic("mock out the DialOpenListener method")
+//			},
 //		}
 //
 //		// use mockedSocketAllocatorServiceClient in code that requires runmv1.SocketAllocatorServiceClient
@@ -88,6 +91,9 @@ type MockSocketAllocatorServiceClient struct {
 
 	// CloseSocketsFunc mocks the CloseSockets method.
 	CloseSocketsFunc func(ctx context.Context, in *runmv1.CloseSocketsRequest, opts ...grpc.CallOption) (*runmv1.CloseSocketsResponse, error)
+
+	// DialOpenListenerFunc mocks the DialOpenListener method.
+	DialOpenListenerFunc func(ctx context.Context, in *runmv1.DialOpenListenerRequest, opts ...grpc.CallOption) (*runmv1.DialOpenListenerResponse, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -181,6 +187,15 @@ type MockSocketAllocatorServiceClient struct {
 			// Opts is the opts argument value.
 			Opts []grpc.CallOption
 		}
+		// DialOpenListener holds details about calls to the DialOpenListener method.
+		DialOpenListener []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// In is the in argument value.
+			In *runmv1.DialOpenListenerRequest
+			// Opts is the opts argument value.
+			Opts []grpc.CallOption
+		}
 	}
 	lockAllocateConsole      sync.RWMutex
 	lockAllocateIO           sync.RWMutex
@@ -192,6 +207,7 @@ type MockSocketAllocatorServiceClient struct {
 	lockCloseIO              sync.RWMutex
 	lockCloseSocket          sync.RWMutex
 	lockCloseSockets         sync.RWMutex
+	lockDialOpenListener     sync.RWMutex
 }
 
 // AllocateConsole calls AllocateConsoleFunc.
@@ -591,5 +607,45 @@ func (mock *MockSocketAllocatorServiceClient) CloseSocketsCalls() []struct {
 	mock.lockCloseSockets.RLock()
 	calls = mock.calls.CloseSockets
 	mock.lockCloseSockets.RUnlock()
+	return calls
+}
+
+// DialOpenListener calls DialOpenListenerFunc.
+func (mock *MockSocketAllocatorServiceClient) DialOpenListener(ctx context.Context, in *runmv1.DialOpenListenerRequest, opts ...grpc.CallOption) (*runmv1.DialOpenListenerResponse, error) {
+	if mock.DialOpenListenerFunc == nil {
+		panic("MockSocketAllocatorServiceClient.DialOpenListenerFunc: method is nil but SocketAllocatorServiceClient.DialOpenListener was just called")
+	}
+	callInfo := struct {
+		Ctx  context.Context
+		In   *runmv1.DialOpenListenerRequest
+		Opts []grpc.CallOption
+	}{
+		Ctx:  ctx,
+		In:   in,
+		Opts: opts,
+	}
+	mock.lockDialOpenListener.Lock()
+	mock.calls.DialOpenListener = append(mock.calls.DialOpenListener, callInfo)
+	mock.lockDialOpenListener.Unlock()
+	return mock.DialOpenListenerFunc(ctx, in, opts...)
+}
+
+// DialOpenListenerCalls gets all the calls that were made to DialOpenListener.
+// Check the length with:
+//
+//	len(mockedSocketAllocatorServiceClient.DialOpenListenerCalls())
+func (mock *MockSocketAllocatorServiceClient) DialOpenListenerCalls() []struct {
+	Ctx  context.Context
+	In   *runmv1.DialOpenListenerRequest
+	Opts []grpc.CallOption
+} {
+	var calls []struct {
+		Ctx  context.Context
+		In   *runmv1.DialOpenListenerRequest
+		Opts []grpc.CallOption
+	}
+	mock.lockDialOpenListener.RLock()
+	calls = mock.calls.DialOpenListener
+	mock.lockDialOpenListener.RUnlock()
 	return calls
 }

@@ -21,10 +21,12 @@ package process
 import (
 	"context"
 	"io"
+	"log/slog"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -70,6 +72,7 @@ func (p *processIO) IO() runtime.IO {
 }
 
 func (p *processIO) Copy(ctx context.Context, wg *sync.WaitGroup) error {
+	slog.InfoContext(ctx, "copying pipes", "pio_is_nil", p == nil, "stdin_is_null", p.IO().Stdin() == nil, "stdout_is_null", p.IO().Stdout() == nil, "stderr_is_null", p.IO().Stderr() == nil)
 	if !p.copy {
 		return nil
 	}
@@ -104,6 +107,7 @@ func createIO(ctx context.Context, id string, ioUID, ioGID int, stdio stdio.Stdi
 	switch u.Scheme {
 	case "fifo":
 		pio.copy = true
+		slog.InfoContext(ctx, "creating pipe IO", "ioUID", ioUID, "ioGID", ioGID, "stdin", stdio.Stdin, "stdout", stdio.Stdout, "stderr", stdio.Stderr)
 		pio.io, err = runtime.NewPipeIO(ctx, ioUID, ioGID, withConditionalIO(stdio))
 	case "binary":
 		pio.io, err = NewBinaryIO(ctx, id, u)
@@ -132,6 +136,13 @@ func createIO(ctx context.Context, id string, ioUID, ioGID int, stdio stdio.Stdi
 }
 
 func copyPipes(ctx context.Context, rio runtime.IO, stdin, stdout, stderr string, wg, cwg *sync.WaitGroup) error {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.ErrorContext(ctx, "panic in copyPipes main", "error", r)
+			slog.ErrorContext(ctx, string(debug.Stack()))
+			panic(r)
+		}
+	}()
 	var sameFile *countingWriteCloser
 	for _, i := range []struct {
 		name string
@@ -143,6 +154,13 @@ func copyPipes(ctx context.Context, rio runtime.IO, stdin, stdout, stderr string
 				wg.Add(1)
 				cwg.Add(1)
 				go func() {
+					defer func() {
+						if r := recover(); r != nil {
+							slog.ErrorContext(ctx, "panic in copyPipes stdout", "error", r)
+							slog.ErrorContext(ctx, string(debug.Stack()))
+							panic(r)
+						}
+					}()
 					cwg.Done()
 					p := bufPool.Get().(*[]byte)
 					defer bufPool.Put(p)
@@ -162,6 +180,13 @@ func copyPipes(ctx context.Context, rio runtime.IO, stdin, stdout, stderr string
 				wg.Add(1)
 				cwg.Add(1)
 				go func() {
+					defer func() {
+						if r := recover(); r != nil {
+							slog.ErrorContext(ctx, "panic in copyPipes stderr", "error", r)
+							slog.ErrorContext(ctx, string(debug.Stack()))
+							panic(r)
+						}
+					}()
 					cwg.Done()
 					p := bufPool.Get().(*[]byte)
 					defer bufPool.Put(p)
@@ -216,6 +241,12 @@ func copyPipes(ctx context.Context, rio runtime.IO, stdin, stdout, stderr string
 	}
 	cwg.Add(1)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.ErrorContext(ctx, "panic in copyPipes", "error", r)
+				panic(r)
+			}
+		}()
 		cwg.Done()
 		p := bufPool.Get().(*[]byte)
 		defer bufPool.Put(p)

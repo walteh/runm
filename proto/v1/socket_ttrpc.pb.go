@@ -10,6 +10,7 @@ import (
 type TTRPCSocketAllocatorServiceService interface {
 	AllocateSockets(context.Context, *AllocateSocketsRequest) (*AllocateSocketsResponse, error)
 	AllocateSocketStream(context.Context, *AllocateSocketStreamRequest, TTRPCSocketAllocatorService_AllocateSocketStreamServer) error
+	DialOpenListener(context.Context, *DialOpenListenerRequest) (*DialOpenListenerResponse, error)
 	AllocateIO(context.Context, *AllocateIORequest) (*AllocateIOResponse, error)
 	AllocateConsole(context.Context, *AllocateConsoleRequest) (*AllocateConsoleResponse, error)
 	BindConsoleToSocket(context.Context, *BindConsoleToSocketRequest) (*BindConsoleToSocketResponse, error)
@@ -42,6 +43,13 @@ func RegisterTTRPCSocketAllocatorServiceService(srv *ttrpc.Server, svc TTRPCSock
 					return nil, err
 				}
 				return svc.AllocateSockets(ctx, &req)
+			},
+			"DialOpenListener": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+				var req DialOpenListenerRequest
+				if err := unmarshal(&req); err != nil {
+					return nil, err
+				}
+				return svc.DialOpenListener(ctx, &req)
 			},
 			"AllocateIO": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
 				var req AllocateIORequest
@@ -119,6 +127,7 @@ func RegisterTTRPCSocketAllocatorServiceService(srv *ttrpc.Server, svc TTRPCSock
 type TTRPCSocketAllocatorServiceClient interface {
 	AllocateSockets(context.Context, *AllocateSocketsRequest) (*AllocateSocketsResponse, error)
 	AllocateSocketStream(context.Context, *AllocateSocketStreamRequest) (TTRPCSocketAllocatorService_AllocateSocketStreamClient, error)
+	DialOpenListener(context.Context, *DialOpenListenerRequest) (*DialOpenListenerResponse, error)
 	AllocateIO(context.Context, *AllocateIORequest) (*AllocateIOResponse, error)
 	AllocateConsole(context.Context, *AllocateConsoleRequest) (*AllocateConsoleResponse, error)
 	BindConsoleToSocket(context.Context, *BindConsoleToSocketRequest) (*BindConsoleToSocketResponse, error)
@@ -174,6 +183,14 @@ func (x *ttrpcsocketallocatorserviceAllocateSocketStreamClient) Recv() (*Allocat
 		return nil, err
 	}
 	return m, nil
+}
+
+func (c *ttrpcsocketallocatorserviceClient) DialOpenListener(ctx context.Context, req *DialOpenListenerRequest) (*DialOpenListenerResponse, error) {
+	var resp DialOpenListenerResponse
+	if err := c.client.Call(ctx, "runm.v1.SocketAllocatorService", "DialOpenListener", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
 }
 
 func (c *ttrpcsocketallocatorserviceClient) AllocateIO(ctx context.Context, req *AllocateIORequest) (*AllocateIOResponse, error) {

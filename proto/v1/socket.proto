@@ -12,9 +12,10 @@ service SocketAllocatorService {
 	rpc AllocateSockets(AllocateSocketsRequest) returns (AllocateSocketsResponse) {}
 
 
-	// rpc AllocateSocket(AllocateSocketRequest) returns (AllocateSocketResponse) {}
-
 	rpc AllocateSocketStream(AllocateSocketStreamRequest) returns (stream AllocateSocketStreamResponse) {}
+
+
+	rpc DialOpenListener(DialOpenListenerRequest) returns (DialOpenListenerResponse) {}
 
 
 	// the same thing but with different name than "NewPipeIO"
@@ -43,10 +44,31 @@ service SocketAllocatorService {
 	rpc CloseConsole(CloseConsoleRequest) returns (CloseConsoleResponse) {}
 }
 
+message VsockPort {
+	uint32 port = 1;
+}
+
+message UnixSocketPath {
+	string path = 1;
+}
+
+message SocketType {
+	oneof type {
+		VsockPort      vsock_port       = 1;
+		UnixSocketPath unix_socket_path = 2;
+	}
+}
+
+message DialOpenListenerRequest {
+	SocketType listening_on = 1;
+}
+
+message DialOpenListenerResponse {}
+
 message AllocateSocketStreamRequest {}
 
 message AllocateSocketStreamResponse {
-	string socket_reference_id = 1;
+	SocketType socket_type = 1;
 }
 
 message AllocateIORequest {
@@ -66,7 +88,7 @@ message AllocateConsoleResponse {
 }
 
 message CloseSocketsRequest {
-	repeated string socket_reference_ids = 1;
+	repeated SocketType socket_types = 1;
 }
 
 message CloseSocketsResponse {}
@@ -76,21 +98,21 @@ message AllocateSocketsRequest {
 }
 
 message AllocateSocketsResponse {
-	repeated string socket_reference_ids = 1;
+	repeated SocketType socket_types = 1;
 }
 
 message BindIOToSocketsRequest {
-	string io_reference_id            = 1;
-	string stdin_socket_reference_id  = 2;
-	string stdout_socket_reference_id = 3;
-	string stderr_socket_reference_id = 4;
+	string     io_reference_id = 1;
+	SocketType stdin_socket    = 2;
+	SocketType stdout_socket   = 3;
+	SocketType stderr_socket   = 4;
 }
 
 message BindIOToSocketsResponse {}
 
 message BindConsoleToSocketRequest {
-	string console_reference_id = 1;
-	string socket_reference_id  = 2;
+	string     console_reference_id = 1;
+	SocketType socket_type          = 2;
 }
 
 message BindConsoleToSocketResponse {}
@@ -100,11 +122,11 @@ message AllocateSocketRequest {
 }
 
 message AllocateSocketResponse {
-	string socket_reference_id = 1;
+	SocketType socket_type = 1;
 }
 
 message CloseSocketRequest {
-	string socket_reference_id = 1;
+	SocketType socket_type = 1;
 }
 
 message CloseSocketResponse {

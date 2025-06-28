@@ -9,6 +9,70 @@ import (
 	slog "log/slog"
 )
 
+func (x *VsockPort) LogValue() slog.Value {
+	if x == nil {
+		return slog.AnyValue(nil)
+	}
+	attrs := make([]slog.Attr, 0, 1)
+	attrs = append(attrs, slog.Uint64("port", uint64(x.GetPort())))
+	return slog.GroupValue(attrs...)
+}
+
+func (x *UnixSocketPath) LogValue() slog.Value {
+	if x == nil {
+		return slog.AnyValue(nil)
+	}
+	attrs := make([]slog.Attr, 0, 1)
+	attrs = append(attrs, slog.String("path", x.GetPath()))
+	return slog.GroupValue(attrs...)
+}
+
+func (x *SocketType) LogValue() slog.Value {
+	if x == nil {
+		return slog.AnyValue(nil)
+	}
+	attrs := make([]slog.Attr, 0, 2)
+	// Handle oneof field: Type
+	switch x.WhichType() {
+	case SocketType_VsockPort_case:
+		if msgValue, ok := interface{}(x.GetVsockPort()).(slog.LogValuer); ok {
+			attrs = append(attrs, slog.Attr{Key: "vsock_port", Value: msgValue.LogValue()})
+		} else {
+			attrs = append(attrs, slog.Any("vsock_port", x.GetVsockPort()))
+		}
+	case SocketType_UnixSocketPath_case:
+		if msgValue, ok := interface{}(x.GetUnixSocketPath()).(slog.LogValuer); ok {
+			attrs = append(attrs, slog.Attr{Key: "unix_socket_path", Value: msgValue.LogValue()})
+		} else {
+			attrs = append(attrs, slog.Any("unix_socket_path", x.GetUnixSocketPath()))
+		}
+	}
+	return slog.GroupValue(attrs...)
+}
+
+func (x *DialOpenListenerRequest) LogValue() slog.Value {
+	if x == nil {
+		return slog.AnyValue(nil)
+	}
+	attrs := make([]slog.Attr, 0, 1)
+	if x.GetListeningOn() != nil {
+		if v, ok := interface{}(x.GetListeningOn()).(slog.LogValuer); ok {
+			attrs = append(attrs, slog.Attr{Key: "listening_on", Value: v.LogValue()})
+		} else {
+			attrs = append(attrs, slog.Any("listening_on", x.GetListeningOn()))
+		}
+	}
+	return slog.GroupValue(attrs...)
+}
+
+func (x *DialOpenListenerResponse) LogValue() slog.Value {
+	if x == nil {
+		return slog.AnyValue(nil)
+	}
+	attrs := make([]slog.Attr, 0, 0)
+	return slog.GroupValue(attrs...)
+}
+
 func (x *AllocateSocketStreamRequest) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
@@ -22,7 +86,13 @@ func (x *AllocateSocketStreamResponse) LogValue() slog.Value {
 		return slog.AnyValue(nil)
 	}
 	attrs := make([]slog.Attr, 0, 1)
-	attrs = append(attrs, slog.String("socket_reference_id", x.GetSocketReferenceId()))
+	if x.GetSocketType() != nil {
+		if v, ok := interface{}(x.GetSocketType()).(slog.LogValuer); ok {
+			attrs = append(attrs, slog.Attr{Key: "socket_type", Value: v.LogValue()})
+		} else {
+			attrs = append(attrs, slog.Any("socket_type", x.GetSocketType()))
+		}
+	}
 	return slog.GroupValue(attrs...)
 }
 
@@ -68,12 +138,16 @@ func (x *CloseSocketsRequest) LogValue() slog.Value {
 		return slog.AnyValue(nil)
 	}
 	attrs := make([]slog.Attr, 0, 1)
-	if len(x.GetSocketReferenceIds()) != 0 {
-		attrs0 := make([]slog.Attr, 0, len(x.GetSocketReferenceIds()))
-		for i, v := range x.GetSocketReferenceIds() {
-			attrs0 = append(attrs0, slog.String(fmt.Sprintf("%d", i), v))
+	if len(x.GetSocketTypes()) != 0 {
+		attrs0 := make([]slog.Attr, 0, len(x.GetSocketTypes()))
+		for i, v := range x.GetSocketTypes() {
+			if v, ok := interface{}(v).(slog.LogValuer); ok {
+				attrs0 = append(attrs0, slog.Attr{Key: fmt.Sprintf("%d", i), Value: v.LogValue()})
+			} else {
+				attrs0 = append(attrs0, slog.Any(fmt.Sprintf("%d", i), v))
+			}
 		}
-		attrs = append(attrs, slog.Any("socket_reference_ids", attrs0))
+		attrs = append(attrs, slog.Any("socket_types", attrs0))
 	}
 	return slog.GroupValue(attrs...)
 }
@@ -100,12 +174,16 @@ func (x *AllocateSocketsResponse) LogValue() slog.Value {
 		return slog.AnyValue(nil)
 	}
 	attrs := make([]slog.Attr, 0, 1)
-	if len(x.GetSocketReferenceIds()) != 0 {
-		attrs0 := make([]slog.Attr, 0, len(x.GetSocketReferenceIds()))
-		for i, v := range x.GetSocketReferenceIds() {
-			attrs0 = append(attrs0, slog.String(fmt.Sprintf("%d", i), v))
+	if len(x.GetSocketTypes()) != 0 {
+		attrs0 := make([]slog.Attr, 0, len(x.GetSocketTypes()))
+		for i, v := range x.GetSocketTypes() {
+			if v, ok := interface{}(v).(slog.LogValuer); ok {
+				attrs0 = append(attrs0, slog.Attr{Key: fmt.Sprintf("%d", i), Value: v.LogValue()})
+			} else {
+				attrs0 = append(attrs0, slog.Any(fmt.Sprintf("%d", i), v))
+			}
 		}
-		attrs = append(attrs, slog.Any("socket_reference_ids", attrs0))
+		attrs = append(attrs, slog.Any("socket_types", attrs0))
 	}
 	return slog.GroupValue(attrs...)
 }
@@ -116,9 +194,27 @@ func (x *BindIOToSocketsRequest) LogValue() slog.Value {
 	}
 	attrs := make([]slog.Attr, 0, 4)
 	attrs = append(attrs, slog.String("io_reference_id", x.GetIoReferenceId()))
-	attrs = append(attrs, slog.String("stdin_socket_reference_id", x.GetStdinSocketReferenceId()))
-	attrs = append(attrs, slog.String("stdout_socket_reference_id", x.GetStdoutSocketReferenceId()))
-	attrs = append(attrs, slog.String("stderr_socket_reference_id", x.GetStderrSocketReferenceId()))
+	if x.GetStdinSocket() != nil {
+		if v, ok := interface{}(x.GetStdinSocket()).(slog.LogValuer); ok {
+			attrs = append(attrs, slog.Attr{Key: "stdin_socket", Value: v.LogValue()})
+		} else {
+			attrs = append(attrs, slog.Any("stdin_socket", x.GetStdinSocket()))
+		}
+	}
+	if x.GetStdoutSocket() != nil {
+		if v, ok := interface{}(x.GetStdoutSocket()).(slog.LogValuer); ok {
+			attrs = append(attrs, slog.Attr{Key: "stdout_socket", Value: v.LogValue()})
+		} else {
+			attrs = append(attrs, slog.Any("stdout_socket", x.GetStdoutSocket()))
+		}
+	}
+	if x.GetStderrSocket() != nil {
+		if v, ok := interface{}(x.GetStderrSocket()).(slog.LogValuer); ok {
+			attrs = append(attrs, slog.Attr{Key: "stderr_socket", Value: v.LogValue()})
+		} else {
+			attrs = append(attrs, slog.Any("stderr_socket", x.GetStderrSocket()))
+		}
+	}
 	return slog.GroupValue(attrs...)
 }
 
@@ -136,7 +232,13 @@ func (x *BindConsoleToSocketRequest) LogValue() slog.Value {
 	}
 	attrs := make([]slog.Attr, 0, 2)
 	attrs = append(attrs, slog.String("console_reference_id", x.GetConsoleReferenceId()))
-	attrs = append(attrs, slog.String("socket_reference_id", x.GetSocketReferenceId()))
+	if x.GetSocketType() != nil {
+		if v, ok := interface{}(x.GetSocketType()).(slog.LogValuer); ok {
+			attrs = append(attrs, slog.Attr{Key: "socket_type", Value: v.LogValue()})
+		} else {
+			attrs = append(attrs, slog.Any("socket_type", x.GetSocketType()))
+		}
+	}
 	return slog.GroupValue(attrs...)
 }
 
@@ -162,7 +264,13 @@ func (x *AllocateSocketResponse) LogValue() slog.Value {
 		return slog.AnyValue(nil)
 	}
 	attrs := make([]slog.Attr, 0, 1)
-	attrs = append(attrs, slog.String("socket_reference_id", x.GetSocketReferenceId()))
+	if x.GetSocketType() != nil {
+		if v, ok := interface{}(x.GetSocketType()).(slog.LogValuer); ok {
+			attrs = append(attrs, slog.Attr{Key: "socket_type", Value: v.LogValue()})
+		} else {
+			attrs = append(attrs, slog.Any("socket_type", x.GetSocketType()))
+		}
+	}
 	return slog.GroupValue(attrs...)
 }
 
@@ -171,7 +279,13 @@ func (x *CloseSocketRequest) LogValue() slog.Value {
 		return slog.AnyValue(nil)
 	}
 	attrs := make([]slog.Attr, 0, 1)
-	attrs = append(attrs, slog.String("socket_reference_id", x.GetSocketReferenceId()))
+	if x.GetSocketType() != nil {
+		if v, ok := interface{}(x.GetSocketType()).(slog.LogValuer); ok {
+			attrs = append(attrs, slog.Attr{Key: "socket_type", Value: v.LogValue()})
+		} else {
+			attrs = append(attrs, slog.Any("socket_type", x.GetSocketType()))
+		}
+	}
 	return slog.GroupValue(attrs...)
 }
 

@@ -22,6 +22,402 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type VsockPort struct {
+	state           protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Port uint32                 `protobuf:"varint,1,opt,name=port"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *VsockPort) Reset() {
+	*x = VsockPort{}
+	mi := &file_v1_socket_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VsockPort) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VsockPort) ProtoMessage() {}
+
+func (x *VsockPort) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_socket_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *VsockPort) GetPort() uint32 {
+	if x != nil {
+		return x.xxx_hidden_Port
+	}
+	return 0
+}
+
+func (x *VsockPort) SetPort(v uint32) {
+	x.xxx_hidden_Port = v
+}
+
+type VsockPort_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	Port uint32
+}
+
+func (b0 VsockPort_builder) Build() *VsockPort {
+	m0 := &VsockPort{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Port = b.Port
+	return m0
+}
+
+type UnixSocketPath struct {
+	state           protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Path string                 `protobuf:"bytes,1,opt,name=path"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *UnixSocketPath) Reset() {
+	*x = UnixSocketPath{}
+	mi := &file_v1_socket_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnixSocketPath) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnixSocketPath) ProtoMessage() {}
+
+func (x *UnixSocketPath) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_socket_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *UnixSocketPath) GetPath() string {
+	if x != nil {
+		return x.xxx_hidden_Path
+	}
+	return ""
+}
+
+func (x *UnixSocketPath) SetPath(v string) {
+	x.xxx_hidden_Path = v
+}
+
+type UnixSocketPath_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	Path string
+}
+
+func (b0 UnixSocketPath_builder) Build() *UnixSocketPath {
+	m0 := &UnixSocketPath{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Path = b.Path
+	return m0
+}
+
+type SocketType struct {
+	state           protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Type isSocketType_Type      `protobuf_oneof:"type"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *SocketType) Reset() {
+	*x = SocketType{}
+	mi := &file_v1_socket_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SocketType) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SocketType) ProtoMessage() {}
+
+func (x *SocketType) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_socket_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *SocketType) GetVsockPort() *VsockPort {
+	if x != nil {
+		if x, ok := x.xxx_hidden_Type.(*socketType_VsockPort); ok {
+			return x.VsockPort
+		}
+	}
+	return nil
+}
+
+func (x *SocketType) GetUnixSocketPath() *UnixSocketPath {
+	if x != nil {
+		if x, ok := x.xxx_hidden_Type.(*socketType_UnixSocketPath); ok {
+			return x.UnixSocketPath
+		}
+	}
+	return nil
+}
+
+func (x *SocketType) SetVsockPort(v *VsockPort) {
+	if v == nil {
+		x.xxx_hidden_Type = nil
+		return
+	}
+	x.xxx_hidden_Type = &socketType_VsockPort{v}
+}
+
+func (x *SocketType) SetUnixSocketPath(v *UnixSocketPath) {
+	if v == nil {
+		x.xxx_hidden_Type = nil
+		return
+	}
+	x.xxx_hidden_Type = &socketType_UnixSocketPath{v}
+}
+
+func (x *SocketType) HasType() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_Type != nil
+}
+
+func (x *SocketType) HasVsockPort() bool {
+	if x == nil {
+		return false
+	}
+	_, ok := x.xxx_hidden_Type.(*socketType_VsockPort)
+	return ok
+}
+
+func (x *SocketType) HasUnixSocketPath() bool {
+	if x == nil {
+		return false
+	}
+	_, ok := x.xxx_hidden_Type.(*socketType_UnixSocketPath)
+	return ok
+}
+
+func (x *SocketType) ClearType() {
+	x.xxx_hidden_Type = nil
+}
+
+func (x *SocketType) ClearVsockPort() {
+	if _, ok := x.xxx_hidden_Type.(*socketType_VsockPort); ok {
+		x.xxx_hidden_Type = nil
+	}
+}
+
+func (x *SocketType) ClearUnixSocketPath() {
+	if _, ok := x.xxx_hidden_Type.(*socketType_UnixSocketPath); ok {
+		x.xxx_hidden_Type = nil
+	}
+}
+
+const SocketType_Type_not_set_case case_SocketType_Type = 0
+const SocketType_VsockPort_case case_SocketType_Type = 1
+const SocketType_UnixSocketPath_case case_SocketType_Type = 2
+
+func (x *SocketType) WhichType() case_SocketType_Type {
+	if x == nil {
+		return SocketType_Type_not_set_case
+	}
+	switch x.xxx_hidden_Type.(type) {
+	case *socketType_VsockPort:
+		return SocketType_VsockPort_case
+	case *socketType_UnixSocketPath:
+		return SocketType_UnixSocketPath_case
+	default:
+		return SocketType_Type_not_set_case
+	}
+}
+
+type SocketType_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// Fields of oneof xxx_hidden_Type:
+	VsockPort      *VsockPort
+	UnixSocketPath *UnixSocketPath
+	// -- end of xxx_hidden_Type
+}
+
+func (b0 SocketType_builder) Build() *SocketType {
+	m0 := &SocketType{}
+	b, x := &b0, m0
+	_, _ = b, x
+	if b.VsockPort != nil {
+		x.xxx_hidden_Type = &socketType_VsockPort{b.VsockPort}
+	}
+	if b.UnixSocketPath != nil {
+		x.xxx_hidden_Type = &socketType_UnixSocketPath{b.UnixSocketPath}
+	}
+	return m0
+}
+
+type case_SocketType_Type protoreflect.FieldNumber
+
+func (x case_SocketType_Type) String() string {
+	md := file_v1_socket_proto_msgTypes[2].Descriptor()
+	if x == 0 {
+		return "not set"
+	}
+	return protoimpl.X.MessageFieldStringOf(md, protoreflect.FieldNumber(x))
+}
+
+type isSocketType_Type interface {
+	isSocketType_Type()
+}
+
+type socketType_VsockPort struct {
+	VsockPort *VsockPort `protobuf:"bytes,1,opt,name=vsock_port,json=vsockPort,oneof"`
+}
+
+type socketType_UnixSocketPath struct {
+	UnixSocketPath *UnixSocketPath `protobuf:"bytes,2,opt,name=unix_socket_path,json=unixSocketPath,oneof"`
+}
+
+func (*socketType_VsockPort) isSocketType_Type() {}
+
+func (*socketType_UnixSocketPath) isSocketType_Type() {}
+
+type DialOpenListenerRequest struct {
+	state                  protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_ListeningOn *SocketType            `protobuf:"bytes,1,opt,name=listening_on,json=listeningOn"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *DialOpenListenerRequest) Reset() {
+	*x = DialOpenListenerRequest{}
+	mi := &file_v1_socket_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DialOpenListenerRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DialOpenListenerRequest) ProtoMessage() {}
+
+func (x *DialOpenListenerRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_socket_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *DialOpenListenerRequest) GetListeningOn() *SocketType {
+	if x != nil {
+		return x.xxx_hidden_ListeningOn
+	}
+	return nil
+}
+
+func (x *DialOpenListenerRequest) SetListeningOn(v *SocketType) {
+	x.xxx_hidden_ListeningOn = v
+}
+
+func (x *DialOpenListenerRequest) HasListeningOn() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_ListeningOn != nil
+}
+
+func (x *DialOpenListenerRequest) ClearListeningOn() {
+	x.xxx_hidden_ListeningOn = nil
+}
+
+type DialOpenListenerRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	ListeningOn *SocketType
+}
+
+func (b0 DialOpenListenerRequest_builder) Build() *DialOpenListenerRequest {
+	m0 := &DialOpenListenerRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_ListeningOn = b.ListeningOn
+	return m0
+}
+
+type DialOpenListenerResponse struct {
+	state         protoimpl.MessageState `protogen:"opaque.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DialOpenListenerResponse) Reset() {
+	*x = DialOpenListenerResponse{}
+	mi := &file_v1_socket_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DialOpenListenerResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DialOpenListenerResponse) ProtoMessage() {}
+
+func (x *DialOpenListenerResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_socket_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+type DialOpenListenerResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+}
+
+func (b0 DialOpenListenerResponse_builder) Build() *DialOpenListenerResponse {
+	m0 := &DialOpenListenerResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	return m0
+}
+
 type AllocateSocketStreamRequest struct {
 	state         protoimpl.MessageState `protogen:"opaque.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -30,7 +426,7 @@ type AllocateSocketStreamRequest struct {
 
 func (x *AllocateSocketStreamRequest) Reset() {
 	*x = AllocateSocketStreamRequest{}
-	mi := &file_v1_socket_proto_msgTypes[0]
+	mi := &file_v1_socket_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -42,7 +438,7 @@ func (x *AllocateSocketStreamRequest) String() string {
 func (*AllocateSocketStreamRequest) ProtoMessage() {}
 
 func (x *AllocateSocketStreamRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_socket_proto_msgTypes[0]
+	mi := &file_v1_socket_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -66,15 +462,15 @@ func (b0 AllocateSocketStreamRequest_builder) Build() *AllocateSocketStreamReque
 }
 
 type AllocateSocketStreamResponse struct {
-	state                        protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_SocketReferenceId string                 `protobuf:"bytes,1,opt,name=socket_reference_id,json=socketReferenceId"`
-	unknownFields                protoimpl.UnknownFields
-	sizeCache                    protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_SocketType *SocketType            `protobuf:"bytes,1,opt,name=socket_type,json=socketType"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *AllocateSocketStreamResponse) Reset() {
 	*x = AllocateSocketStreamResponse{}
-	mi := &file_v1_socket_proto_msgTypes[1]
+	mi := &file_v1_socket_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -86,7 +482,7 @@ func (x *AllocateSocketStreamResponse) String() string {
 func (*AllocateSocketStreamResponse) ProtoMessage() {}
 
 func (x *AllocateSocketStreamResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_socket_proto_msgTypes[1]
+	mi := &file_v1_socket_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -97,28 +493,39 @@ func (x *AllocateSocketStreamResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *AllocateSocketStreamResponse) GetSocketReferenceId() string {
+func (x *AllocateSocketStreamResponse) GetSocketType() *SocketType {
 	if x != nil {
-		return x.xxx_hidden_SocketReferenceId
+		return x.xxx_hidden_SocketType
 	}
-	return ""
+	return nil
 }
 
-func (x *AllocateSocketStreamResponse) SetSocketReferenceId(v string) {
-	x.xxx_hidden_SocketReferenceId = v
+func (x *AllocateSocketStreamResponse) SetSocketType(v *SocketType) {
+	x.xxx_hidden_SocketType = v
+}
+
+func (x *AllocateSocketStreamResponse) HasSocketType() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_SocketType != nil
+}
+
+func (x *AllocateSocketStreamResponse) ClearSocketType() {
+	x.xxx_hidden_SocketType = nil
 }
 
 type AllocateSocketStreamResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	SocketReferenceId string
+	SocketType *SocketType
 }
 
 func (b0 AllocateSocketStreamResponse_builder) Build() *AllocateSocketStreamResponse {
 	m0 := &AllocateSocketStreamResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.xxx_hidden_SocketReferenceId = b.SocketReferenceId
+	x.xxx_hidden_SocketType = b.SocketType
 	return m0
 }
 
@@ -133,7 +540,7 @@ type AllocateIORequest struct {
 
 func (x *AllocateIORequest) Reset() {
 	*x = AllocateIORequest{}
-	mi := &file_v1_socket_proto_msgTypes[2]
+	mi := &file_v1_socket_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -145,7 +552,7 @@ func (x *AllocateIORequest) String() string {
 func (*AllocateIORequest) ProtoMessage() {}
 
 func (x *AllocateIORequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_socket_proto_msgTypes[2]
+	mi := &file_v1_socket_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -216,7 +623,7 @@ type AllocateIOResponse struct {
 
 func (x *AllocateIOResponse) Reset() {
 	*x = AllocateIOResponse{}
-	mi := &file_v1_socket_proto_msgTypes[3]
+	mi := &file_v1_socket_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -228,7 +635,7 @@ func (x *AllocateIOResponse) String() string {
 func (*AllocateIOResponse) ProtoMessage() {}
 
 func (x *AllocateIOResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_socket_proto_msgTypes[3]
+	mi := &file_v1_socket_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -272,7 +679,7 @@ type AllocateConsoleRequest struct {
 
 func (x *AllocateConsoleRequest) Reset() {
 	*x = AllocateConsoleRequest{}
-	mi := &file_v1_socket_proto_msgTypes[4]
+	mi := &file_v1_socket_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -284,7 +691,7 @@ func (x *AllocateConsoleRequest) String() string {
 func (*AllocateConsoleRequest) ProtoMessage() {}
 
 func (x *AllocateConsoleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_socket_proto_msgTypes[4]
+	mi := &file_v1_socket_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -316,7 +723,7 @@ type AllocateConsoleResponse struct {
 
 func (x *AllocateConsoleResponse) Reset() {
 	*x = AllocateConsoleResponse{}
-	mi := &file_v1_socket_proto_msgTypes[5]
+	mi := &file_v1_socket_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -328,7 +735,7 @@ func (x *AllocateConsoleResponse) String() string {
 func (*AllocateConsoleResponse) ProtoMessage() {}
 
 func (x *AllocateConsoleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_socket_proto_msgTypes[5]
+	mi := &file_v1_socket_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -365,15 +772,15 @@ func (b0 AllocateConsoleResponse_builder) Build() *AllocateConsoleResponse {
 }
 
 type CloseSocketsRequest struct {
-	state                         protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_SocketReferenceIds []string               `protobuf:"bytes,1,rep,name=socket_reference_ids,json=socketReferenceIds"`
-	unknownFields                 protoimpl.UnknownFields
-	sizeCache                     protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_SocketTypes *[]*SocketType         `protobuf:"bytes,1,rep,name=socket_types,json=socketTypes"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *CloseSocketsRequest) Reset() {
 	*x = CloseSocketsRequest{}
-	mi := &file_v1_socket_proto_msgTypes[6]
+	mi := &file_v1_socket_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -385,7 +792,7 @@ func (x *CloseSocketsRequest) String() string {
 func (*CloseSocketsRequest) ProtoMessage() {}
 
 func (x *CloseSocketsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_socket_proto_msgTypes[6]
+	mi := &file_v1_socket_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -396,28 +803,30 @@ func (x *CloseSocketsRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *CloseSocketsRequest) GetSocketReferenceIds() []string {
+func (x *CloseSocketsRequest) GetSocketTypes() []*SocketType {
 	if x != nil {
-		return x.xxx_hidden_SocketReferenceIds
+		if x.xxx_hidden_SocketTypes != nil {
+			return *x.xxx_hidden_SocketTypes
+		}
 	}
 	return nil
 }
 
-func (x *CloseSocketsRequest) SetSocketReferenceIds(v []string) {
-	x.xxx_hidden_SocketReferenceIds = v
+func (x *CloseSocketsRequest) SetSocketTypes(v []*SocketType) {
+	x.xxx_hidden_SocketTypes = &v
 }
 
 type CloseSocketsRequest_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	SocketReferenceIds []string
+	SocketTypes []*SocketType
 }
 
 func (b0 CloseSocketsRequest_builder) Build() *CloseSocketsRequest {
 	m0 := &CloseSocketsRequest{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.xxx_hidden_SocketReferenceIds = b.SocketReferenceIds
+	x.xxx_hidden_SocketTypes = &b.SocketTypes
 	return m0
 }
 
@@ -429,7 +838,7 @@ type CloseSocketsResponse struct {
 
 func (x *CloseSocketsResponse) Reset() {
 	*x = CloseSocketsResponse{}
-	mi := &file_v1_socket_proto_msgTypes[7]
+	mi := &file_v1_socket_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -441,7 +850,7 @@ func (x *CloseSocketsResponse) String() string {
 func (*CloseSocketsResponse) ProtoMessage() {}
 
 func (x *CloseSocketsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_socket_proto_msgTypes[7]
+	mi := &file_v1_socket_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -473,7 +882,7 @@ type AllocateSocketsRequest struct {
 
 func (x *AllocateSocketsRequest) Reset() {
 	*x = AllocateSocketsRequest{}
-	mi := &file_v1_socket_proto_msgTypes[8]
+	mi := &file_v1_socket_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -485,7 +894,7 @@ func (x *AllocateSocketsRequest) String() string {
 func (*AllocateSocketsRequest) ProtoMessage() {}
 
 func (x *AllocateSocketsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_socket_proto_msgTypes[8]
+	mi := &file_v1_socket_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -522,15 +931,15 @@ func (b0 AllocateSocketsRequest_builder) Build() *AllocateSocketsRequest {
 }
 
 type AllocateSocketsResponse struct {
-	state                         protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_SocketReferenceIds []string               `protobuf:"bytes,1,rep,name=socket_reference_ids,json=socketReferenceIds"`
-	unknownFields                 protoimpl.UnknownFields
-	sizeCache                     protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_SocketTypes *[]*SocketType         `protobuf:"bytes,1,rep,name=socket_types,json=socketTypes"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *AllocateSocketsResponse) Reset() {
 	*x = AllocateSocketsResponse{}
-	mi := &file_v1_socket_proto_msgTypes[9]
+	mi := &file_v1_socket_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -542,7 +951,7 @@ func (x *AllocateSocketsResponse) String() string {
 func (*AllocateSocketsResponse) ProtoMessage() {}
 
 func (x *AllocateSocketsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_socket_proto_msgTypes[9]
+	mi := &file_v1_socket_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -553,44 +962,46 @@ func (x *AllocateSocketsResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *AllocateSocketsResponse) GetSocketReferenceIds() []string {
+func (x *AllocateSocketsResponse) GetSocketTypes() []*SocketType {
 	if x != nil {
-		return x.xxx_hidden_SocketReferenceIds
+		if x.xxx_hidden_SocketTypes != nil {
+			return *x.xxx_hidden_SocketTypes
+		}
 	}
 	return nil
 }
 
-func (x *AllocateSocketsResponse) SetSocketReferenceIds(v []string) {
-	x.xxx_hidden_SocketReferenceIds = v
+func (x *AllocateSocketsResponse) SetSocketTypes(v []*SocketType) {
+	x.xxx_hidden_SocketTypes = &v
 }
 
 type AllocateSocketsResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	SocketReferenceIds []string
+	SocketTypes []*SocketType
 }
 
 func (b0 AllocateSocketsResponse_builder) Build() *AllocateSocketsResponse {
 	m0 := &AllocateSocketsResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.xxx_hidden_SocketReferenceIds = b.SocketReferenceIds
+	x.xxx_hidden_SocketTypes = &b.SocketTypes
 	return m0
 }
 
 type BindIOToSocketsRequest struct {
-	state                              protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_IoReferenceId           string                 `protobuf:"bytes,1,opt,name=io_reference_id,json=ioReferenceId"`
-	xxx_hidden_StdinSocketReferenceId  string                 `protobuf:"bytes,2,opt,name=stdin_socket_reference_id,json=stdinSocketReferenceId"`
-	xxx_hidden_StdoutSocketReferenceId string                 `protobuf:"bytes,3,opt,name=stdout_socket_reference_id,json=stdoutSocketReferenceId"`
-	xxx_hidden_StderrSocketReferenceId string                 `protobuf:"bytes,4,opt,name=stderr_socket_reference_id,json=stderrSocketReferenceId"`
-	unknownFields                      protoimpl.UnknownFields
-	sizeCache                          protoimpl.SizeCache
+	state                    protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_IoReferenceId string                 `protobuf:"bytes,1,opt,name=io_reference_id,json=ioReferenceId"`
+	xxx_hidden_StdinSocket   *SocketType            `protobuf:"bytes,2,opt,name=stdin_socket,json=stdinSocket"`
+	xxx_hidden_StdoutSocket  *SocketType            `protobuf:"bytes,3,opt,name=stdout_socket,json=stdoutSocket"`
+	xxx_hidden_StderrSocket  *SocketType            `protobuf:"bytes,4,opt,name=stderr_socket,json=stderrSocket"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *BindIOToSocketsRequest) Reset() {
 	*x = BindIOToSocketsRequest{}
-	mi := &file_v1_socket_proto_msgTypes[10]
+	mi := &file_v1_socket_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -602,7 +1013,7 @@ func (x *BindIOToSocketsRequest) String() string {
 func (*BindIOToSocketsRequest) ProtoMessage() {}
 
 func (x *BindIOToSocketsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_socket_proto_msgTypes[10]
+	mi := &file_v1_socket_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -620,50 +1031,83 @@ func (x *BindIOToSocketsRequest) GetIoReferenceId() string {
 	return ""
 }
 
-func (x *BindIOToSocketsRequest) GetStdinSocketReferenceId() string {
+func (x *BindIOToSocketsRequest) GetStdinSocket() *SocketType {
 	if x != nil {
-		return x.xxx_hidden_StdinSocketReferenceId
+		return x.xxx_hidden_StdinSocket
 	}
-	return ""
+	return nil
 }
 
-func (x *BindIOToSocketsRequest) GetStdoutSocketReferenceId() string {
+func (x *BindIOToSocketsRequest) GetStdoutSocket() *SocketType {
 	if x != nil {
-		return x.xxx_hidden_StdoutSocketReferenceId
+		return x.xxx_hidden_StdoutSocket
 	}
-	return ""
+	return nil
 }
 
-func (x *BindIOToSocketsRequest) GetStderrSocketReferenceId() string {
+func (x *BindIOToSocketsRequest) GetStderrSocket() *SocketType {
 	if x != nil {
-		return x.xxx_hidden_StderrSocketReferenceId
+		return x.xxx_hidden_StderrSocket
 	}
-	return ""
+	return nil
 }
 
 func (x *BindIOToSocketsRequest) SetIoReferenceId(v string) {
 	x.xxx_hidden_IoReferenceId = v
 }
 
-func (x *BindIOToSocketsRequest) SetStdinSocketReferenceId(v string) {
-	x.xxx_hidden_StdinSocketReferenceId = v
+func (x *BindIOToSocketsRequest) SetStdinSocket(v *SocketType) {
+	x.xxx_hidden_StdinSocket = v
 }
 
-func (x *BindIOToSocketsRequest) SetStdoutSocketReferenceId(v string) {
-	x.xxx_hidden_StdoutSocketReferenceId = v
+func (x *BindIOToSocketsRequest) SetStdoutSocket(v *SocketType) {
+	x.xxx_hidden_StdoutSocket = v
 }
 
-func (x *BindIOToSocketsRequest) SetStderrSocketReferenceId(v string) {
-	x.xxx_hidden_StderrSocketReferenceId = v
+func (x *BindIOToSocketsRequest) SetStderrSocket(v *SocketType) {
+	x.xxx_hidden_StderrSocket = v
+}
+
+func (x *BindIOToSocketsRequest) HasStdinSocket() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_StdinSocket != nil
+}
+
+func (x *BindIOToSocketsRequest) HasStdoutSocket() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_StdoutSocket != nil
+}
+
+func (x *BindIOToSocketsRequest) HasStderrSocket() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_StderrSocket != nil
+}
+
+func (x *BindIOToSocketsRequest) ClearStdinSocket() {
+	x.xxx_hidden_StdinSocket = nil
+}
+
+func (x *BindIOToSocketsRequest) ClearStdoutSocket() {
+	x.xxx_hidden_StdoutSocket = nil
+}
+
+func (x *BindIOToSocketsRequest) ClearStderrSocket() {
+	x.xxx_hidden_StderrSocket = nil
 }
 
 type BindIOToSocketsRequest_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	IoReferenceId           string
-	StdinSocketReferenceId  string
-	StdoutSocketReferenceId string
-	StderrSocketReferenceId string
+	IoReferenceId string
+	StdinSocket   *SocketType
+	StdoutSocket  *SocketType
+	StderrSocket  *SocketType
 }
 
 func (b0 BindIOToSocketsRequest_builder) Build() *BindIOToSocketsRequest {
@@ -671,9 +1115,9 @@ func (b0 BindIOToSocketsRequest_builder) Build() *BindIOToSocketsRequest {
 	b, x := &b0, m0
 	_, _ = b, x
 	x.xxx_hidden_IoReferenceId = b.IoReferenceId
-	x.xxx_hidden_StdinSocketReferenceId = b.StdinSocketReferenceId
-	x.xxx_hidden_StdoutSocketReferenceId = b.StdoutSocketReferenceId
-	x.xxx_hidden_StderrSocketReferenceId = b.StderrSocketReferenceId
+	x.xxx_hidden_StdinSocket = b.StdinSocket
+	x.xxx_hidden_StdoutSocket = b.StdoutSocket
+	x.xxx_hidden_StderrSocket = b.StderrSocket
 	return m0
 }
 
@@ -685,7 +1129,7 @@ type BindIOToSocketsResponse struct {
 
 func (x *BindIOToSocketsResponse) Reset() {
 	*x = BindIOToSocketsResponse{}
-	mi := &file_v1_socket_proto_msgTypes[11]
+	mi := &file_v1_socket_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -697,7 +1141,7 @@ func (x *BindIOToSocketsResponse) String() string {
 func (*BindIOToSocketsResponse) ProtoMessage() {}
 
 func (x *BindIOToSocketsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_socket_proto_msgTypes[11]
+	mi := &file_v1_socket_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -723,14 +1167,14 @@ func (b0 BindIOToSocketsResponse_builder) Build() *BindIOToSocketsResponse {
 type BindConsoleToSocketRequest struct {
 	state                         protoimpl.MessageState `protogen:"opaque.v1"`
 	xxx_hidden_ConsoleReferenceId string                 `protobuf:"bytes,1,opt,name=console_reference_id,json=consoleReferenceId"`
-	xxx_hidden_SocketReferenceId  string                 `protobuf:"bytes,2,opt,name=socket_reference_id,json=socketReferenceId"`
+	xxx_hidden_SocketType         *SocketType            `protobuf:"bytes,2,opt,name=socket_type,json=socketType"`
 	unknownFields                 protoimpl.UnknownFields
 	sizeCache                     protoimpl.SizeCache
 }
 
 func (x *BindConsoleToSocketRequest) Reset() {
 	*x = BindConsoleToSocketRequest{}
-	mi := &file_v1_socket_proto_msgTypes[12]
+	mi := &file_v1_socket_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -742,7 +1186,7 @@ func (x *BindConsoleToSocketRequest) String() string {
 func (*BindConsoleToSocketRequest) ProtoMessage() {}
 
 func (x *BindConsoleToSocketRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_socket_proto_msgTypes[12]
+	mi := &file_v1_socket_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -760,26 +1204,37 @@ func (x *BindConsoleToSocketRequest) GetConsoleReferenceId() string {
 	return ""
 }
 
-func (x *BindConsoleToSocketRequest) GetSocketReferenceId() string {
+func (x *BindConsoleToSocketRequest) GetSocketType() *SocketType {
 	if x != nil {
-		return x.xxx_hidden_SocketReferenceId
+		return x.xxx_hidden_SocketType
 	}
-	return ""
+	return nil
 }
 
 func (x *BindConsoleToSocketRequest) SetConsoleReferenceId(v string) {
 	x.xxx_hidden_ConsoleReferenceId = v
 }
 
-func (x *BindConsoleToSocketRequest) SetSocketReferenceId(v string) {
-	x.xxx_hidden_SocketReferenceId = v
+func (x *BindConsoleToSocketRequest) SetSocketType(v *SocketType) {
+	x.xxx_hidden_SocketType = v
+}
+
+func (x *BindConsoleToSocketRequest) HasSocketType() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_SocketType != nil
+}
+
+func (x *BindConsoleToSocketRequest) ClearSocketType() {
+	x.xxx_hidden_SocketType = nil
 }
 
 type BindConsoleToSocketRequest_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
 	ConsoleReferenceId string
-	SocketReferenceId  string
+	SocketType         *SocketType
 }
 
 func (b0 BindConsoleToSocketRequest_builder) Build() *BindConsoleToSocketRequest {
@@ -787,7 +1242,7 @@ func (b0 BindConsoleToSocketRequest_builder) Build() *BindConsoleToSocketRequest
 	b, x := &b0, m0
 	_, _ = b, x
 	x.xxx_hidden_ConsoleReferenceId = b.ConsoleReferenceId
-	x.xxx_hidden_SocketReferenceId = b.SocketReferenceId
+	x.xxx_hidden_SocketType = b.SocketType
 	return m0
 }
 
@@ -799,7 +1254,7 @@ type BindConsoleToSocketResponse struct {
 
 func (x *BindConsoleToSocketResponse) Reset() {
 	*x = BindConsoleToSocketResponse{}
-	mi := &file_v1_socket_proto_msgTypes[13]
+	mi := &file_v1_socket_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -811,7 +1266,7 @@ func (x *BindConsoleToSocketResponse) String() string {
 func (*BindConsoleToSocketResponse) ProtoMessage() {}
 
 func (x *BindConsoleToSocketResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_socket_proto_msgTypes[13]
+	mi := &file_v1_socket_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -843,7 +1298,7 @@ type AllocateSocketRequest struct {
 
 func (x *AllocateSocketRequest) Reset() {
 	*x = AllocateSocketRequest{}
-	mi := &file_v1_socket_proto_msgTypes[14]
+	mi := &file_v1_socket_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -855,7 +1310,7 @@ func (x *AllocateSocketRequest) String() string {
 func (*AllocateSocketRequest) ProtoMessage() {}
 
 func (x *AllocateSocketRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_socket_proto_msgTypes[14]
+	mi := &file_v1_socket_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -892,15 +1347,15 @@ func (b0 AllocateSocketRequest_builder) Build() *AllocateSocketRequest {
 }
 
 type AllocateSocketResponse struct {
-	state                        protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_SocketReferenceId string                 `protobuf:"bytes,1,opt,name=socket_reference_id,json=socketReferenceId"`
-	unknownFields                protoimpl.UnknownFields
-	sizeCache                    protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_SocketType *SocketType            `protobuf:"bytes,1,opt,name=socket_type,json=socketType"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *AllocateSocketResponse) Reset() {
 	*x = AllocateSocketResponse{}
-	mi := &file_v1_socket_proto_msgTypes[15]
+	mi := &file_v1_socket_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -912,7 +1367,7 @@ func (x *AllocateSocketResponse) String() string {
 func (*AllocateSocketResponse) ProtoMessage() {}
 
 func (x *AllocateSocketResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_socket_proto_msgTypes[15]
+	mi := &file_v1_socket_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -923,41 +1378,52 @@ func (x *AllocateSocketResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *AllocateSocketResponse) GetSocketReferenceId() string {
+func (x *AllocateSocketResponse) GetSocketType() *SocketType {
 	if x != nil {
-		return x.xxx_hidden_SocketReferenceId
+		return x.xxx_hidden_SocketType
 	}
-	return ""
+	return nil
 }
 
-func (x *AllocateSocketResponse) SetSocketReferenceId(v string) {
-	x.xxx_hidden_SocketReferenceId = v
+func (x *AllocateSocketResponse) SetSocketType(v *SocketType) {
+	x.xxx_hidden_SocketType = v
+}
+
+func (x *AllocateSocketResponse) HasSocketType() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_SocketType != nil
+}
+
+func (x *AllocateSocketResponse) ClearSocketType() {
+	x.xxx_hidden_SocketType = nil
 }
 
 type AllocateSocketResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	SocketReferenceId string
+	SocketType *SocketType
 }
 
 func (b0 AllocateSocketResponse_builder) Build() *AllocateSocketResponse {
 	m0 := &AllocateSocketResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.xxx_hidden_SocketReferenceId = b.SocketReferenceId
+	x.xxx_hidden_SocketType = b.SocketType
 	return m0
 }
 
 type CloseSocketRequest struct {
-	state                        protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_SocketReferenceId string                 `protobuf:"bytes,1,opt,name=socket_reference_id,json=socketReferenceId"`
-	unknownFields                protoimpl.UnknownFields
-	sizeCache                    protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_SocketType *SocketType            `protobuf:"bytes,1,opt,name=socket_type,json=socketType"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *CloseSocketRequest) Reset() {
 	*x = CloseSocketRequest{}
-	mi := &file_v1_socket_proto_msgTypes[16]
+	mi := &file_v1_socket_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -969,7 +1435,7 @@ func (x *CloseSocketRequest) String() string {
 func (*CloseSocketRequest) ProtoMessage() {}
 
 func (x *CloseSocketRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_socket_proto_msgTypes[16]
+	mi := &file_v1_socket_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -980,28 +1446,39 @@ func (x *CloseSocketRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *CloseSocketRequest) GetSocketReferenceId() string {
+func (x *CloseSocketRequest) GetSocketType() *SocketType {
 	if x != nil {
-		return x.xxx_hidden_SocketReferenceId
+		return x.xxx_hidden_SocketType
 	}
-	return ""
+	return nil
 }
 
-func (x *CloseSocketRequest) SetSocketReferenceId(v string) {
-	x.xxx_hidden_SocketReferenceId = v
+func (x *CloseSocketRequest) SetSocketType(v *SocketType) {
+	x.xxx_hidden_SocketType = v
+}
+
+func (x *CloseSocketRequest) HasSocketType() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_SocketType != nil
+}
+
+func (x *CloseSocketRequest) ClearSocketType() {
+	x.xxx_hidden_SocketType = nil
 }
 
 type CloseSocketRequest_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	SocketReferenceId string
+	SocketType *SocketType
 }
 
 func (b0 CloseSocketRequest_builder) Build() *CloseSocketRequest {
 	m0 := &CloseSocketRequest{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.xxx_hidden_SocketReferenceId = b.SocketReferenceId
+	x.xxx_hidden_SocketType = b.SocketType
 	return m0
 }
 
@@ -1014,7 +1491,7 @@ type CloseSocketResponse struct {
 
 func (x *CloseSocketResponse) Reset() {
 	*x = CloseSocketResponse{}
-	mi := &file_v1_socket_proto_msgTypes[17]
+	mi := &file_v1_socket_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1026,7 +1503,7 @@ func (x *CloseSocketResponse) String() string {
 func (*CloseSocketResponse) ProtoMessage() {}
 
 func (x *CloseSocketResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_socket_proto_msgTypes[17]
+	mi := &file_v1_socket_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1071,7 +1548,7 @@ type CloseIORequest struct {
 
 func (x *CloseIORequest) Reset() {
 	*x = CloseIORequest{}
-	mi := &file_v1_socket_proto_msgTypes[18]
+	mi := &file_v1_socket_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1083,7 +1560,7 @@ func (x *CloseIORequest) String() string {
 func (*CloseIORequest) ProtoMessage() {}
 
 func (x *CloseIORequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_socket_proto_msgTypes[18]
+	mi := &file_v1_socket_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1127,7 +1604,7 @@ type CloseIOResponse struct {
 
 func (x *CloseIOResponse) Reset() {
 	*x = CloseIOResponse{}
-	mi := &file_v1_socket_proto_msgTypes[19]
+	mi := &file_v1_socket_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1139,7 +1616,7 @@ func (x *CloseIOResponse) String() string {
 func (*CloseIOResponse) ProtoMessage() {}
 
 func (x *CloseIOResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_socket_proto_msgTypes[19]
+	mi := &file_v1_socket_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1171,7 +1648,7 @@ type CloseConsoleRequest struct {
 
 func (x *CloseConsoleRequest) Reset() {
 	*x = CloseConsoleRequest{}
-	mi := &file_v1_socket_proto_msgTypes[20]
+	mi := &file_v1_socket_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1183,7 +1660,7 @@ func (x *CloseConsoleRequest) String() string {
 func (*CloseConsoleRequest) ProtoMessage() {}
 
 func (x *CloseConsoleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_socket_proto_msgTypes[20]
+	mi := &file_v1_socket_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1227,7 +1704,7 @@ type CloseConsoleResponse struct {
 
 func (x *CloseConsoleResponse) Reset() {
 	*x = CloseConsoleResponse{}
-	mi := &file_v1_socket_proto_msgTypes[21]
+	mi := &file_v1_socket_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1239,7 +1716,7 @@ func (x *CloseConsoleResponse) String() string {
 func (*CloseConsoleResponse) ProtoMessage() {}
 
 func (x *CloseConsoleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_socket_proto_msgTypes[21]
+	mi := &file_v1_socket_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1266,10 +1743,24 @@ var File_v1_socket_proto protoreflect.FileDescriptor
 
 const file_v1_socket_proto_rawDesc = "" +
 	"\n" +
-	"\x0fv1/socket.proto\x12\arunm.v1\x1a\x1egoogle/protobuf/duration.proto\x1a!google/protobuf/go_features.proto\"\x1d\n" +
-	"\x1bAllocateSocketStreamRequest\"N\n" +
-	"\x1cAllocateSocketStreamResponse\x12.\n" +
-	"\x13socket_reference_id\x18\x01 \x01(\tR\x11socketReferenceId\"t\n" +
+	"\x0fv1/socket.proto\x12\arunm.v1\x1a\x1egoogle/protobuf/duration.proto\x1a!google/protobuf/go_features.proto\"\x1f\n" +
+	"\tVsockPort\x12\x12\n" +
+	"\x04port\x18\x01 \x01(\rR\x04port\"$\n" +
+	"\x0eUnixSocketPath\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\"\x8e\x01\n" +
+	"\n" +
+	"SocketType\x123\n" +
+	"\n" +
+	"vsock_port\x18\x01 \x01(\v2\x12.runm.v1.VsockPortH\x00R\tvsockPort\x12C\n" +
+	"\x10unix_socket_path\x18\x02 \x01(\v2\x17.runm.v1.UnixSocketPathH\x00R\x0eunixSocketPathB\x06\n" +
+	"\x04type\"Q\n" +
+	"\x17DialOpenListenerRequest\x126\n" +
+	"\flistening_on\x18\x01 \x01(\v2\x13.runm.v1.SocketTypeR\vlisteningOn\"\x1a\n" +
+	"\x18DialOpenListenerResponse\"\x1d\n" +
+	"\x1bAllocateSocketStreamRequest\"T\n" +
+	"\x1cAllocateSocketStreamResponse\x124\n" +
+	"\vsocket_type\x18\x01 \x01(\v2\x13.runm.v1.SocketTypeR\n" +
+	"socketType\"t\n" +
 	"\x11AllocateIORequest\x12\x1d\n" +
 	"\n" +
 	"open_stdin\x18\x01 \x01(\bR\topenStdin\x12\x1f\n" +
@@ -1281,30 +1772,33 @@ const file_v1_socket_proto_rawDesc = "" +
 	"\x0fio_reference_id\x18\x01 \x01(\tR\rioReferenceId\"\x18\n" +
 	"\x16AllocateConsoleRequest\"K\n" +
 	"\x17AllocateConsoleResponse\x120\n" +
-	"\x14console_reference_id\x18\x01 \x01(\tR\x12consoleReferenceId\"G\n" +
-	"\x13CloseSocketsRequest\x120\n" +
-	"\x14socket_reference_ids\x18\x01 \x03(\tR\x12socketReferenceIds\"\x16\n" +
+	"\x14console_reference_id\x18\x01 \x01(\tR\x12consoleReferenceId\"M\n" +
+	"\x13CloseSocketsRequest\x126\n" +
+	"\fsocket_types\x18\x01 \x03(\v2\x13.runm.v1.SocketTypeR\vsocketTypes\"\x16\n" +
 	"\x14CloseSocketsResponse\".\n" +
 	"\x16AllocateSocketsRequest\x12\x14\n" +
-	"\x05count\x18\x01 \x01(\rR\x05count\"K\n" +
-	"\x17AllocateSocketsResponse\x120\n" +
-	"\x14socket_reference_ids\x18\x01 \x03(\tR\x12socketReferenceIds\"\xf5\x01\n" +
+	"\x05count\x18\x01 \x01(\rR\x05count\"Q\n" +
+	"\x17AllocateSocketsResponse\x126\n" +
+	"\fsocket_types\x18\x01 \x03(\v2\x13.runm.v1.SocketTypeR\vsocketTypes\"\xec\x01\n" +
 	"\x16BindIOToSocketsRequest\x12&\n" +
-	"\x0fio_reference_id\x18\x01 \x01(\tR\rioReferenceId\x129\n" +
-	"\x19stdin_socket_reference_id\x18\x02 \x01(\tR\x16stdinSocketReferenceId\x12;\n" +
-	"\x1astdout_socket_reference_id\x18\x03 \x01(\tR\x17stdoutSocketReferenceId\x12;\n" +
-	"\x1astderr_socket_reference_id\x18\x04 \x01(\tR\x17stderrSocketReferenceId\"\x19\n" +
-	"\x17BindIOToSocketsResponse\"~\n" +
+	"\x0fio_reference_id\x18\x01 \x01(\tR\rioReferenceId\x126\n" +
+	"\fstdin_socket\x18\x02 \x01(\v2\x13.runm.v1.SocketTypeR\vstdinSocket\x128\n" +
+	"\rstdout_socket\x18\x03 \x01(\v2\x13.runm.v1.SocketTypeR\fstdoutSocket\x128\n" +
+	"\rstderr_socket\x18\x04 \x01(\v2\x13.runm.v1.SocketTypeR\fstderrSocket\"\x19\n" +
+	"\x17BindIOToSocketsResponse\"\x84\x01\n" +
 	"\x1aBindConsoleToSocketRequest\x120\n" +
-	"\x14console_reference_id\x18\x01 \x01(\tR\x12consoleReferenceId\x12.\n" +
-	"\x13socket_reference_id\x18\x02 \x01(\tR\x11socketReferenceId\"\x1d\n" +
+	"\x14console_reference_id\x18\x01 \x01(\tR\x12consoleReferenceId\x124\n" +
+	"\vsocket_type\x18\x02 \x01(\v2\x13.runm.v1.SocketTypeR\n" +
+	"socketType\"\x1d\n" +
 	"\x1bBindConsoleToSocketResponse\"-\n" +
 	"\x15AllocateSocketRequest\x12\x14\n" +
-	"\x05count\x18\x01 \x01(\rR\x05count\"H\n" +
-	"\x16AllocateSocketResponse\x12.\n" +
-	"\x13socket_reference_id\x18\x01 \x01(\tR\x11socketReferenceId\"D\n" +
-	"\x12CloseSocketRequest\x12.\n" +
-	"\x13socket_reference_id\x18\x01 \x01(\tR\x11socketReferenceId\"0\n" +
+	"\x05count\x18\x01 \x01(\rR\x05count\"N\n" +
+	"\x16AllocateSocketResponse\x124\n" +
+	"\vsocket_type\x18\x01 \x01(\v2\x13.runm.v1.SocketTypeR\n" +
+	"socketType\"J\n" +
+	"\x12CloseSocketRequest\x124\n" +
+	"\vsocket_type\x18\x01 \x01(\v2\x13.runm.v1.SocketTypeR\n" +
+	"socketType\"0\n" +
 	"\x13CloseSocketResponse\x12\x19\n" +
 	"\bgo_error\x18\x01 \x01(\tR\agoError\"8\n" +
 	"\x0eCloseIORequest\x12&\n" +
@@ -1312,10 +1806,11 @@ const file_v1_socket_proto_rawDesc = "" +
 	"\x0fCloseIOResponse\"G\n" +
 	"\x13CloseConsoleRequest\x120\n" +
 	"\x14console_reference_id\x18\x01 \x01(\tR\x12consoleReferenceId\"\x16\n" +
-	"\x14CloseConsoleResponse2\xe0\x06\n" +
+	"\x14CloseConsoleResponse2\xbb\a\n" +
 	"\x16SocketAllocatorService\x12V\n" +
 	"\x0fAllocateSockets\x12\x1f.runm.v1.AllocateSocketsRequest\x1a .runm.v1.AllocateSocketsResponse\"\x00\x12g\n" +
-	"\x14AllocateSocketStream\x12$.runm.v1.AllocateSocketStreamRequest\x1a%.runm.v1.AllocateSocketStreamResponse\"\x000\x01\x12G\n" +
+	"\x14AllocateSocketStream\x12$.runm.v1.AllocateSocketStreamRequest\x1a%.runm.v1.AllocateSocketStreamResponse\"\x000\x01\x12Y\n" +
+	"\x10DialOpenListener\x12 .runm.v1.DialOpenListenerRequest\x1a!.runm.v1.DialOpenListenerResponse\"\x00\x12G\n" +
 	"\n" +
 	"AllocateIO\x12\x1a.runm.v1.AllocateIORequest\x1a\x1b.runm.v1.AllocateIOResponse\"\x00\x12V\n" +
 	"\x0fAllocateConsole\x12\x1f.runm.v1.AllocateConsoleRequest\x1a .runm.v1.AllocateConsoleResponse\"\x00\x12b\n" +
@@ -1327,57 +1822,76 @@ const file_v1_socket_proto_rawDesc = "" +
 	"\fCloseConsole\x12\x1c.runm.v1.CloseConsoleRequest\x1a\x1d.runm.v1.CloseConsoleResponse\"\x00B\x89\x01\n" +
 	"\vcom.runm.v1B\vSocketProtoP\x01Z&github.com/walteh/runm/proto/v1;runmv1\xa2\x02\x03RXX\xaa\x02\aRunm.V1\xca\x02\aRunm\\V1\xe2\x02\x13Runm\\V1\\GPBMetadata\xea\x02\bRunm::V1\x92\x03\a\xd2>\x02\x10\x03\b\x02b\beditionsp\xe8\a"
 
-var file_v1_socket_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_v1_socket_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_v1_socket_proto_goTypes = []any{
-	(*AllocateSocketStreamRequest)(nil),  // 0: runm.v1.AllocateSocketStreamRequest
-	(*AllocateSocketStreamResponse)(nil), // 1: runm.v1.AllocateSocketStreamResponse
-	(*AllocateIORequest)(nil),            // 2: runm.v1.AllocateIORequest
-	(*AllocateIOResponse)(nil),           // 3: runm.v1.AllocateIOResponse
-	(*AllocateConsoleRequest)(nil),       // 4: runm.v1.AllocateConsoleRequest
-	(*AllocateConsoleResponse)(nil),      // 5: runm.v1.AllocateConsoleResponse
-	(*CloseSocketsRequest)(nil),          // 6: runm.v1.CloseSocketsRequest
-	(*CloseSocketsResponse)(nil),         // 7: runm.v1.CloseSocketsResponse
-	(*AllocateSocketsRequest)(nil),       // 8: runm.v1.AllocateSocketsRequest
-	(*AllocateSocketsResponse)(nil),      // 9: runm.v1.AllocateSocketsResponse
-	(*BindIOToSocketsRequest)(nil),       // 10: runm.v1.BindIOToSocketsRequest
-	(*BindIOToSocketsResponse)(nil),      // 11: runm.v1.BindIOToSocketsResponse
-	(*BindConsoleToSocketRequest)(nil),   // 12: runm.v1.BindConsoleToSocketRequest
-	(*BindConsoleToSocketResponse)(nil),  // 13: runm.v1.BindConsoleToSocketResponse
-	(*AllocateSocketRequest)(nil),        // 14: runm.v1.AllocateSocketRequest
-	(*AllocateSocketResponse)(nil),       // 15: runm.v1.AllocateSocketResponse
-	(*CloseSocketRequest)(nil),           // 16: runm.v1.CloseSocketRequest
-	(*CloseSocketResponse)(nil),          // 17: runm.v1.CloseSocketResponse
-	(*CloseIORequest)(nil),               // 18: runm.v1.CloseIORequest
-	(*CloseIOResponse)(nil),              // 19: runm.v1.CloseIOResponse
-	(*CloseConsoleRequest)(nil),          // 20: runm.v1.CloseConsoleRequest
-	(*CloseConsoleResponse)(nil),         // 21: runm.v1.CloseConsoleResponse
+	(*VsockPort)(nil),                    // 0: runm.v1.VsockPort
+	(*UnixSocketPath)(nil),               // 1: runm.v1.UnixSocketPath
+	(*SocketType)(nil),                   // 2: runm.v1.SocketType
+	(*DialOpenListenerRequest)(nil),      // 3: runm.v1.DialOpenListenerRequest
+	(*DialOpenListenerResponse)(nil),     // 4: runm.v1.DialOpenListenerResponse
+	(*AllocateSocketStreamRequest)(nil),  // 5: runm.v1.AllocateSocketStreamRequest
+	(*AllocateSocketStreamResponse)(nil), // 6: runm.v1.AllocateSocketStreamResponse
+	(*AllocateIORequest)(nil),            // 7: runm.v1.AllocateIORequest
+	(*AllocateIOResponse)(nil),           // 8: runm.v1.AllocateIOResponse
+	(*AllocateConsoleRequest)(nil),       // 9: runm.v1.AllocateConsoleRequest
+	(*AllocateConsoleResponse)(nil),      // 10: runm.v1.AllocateConsoleResponse
+	(*CloseSocketsRequest)(nil),          // 11: runm.v1.CloseSocketsRequest
+	(*CloseSocketsResponse)(nil),         // 12: runm.v1.CloseSocketsResponse
+	(*AllocateSocketsRequest)(nil),       // 13: runm.v1.AllocateSocketsRequest
+	(*AllocateSocketsResponse)(nil),      // 14: runm.v1.AllocateSocketsResponse
+	(*BindIOToSocketsRequest)(nil),       // 15: runm.v1.BindIOToSocketsRequest
+	(*BindIOToSocketsResponse)(nil),      // 16: runm.v1.BindIOToSocketsResponse
+	(*BindConsoleToSocketRequest)(nil),   // 17: runm.v1.BindConsoleToSocketRequest
+	(*BindConsoleToSocketResponse)(nil),  // 18: runm.v1.BindConsoleToSocketResponse
+	(*AllocateSocketRequest)(nil),        // 19: runm.v1.AllocateSocketRequest
+	(*AllocateSocketResponse)(nil),       // 20: runm.v1.AllocateSocketResponse
+	(*CloseSocketRequest)(nil),           // 21: runm.v1.CloseSocketRequest
+	(*CloseSocketResponse)(nil),          // 22: runm.v1.CloseSocketResponse
+	(*CloseIORequest)(nil),               // 23: runm.v1.CloseIORequest
+	(*CloseIOResponse)(nil),              // 24: runm.v1.CloseIOResponse
+	(*CloseConsoleRequest)(nil),          // 25: runm.v1.CloseConsoleRequest
+	(*CloseConsoleResponse)(nil),         // 26: runm.v1.CloseConsoleResponse
 }
 var file_v1_socket_proto_depIdxs = []int32{
-	8,  // 0: runm.v1.SocketAllocatorService.AllocateSockets:input_type -> runm.v1.AllocateSocketsRequest
-	0,  // 1: runm.v1.SocketAllocatorService.AllocateSocketStream:input_type -> runm.v1.AllocateSocketStreamRequest
-	2,  // 2: runm.v1.SocketAllocatorService.AllocateIO:input_type -> runm.v1.AllocateIORequest
-	4,  // 3: runm.v1.SocketAllocatorService.AllocateConsole:input_type -> runm.v1.AllocateConsoleRequest
-	12, // 4: runm.v1.SocketAllocatorService.BindConsoleToSocket:input_type -> runm.v1.BindConsoleToSocketRequest
-	10, // 5: runm.v1.SocketAllocatorService.BindIOToSockets:input_type -> runm.v1.BindIOToSocketsRequest
-	16, // 6: runm.v1.SocketAllocatorService.CloseSocket:input_type -> runm.v1.CloseSocketRequest
-	6,  // 7: runm.v1.SocketAllocatorService.CloseSockets:input_type -> runm.v1.CloseSocketsRequest
-	18, // 8: runm.v1.SocketAllocatorService.CloseIO:input_type -> runm.v1.CloseIORequest
-	20, // 9: runm.v1.SocketAllocatorService.CloseConsole:input_type -> runm.v1.CloseConsoleRequest
-	9,  // 10: runm.v1.SocketAllocatorService.AllocateSockets:output_type -> runm.v1.AllocateSocketsResponse
-	1,  // 11: runm.v1.SocketAllocatorService.AllocateSocketStream:output_type -> runm.v1.AllocateSocketStreamResponse
-	3,  // 12: runm.v1.SocketAllocatorService.AllocateIO:output_type -> runm.v1.AllocateIOResponse
-	5,  // 13: runm.v1.SocketAllocatorService.AllocateConsole:output_type -> runm.v1.AllocateConsoleResponse
-	13, // 14: runm.v1.SocketAllocatorService.BindConsoleToSocket:output_type -> runm.v1.BindConsoleToSocketResponse
-	11, // 15: runm.v1.SocketAllocatorService.BindIOToSockets:output_type -> runm.v1.BindIOToSocketsResponse
-	17, // 16: runm.v1.SocketAllocatorService.CloseSocket:output_type -> runm.v1.CloseSocketResponse
-	7,  // 17: runm.v1.SocketAllocatorService.CloseSockets:output_type -> runm.v1.CloseSocketsResponse
-	19, // 18: runm.v1.SocketAllocatorService.CloseIO:output_type -> runm.v1.CloseIOResponse
-	21, // 19: runm.v1.SocketAllocatorService.CloseConsole:output_type -> runm.v1.CloseConsoleResponse
-	10, // [10:20] is the sub-list for method output_type
-	0,  // [0:10] is the sub-list for method input_type
-	0,  // [0:0] is the sub-list for extension type_name
-	0,  // [0:0] is the sub-list for extension extendee
-	0,  // [0:0] is the sub-list for field type_name
+	0,  // 0: runm.v1.SocketType.vsock_port:type_name -> runm.v1.VsockPort
+	1,  // 1: runm.v1.SocketType.unix_socket_path:type_name -> runm.v1.UnixSocketPath
+	2,  // 2: runm.v1.DialOpenListenerRequest.listening_on:type_name -> runm.v1.SocketType
+	2,  // 3: runm.v1.AllocateSocketStreamResponse.socket_type:type_name -> runm.v1.SocketType
+	2,  // 4: runm.v1.CloseSocketsRequest.socket_types:type_name -> runm.v1.SocketType
+	2,  // 5: runm.v1.AllocateSocketsResponse.socket_types:type_name -> runm.v1.SocketType
+	2,  // 6: runm.v1.BindIOToSocketsRequest.stdin_socket:type_name -> runm.v1.SocketType
+	2,  // 7: runm.v1.BindIOToSocketsRequest.stdout_socket:type_name -> runm.v1.SocketType
+	2,  // 8: runm.v1.BindIOToSocketsRequest.stderr_socket:type_name -> runm.v1.SocketType
+	2,  // 9: runm.v1.BindConsoleToSocketRequest.socket_type:type_name -> runm.v1.SocketType
+	2,  // 10: runm.v1.AllocateSocketResponse.socket_type:type_name -> runm.v1.SocketType
+	2,  // 11: runm.v1.CloseSocketRequest.socket_type:type_name -> runm.v1.SocketType
+	13, // 12: runm.v1.SocketAllocatorService.AllocateSockets:input_type -> runm.v1.AllocateSocketsRequest
+	5,  // 13: runm.v1.SocketAllocatorService.AllocateSocketStream:input_type -> runm.v1.AllocateSocketStreamRequest
+	3,  // 14: runm.v1.SocketAllocatorService.DialOpenListener:input_type -> runm.v1.DialOpenListenerRequest
+	7,  // 15: runm.v1.SocketAllocatorService.AllocateIO:input_type -> runm.v1.AllocateIORequest
+	9,  // 16: runm.v1.SocketAllocatorService.AllocateConsole:input_type -> runm.v1.AllocateConsoleRequest
+	17, // 17: runm.v1.SocketAllocatorService.BindConsoleToSocket:input_type -> runm.v1.BindConsoleToSocketRequest
+	15, // 18: runm.v1.SocketAllocatorService.BindIOToSockets:input_type -> runm.v1.BindIOToSocketsRequest
+	21, // 19: runm.v1.SocketAllocatorService.CloseSocket:input_type -> runm.v1.CloseSocketRequest
+	11, // 20: runm.v1.SocketAllocatorService.CloseSockets:input_type -> runm.v1.CloseSocketsRequest
+	23, // 21: runm.v1.SocketAllocatorService.CloseIO:input_type -> runm.v1.CloseIORequest
+	25, // 22: runm.v1.SocketAllocatorService.CloseConsole:input_type -> runm.v1.CloseConsoleRequest
+	14, // 23: runm.v1.SocketAllocatorService.AllocateSockets:output_type -> runm.v1.AllocateSocketsResponse
+	6,  // 24: runm.v1.SocketAllocatorService.AllocateSocketStream:output_type -> runm.v1.AllocateSocketStreamResponse
+	4,  // 25: runm.v1.SocketAllocatorService.DialOpenListener:output_type -> runm.v1.DialOpenListenerResponse
+	8,  // 26: runm.v1.SocketAllocatorService.AllocateIO:output_type -> runm.v1.AllocateIOResponse
+	10, // 27: runm.v1.SocketAllocatorService.AllocateConsole:output_type -> runm.v1.AllocateConsoleResponse
+	18, // 28: runm.v1.SocketAllocatorService.BindConsoleToSocket:output_type -> runm.v1.BindConsoleToSocketResponse
+	16, // 29: runm.v1.SocketAllocatorService.BindIOToSockets:output_type -> runm.v1.BindIOToSocketsResponse
+	22, // 30: runm.v1.SocketAllocatorService.CloseSocket:output_type -> runm.v1.CloseSocketResponse
+	12, // 31: runm.v1.SocketAllocatorService.CloseSockets:output_type -> runm.v1.CloseSocketsResponse
+	24, // 32: runm.v1.SocketAllocatorService.CloseIO:output_type -> runm.v1.CloseIOResponse
+	26, // 33: runm.v1.SocketAllocatorService.CloseConsole:output_type -> runm.v1.CloseConsoleResponse
+	23, // [23:34] is the sub-list for method output_type
+	12, // [12:23] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_v1_socket_proto_init() }
@@ -1385,13 +1899,17 @@ func file_v1_socket_proto_init() {
 	if File_v1_socket_proto != nil {
 		return
 	}
+	file_v1_socket_proto_msgTypes[2].OneofWrappers = []any{
+		(*socketType_VsockPort)(nil),
+		(*socketType_UnixSocketPath)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_socket_proto_rawDesc), len(file_v1_socket_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   22,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -37,10 +37,10 @@
 			"name": "buildkit",
 			"path": "../buildkit"
 		},
-		{
-			"name": "ec1",
-			"path": "../ec1"
-		},
+		// {
+		// 	"name": "ec1",
+		// 	"path": "../ec1"
+		// },
 		{
 			"name": "ttrpc",
 			"path": "../ttrpc"

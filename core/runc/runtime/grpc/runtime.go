@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"path/filepath"
-	"time"
+	"sync/atomic"
 
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"gitlab.com/tozd/go/errors"
@@ -15,11 +16,12 @@ import (
 
 	"github.com/walteh/runm/core/runc/conversion"
 	"github.com/walteh/runm/core/runc/runtime"
-	"github.com/walteh/runm/core/runc/socket"
+	runmsocket "github.com/walteh/runm/core/runc/socket"
 
 	runmv1 "github.com/walteh/runm/proto/v1"
 )
 
+var vsockPortCounter = atomic.Uint32{}
 var _ runtime.Runtime = (*GRPCClientRuntime)(nil)
 
 func (c *GRPCClientRuntime) SharedDir() string {
@@ -32,51 +34,26 @@ func (c *GRPCClientRuntime) Ping(ctx context.Context) error {
 	return err
 }
 
+func (c *GRPCClientRuntime) vsockDialer(ctx context.Context, port uint32) error {
+	req := &runmv1.DialOpenListenerRequest{}
+	req.SetListeningOn(newVsockSocketType(port))
+	_, err := c.socketAllocatorGrpcService.DialOpenListener(ctx, req)
+	return err
+}
+
 // NewTempConsoleSocket implements runtime.Runtime.
 func (c *GRPCClientRuntime) NewTempConsoleSocket(ctx context.Context) (runtime.ConsoleSocket, error) {
 
-	sock, err := c.socketAllocatorGrpcService.AllocateSocketStream(ctx, &runmv1.AllocateSocketStreamRequest{})
+	port := vsockPortCounter.Add(1) + 3300
+
+	conn, err := c.listenToVsockWithDialerCallback(ctx, port)
 	if err != nil {
-		return nil, errors.Errorf("allocating socket stream: %w", err)
+		return nil, errors.Errorf("listening to vsock: %w", err)
 	}
 
-	refId, err := sock.Recv()
-	if err != nil {
-		return nil, errors.Errorf("receiving socket reference id: %w", err)
-	}
+	allocatedSock := runmsocket.NewSimpleVsockProxyConn(ctx, conn, port)
 
-	hsock, err := socket.NewHostAllocatedSocketFromId(ctx, refId.GetSocketReferenceId(), c.vsockProxier)
-	if err != nil {
-		return nil, errors.Errorf("allocating host allocated socket: %w", err)
-	}
-
-	ready := make(chan error)
-	go func() {
-		slog.InfoContext(ctx, "waiting for socket to be ready - A")
-		if err := hsock.Ready(); err != nil {
-			ready <- err
-			return
-		}
-		slog.InfoContext(ctx, "socket is ready - B")
-		if err := sock.CloseSend(); err != nil {
-			ready <- err
-			return
-		}
-		slog.InfoContext(ctx, "socket is ready - C")
-		ready <- nil
-	}()
-
-	select {
-	case <-sock.Context().Done():
-		return nil, errors.Errorf("context done before socket was ready: %w", sock.Context().Err())
-	case <-time.After(10 * time.Second):
-		return nil, errors.Errorf("timeout waiting for socket to be ready")
-	case err := <-ready:
-		if err != nil {
-			return nil, errors.Errorf("socket not ready: %w", err)
-		}
-	}
-	slog.InfoContext(ctx, "socket is ready - D")
+	sockTyp := newVsockSocketType(port)
 
 	cons, err := c.runtimeGrpcService.NewTempConsoleSocket(ctx, &runmv1.RuncNewTempConsoleSocketRequest{})
 	if err != nil {
@@ -90,7 +67,7 @@ func (c *GRPCClientRuntime) NewTempConsoleSocket(ctx context.Context) (runtime.C
 
 	req := &runmv1.BindConsoleToSocketRequest{}
 	req.SetConsoleReferenceId(cons.GetConsoleReferenceId())
-	req.SetSocketReferenceId(refId.GetSocketReferenceId())
+	req.SetSocketType(sockTyp)
 
 	slog.InfoContext(ctx, "binding console to socket - A")
 
@@ -103,13 +80,13 @@ func (c *GRPCClientRuntime) NewTempConsoleSocket(ctx context.Context) (runtime.C
 
 	slog.InfoContext(ctx, "binding console to socket - B")
 
-	consock, err := socket.NewHostConsoleSocket(ctx, hsock, c.vsockProxier)
+	consock, err := runmsocket.NewHostConsoleSocket(ctx, allocatedSock, c.vsockProxier)
 	if err != nil {
 		return nil, err
 	}
 
 	c.state.StoreOpenConsole(cons.GetConsoleReferenceId(), consock)
-	c.state.StoreOpenSocket(refId.GetSocketReferenceId(), hsock)
+	c.state.StoreOpenVsockConnection(port, allocatedSock)
 
 	slog.InfoContext(ctx, "binding console to socket - C")
 
@@ -148,6 +125,27 @@ func (c *GRPCClientRuntime) NewNullIO() (runtime.IO, error) {
 	return runtime.NewHostNullIo()
 }
 
+func (c *GRPCClientRuntime) listenToVsockWithDialerCallback(ctx context.Context, port uint32) (*net.UnixConn, error) {
+
+	dcb := func(ctx context.Context) error {
+		return c.vsockDialer(ctx, port)
+	}
+
+	cz, err := c.vsockProxier.ListenAndAcceptSingleVsockConnection(ctx, port, dcb)
+	if err != nil {
+		return nil, errors.Errorf("listening and accepting vsock connection: %w", err)
+	}
+	return cz, nil
+}
+
+func newVsockSocketType(port uint32) *runmv1.SocketType {
+	typ := &runmv1.SocketType{}
+	vsockPort := &runmv1.VsockPort{}
+	vsockPort.SetPort(port)
+	typ.SetVsockPort(vsockPort)
+	return typ
+}
+
 // NewPipeIO implements runtime.Runtime.
 func (c *GRPCClientRuntime) NewPipeIO(ctx context.Context, ioUID, ioGID int, opts ...gorunc.IOOpt) (runtime.IO, error) {
 
@@ -171,14 +169,20 @@ func (c *GRPCClientRuntime) NewPipeIO(ctx context.Context, ioUID, ioGID int, opt
 		return nil, errors.New("no sockets to allocate")
 	}
 
-	req := &runmv1.AllocateSocketsRequest{}
-	req.SetCount(uint32(count))
+	refs := make([]*runmv1.SocketType, count)
+	allocatedSockets := make(map[uint32]runtime.AllocatedSocket, count)
 
-	slog.InfoContext(ctx, "allocating sockets", "count", count)
+	for i := 0; i < count; i++ {
 
-	iov, err := c.socketAllocatorGrpcService.AllocateSockets(ctx, req)
-	if err != nil {
-		return nil, errors.Errorf("allocating sockets: %w", err)
+		port := vsockPortCounter.Add(1) + 3300
+
+		conn, err := c.listenToVsockWithDialerCallback(ctx, port)
+		if err != nil {
+			return nil, errors.Errorf("listening to vsock: %w", err)
+		}
+
+		refs[i] = newVsockSocketType(port)
+		allocatedSockets[port] = runmsocket.NewSimpleVsockProxyConn(ctx, conn, port)
 	}
 
 	ioReq := &runmv1.AllocateIORequest{}
@@ -192,30 +196,28 @@ func (c *GRPCClientRuntime) NewPipeIO(ctx context.Context, ioUID, ioGID int, opt
 		return nil, errors.Errorf("allocating IO: %w", err)
 	}
 
-	slog.InfoContext(ctx, "all sockets allocated", "list", iov.GetSocketReferenceIds())
-
 	count2 := 0
 
 	bindReq := &runmv1.BindIOToSocketsRequest{}
 	bindReq.SetIoReferenceId(sock.GetIoReferenceId())
 
 	if ropts.OpenStdin {
-		slog.InfoContext(ctx, "allocating stdin socket", "socket_id", iov.GetSocketReferenceIds()[count2])
-		bindReq.SetStdinSocketReferenceId(iov.GetSocketReferenceIds()[count2])
+		slog.InfoContext(ctx, "allocating stdin socket", "socket_id", refs[count2])
+		bindReq.SetStdinSocket(refs[count2])
 		count2++
 	}
 	if ropts.OpenStdout {
-		slog.InfoContext(ctx, "allocating stdout socket", "socket_id", iov.GetSocketReferenceIds()[count2])
-		bindReq.SetStdoutSocketReferenceId(iov.GetSocketReferenceIds()[count2])
+		slog.InfoContext(ctx, "allocating stdout socket", "socket_id", refs[count2])
+		bindReq.SetStdoutSocket(refs[count2])
 		count2++
 	}
 	if ropts.OpenStderr {
-		slog.InfoContext(ctx, "allocating stderr socket", "socket_id", iov.GetSocketReferenceIds()[count2])
-		bindReq.SetStderrSocketReferenceId(iov.GetSocketReferenceIds()[count2])
+		slog.InfoContext(ctx, "allocating stderr socket", "socket_id", refs[count2])
+		bindReq.SetStderrSocket(refs[count2])
 
 	}
 
-	slog.InfoContext(ctx, "binding IO to sockets", "io_id", sock.GetIoReferenceId(), "stdin_id", bindReq.GetStdinSocketReferenceId(), "stdout_id", bindReq.GetStdoutSocketReferenceId(), "stderr_id", bindReq.GetStderrSocketReferenceId())
+	slog.InfoContext(ctx, "binding IO to sockets", "io_id", sock.GetIoReferenceId(), "stdin_id", bindReq.GetStdinSocket(), "stdout_id", bindReq.GetStdoutSocket(), "stderr_id", bindReq.GetStderrSocket())
 
 	slog.InfoContext(ctx, "binding IO to sockets - A")
 	_, err = c.socketAllocatorGrpcService.BindIOToSockets(ctx, bindReq)
@@ -224,42 +226,32 @@ func (c *GRPCClientRuntime) NewPipeIO(ctx context.Context, ioUID, ioGID int, opt
 		return nil, errors.Errorf("binding IO to sockets: %w", err)
 	}
 
-	var stdinRef, stdoutRef, stderrRef string
-
+	var stdinRef, stdoutRef, stderrRef *runmv1.SocketType
 	if ropts.OpenStdin {
-		slog.InfoContext(ctx, "allocating stdin socket", "socket_id", bindReq.GetStdinSocketReferenceId())
-		stdinRef = bindReq.GetStdinSocketReferenceId()
+		slog.InfoContext(ctx, "allocating stdin socket", "socket_id", bindReq.GetStdinSocket())
+		stdinRef = bindReq.GetStdinSocket()
 	}
 	if ropts.OpenStdout {
-		slog.InfoContext(ctx, "allocating stdout socket", "socket_id", bindReq.GetStdoutSocketReferenceId())
-		stdoutRef = bindReq.GetStdoutSocketReferenceId()
+		slog.InfoContext(ctx, "allocating stdout socket", "socket_id", bindReq.GetStdoutSocket())
+		stdoutRef = bindReq.GetStdoutSocket()
 	}
 	if ropts.OpenStderr {
-		slog.InfoContext(ctx, "allocating stderr socket", "socket_id", bindReq.GetStderrSocketReferenceId())
-		stderrRef = bindReq.GetStderrSocketReferenceId()
+		slog.InfoContext(ctx, "allocating stderr socket", "socket_id", bindReq.GetStderrSocket())
+		stderrRef = bindReq.GetStderrSocket()
 	}
 
 	var stdinAllocated, stdoutAllocated, stderrAllocated runtime.AllocatedSocket
 
-	if stdinRef != "" {
-		stdinAllocated, err = socket.NewHostAllocatedSocketFromId(ctx, stdinRef, c.vsockProxier)
-		if err != nil {
-			return nil, errors.Errorf("allocating stdin socket: %w", err)
-		}
+	if stdinRef != nil {
+		stdinAllocated = allocatedSockets[stdinRef.GetVsockPort().GetPort()]
 	}
 
-	if stdoutRef != "" {
-		stdoutAllocated, err = socket.NewHostAllocatedSocketFromId(ctx, stdoutRef, c.vsockProxier)
-		if err != nil {
-			return nil, errors.Errorf("allocating stdout socket: %w", err)
-		}
+	if stdoutRef != nil {
+		stdoutAllocated = allocatedSockets[stdoutRef.GetVsockPort().GetPort()]
 	}
 
-	if stderrRef != "" {
-		stderrAllocated, err = socket.NewHostAllocatedSocketFromId(ctx, stderrRef, c.vsockProxier)
-		if err != nil {
-			return nil, errors.Errorf("allocating stderr socket: %w", err)
-		}
+	if stderrRef != nil {
+		stderrAllocated = allocatedSockets[stderrRef.GetVsockPort().GetPort()]
 	}
 
 	ioz := runtime.NewHostAllocatedStdio(ctx, sock.GetIoReferenceId(), stdinAllocated, stdoutAllocated, stderrAllocated)

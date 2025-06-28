@@ -215,7 +215,8 @@ type UnixAllocatedSocket interface {
 
 type ServerStateGetter interface {
 	GetOpenIO(referenceId string) (IO, bool)
-	GetOpenSocket(referenceId string) (AllocatedSocket, bool)
+	GetOpenVsockConnection(port uint32) (VsockAllocatedSocket, bool)
+	GetOpenUnixConnection(path string) (UnixAllocatedSocket, bool)
 	GetOpenConsole(referenceId string) (ConsoleSocket, bool)
 }
 
@@ -231,6 +232,7 @@ type ReferableByReferenceId interface {
 
 type VsockProxier interface {
 	ProxyVsock(ctx context.Context, port uint32) (*net.UnixConn, string, error)
+	ListenAndAcceptSingleVsockConnection(ctx context.Context, port uint32, dialCallback func(ctx context.Context) error) (*net.UnixConn, error)
 }
 
 type VsockFdProxier interface {

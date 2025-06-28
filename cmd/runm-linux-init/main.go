@@ -29,6 +29,7 @@ import (
 
 	"github.com/walteh/runm/core/runc/runtime"
 	"github.com/walteh/runm/core/runc/server"
+	"github.com/walteh/runm/core/runc/socket"
 	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/pkg/logging"
@@ -55,78 +56,6 @@ func init() {
 	flag.BoolVar(&enableOtel, "enable-otel", false, "enable otel")
 	flag.Parse()
 
-}
-
-func mount(ctx context.Context) error {
-	if err := os.MkdirAll("/dev", 0755); err != nil {
-		return errors.Errorf("problem creating /dev: %w", err)
-	}
-
-	if err := os.MkdirAll("/sys", 0755); err != nil {
-		return errors.Errorf("problem creating /sys: %w", err)
-	}
-
-	if err := os.MkdirAll("/proc", 0755); err != nil {
-		return errors.Errorf("problem creating /proc: %w", err)
-	}
-
-	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "devtmpfs", "devtmpfs", "/dev"); err != nil {
-		return errors.Errorf("problem mounting devtmpfs: %w", err)
-	}
-
-	// mount sysfs
-	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "sysfs", "sysfs", "/sys", "-o", "nosuid,noexec,nodev"); err != nil {
-		return errors.Errorf("problem mounting sysfs: %w", err)
-	}
-
-	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "proc", "proc", "/proc"); err != nil {
-		return errors.Errorf("problem mounting proc: %w", err)
-	}
-
-	if err := ExecCmdForwardingStdio(ctx, "sysctl", "-w", "kernel.pid_max=100000"); err != nil {
-		return errors.Errorf("problem setting pid_max: %w", err)
-	}
-
-	if err := ExecCmdForwardingStdio(ctx, "sysctl", "-w", "user.max_user_namespaces=15000"); err != nil {
-		return errors.Errorf("problem setting user.max_user_namespaces: %w", err)
-	}
-
-	// Mount the unified cgroup v2 hierarchy
-	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "cgroup2", "none", "/sys/fs/cgroup", "-o", "nsdelegate"); err != nil {
-		return errors.Errorf("problem mounting cgroup2: %w", err)
-	}
-
-	// Enable the memory controller in the root cgroup
-	if err := ExecCmdForwardingStdio(ctx, "sh", "-c", "echo +memory > /sys/fs/cgroup/cgroup.subtree_control"); err != nil {
-		return errors.Errorf("failed to enable memory controller: %w", err)
-	}
-
-	// list mounnts
-	mountinfo, err := os.ReadFile("/proc/self/mountinfo")
-	if err != nil {
-		panic(errors.Errorf("problem reading mountinfo: %w", err))
-	}
-
-	fmt.Println("mountinfo contents:")
-
-	fmt.Println(string(mountinfo))
-
-	return nil
-}
-
-type simpleVsockDialer struct {
-	port uint32
-}
-
-func (d *simpleVsockDialer) DialContext(ctx context.Context, _, _ string) (net.Conn, error) {
-	slog.InfoContext(ctx, "dialing vsock for otel", "port", d.port)
-	c, err := vsock.Dial(2, d.port, nil)
-	if err != nil {
-		slog.ErrorContext(ctx, "problem dialing vsock for otel", "error", err)
-		return nil, errors.Errorf("dialing vsock: %w", err)
-	}
-	slog.InfoContext(ctx, "dialed vsock for otel", "conn", c)
-	return c, nil
 }
 
 func setupLogger(ctx context.Context) (context.Context, error) {
@@ -225,7 +154,7 @@ func runGrpcVsockServer(ctx context.Context) error {
 		SystemdCgroup: false,
 	})
 
-	realSocketAllocator := runtime.NewGuestVsockSocketAllocator(3, 2300)
+	realSocketAllocator := socket.NewGuestVsockSocketAllocator(3, 2300)
 
 	serveropts := []grpc.ServerOption{
 		grpc.ChainUnaryInterceptor(grpcerr.UnaryServerInterceptor()),
@@ -356,4 +285,76 @@ func ExecCmdForwardingStdioChroot(ctx context.Context, chroot string, cmds ...st
 	}
 
 	return nil
+}
+
+func mount(ctx context.Context) error {
+	if err := os.MkdirAll("/dev", 0755); err != nil {
+		return errors.Errorf("problem creating /dev: %w", err)
+	}
+
+	if err := os.MkdirAll("/sys", 0755); err != nil {
+		return errors.Errorf("problem creating /sys: %w", err)
+	}
+
+	if err := os.MkdirAll("/proc", 0755); err != nil {
+		return errors.Errorf("problem creating /proc: %w", err)
+	}
+
+	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "devtmpfs", "devtmpfs", "/dev"); err != nil {
+		return errors.Errorf("problem mounting devtmpfs: %w", err)
+	}
+
+	// mount sysfs
+	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "sysfs", "sysfs", "/sys", "-o", "nosuid,noexec,nodev"); err != nil {
+		return errors.Errorf("problem mounting sysfs: %w", err)
+	}
+
+	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "proc", "proc", "/proc"); err != nil {
+		return errors.Errorf("problem mounting proc: %w", err)
+	}
+
+	if err := ExecCmdForwardingStdio(ctx, "sysctl", "-w", "kernel.pid_max=100000"); err != nil {
+		return errors.Errorf("problem setting pid_max: %w", err)
+	}
+
+	if err := ExecCmdForwardingStdio(ctx, "sysctl", "-w", "user.max_user_namespaces=15000"); err != nil {
+		return errors.Errorf("problem setting user.max_user_namespaces: %w", err)
+	}
+
+	// Mount the unified cgroup v2 hierarchy
+	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "cgroup2", "none", "/sys/fs/cgroup", "-o", "nsdelegate"); err != nil {
+		return errors.Errorf("problem mounting cgroup2: %w", err)
+	}
+
+	// Enable the memory controller in the root cgroup
+	if err := ExecCmdForwardingStdio(ctx, "sh", "-c", "echo +memory > /sys/fs/cgroup/cgroup.subtree_control"); err != nil {
+		return errors.Errorf("failed to enable memory controller: %w", err)
+	}
+
+	// list mounnts
+	mountinfo, err := os.ReadFile("/proc/self/mountinfo")
+	if err != nil {
+		panic(errors.Errorf("problem reading mountinfo: %w", err))
+	}
+
+	fmt.Println("mountinfo contents:")
+
+	fmt.Println(string(mountinfo))
+
+	return nil
+}
+
+type simpleVsockDialer struct {
+	port uint32
+}
+
+func (d *simpleVsockDialer) DialContext(ctx context.Context, _, _ string) (net.Conn, error) {
+	slog.InfoContext(ctx, "dialing vsock for otel", "port", d.port)
+	c, err := vsock.Dial(2, d.port, nil)
+	if err != nil {
+		slog.ErrorContext(ctx, "problem dialing vsock for otel", "error", err)
+		return nil, errors.Errorf("dialing vsock: %w", err)
+	}
+	slog.InfoContext(ctx, "dialed vsock for otel", "conn", c)
+	return c, nil
 }

@@ -23,6 +23,7 @@ import (
 	"os"
 	"path"
 	"sync"
+	"time"
 
 	"github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/containerd/api/types/task"
@@ -94,6 +95,11 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 			return nil
 		})
 	}
+
+	sd.RegisterCallback(func(context.Context) error {
+		slog.InfoContext(ctx, "SHIM IS SHUTTING DOWN")
+		return nil
+	})
 
 	return s, nil
 }
@@ -384,29 +390,42 @@ func (s *service) Start(ctx context.Context, r *taskv3.StartRequest) (*taskv3.St
 
 // Delete the initial process and container
 func (s *service) Delete(ctx context.Context, r *taskv3.DeleteRequest) (*taskv3.DeleteResponse, error) {
+	slog.InfoContext(ctx, "deleting container or process", "id", r.ID, "exec_id", r.ExecID)
+
 	container, err := s.getContainer(r.ID)
 	if err != nil {
+		slog.WarnContext(ctx, "container not found during delete", "id", r.ID, "error", err)
 		return nil, err
 	}
+
 	p, err := container.Delete(ctx, r)
 	if err != nil {
+		slog.WarnContext(ctx, "error deleting container process", "id", r.ID, "exec_id", r.ExecID, "error", err)
 		return nil, errgrpc.ToGRPC(err)
 	}
+
 	// if we deleted an init task, send the task delete event
 	if r.ExecID == "" {
+		slog.InfoContext(ctx, "deleted init process, removing container", "id", r.ID)
 		s.mu.Lock()
 		delete(s.containers, r.ID)
 		s.mu.Unlock()
+
+		// Ensure we send the delete event before potentially shutting down
 		s.send(&eventstypes.TaskDelete{
 			ContainerID: container.ID,
 			Pid:         uint32(p.Pid()),
 			ExitStatus:  uint32(p.ExitStatus()),
 			ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
 		})
+
 		s.lifecycleMu.Lock()
 		delete(s.containerInitExit, container)
 		s.lifecycleMu.Unlock()
+	} else {
+		slog.InfoContext(ctx, "deleted exec process", "id", r.ID, "exec_id", r.ExecID)
 	}
+
 	return &taskv3.DeleteResponse{
 		ExitStatus: uint32(p.ExitStatus()),
 		ExitedAt:   protobuf.ToTimestamp(p.ExitedAt()),
@@ -634,18 +653,27 @@ func (s *service) Connect(ctx context.Context, r *taskv3.ConnectRequest) (*taskv
 	}, nil
 }
 
+// Shutdown closes any resources still open
 func (s *service) Shutdown(ctx context.Context, r *taskv3.ShutdownRequest) (*ptypes.Empty, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// return out if the shim is still servicing containers
-	if len(s.containers) > 0 {
-		return empty, nil
-	}
+	slog.InfoContext(ctx, "shutdown request received", "force", r.Now)
 
-	// please make sure that temporary resource has been cleanup or registered
-	// for cleanup before calling shutdown
-	s.shutdown.Shutdown()
+	// If force shutdown requested, or no containers remaining, trigger shutdown
+	if r.Now || len(s.containers) == 0 {
+		// Delay shutdown slightly to allow the caller to receive the response
+		// before we close the connection
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			slog.InfoContext(ctx, "triggering service shutdown")
+			// please make sure that temporary resource has been cleanup or registered
+			// for cleanup before calling shutdown
+			s.shutdown.Shutdown()
+		}()
+	} else {
+		slog.InfoContext(ctx, "skipping shutdown because containers still exist", "container_count", len(s.containers))
+	}
 
 	return empty, nil
 }

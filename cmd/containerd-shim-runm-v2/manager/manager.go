@@ -314,55 +314,33 @@ func (m manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {
 	}
 
 	path := filepath.Join(filepath.Dir(cwd), id)
-	// ns, err := namespaces.NamespaceRequired(ctx)
-	// if err != nil {
-	// 	return shim.StopStatus{}, err
-	// }
-	// runtimez, err := runm.ReadRuntime(path)
-	// if err != nil && !os.IsNotExist(err) {
-	// 	return shim.StopStatus{}, err
-	// }
-	// opts, err := runm.ReadOptions(path)
-	// if err != nil {
-	// 	return shim.StopStatus{}, err
-	// }
-	// root := process.RuncRoot
-	// if opts != nil && opts.Root != "" {
-	// 	root = opts.Root
-	// }
-
-	// this needs to be taken care of in the sig-kill of the main shim process, not here
 	pid, err := runm.ReadPid(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			slog.InfoContext(ctx, "pid file not found, returning default stop status", "path", path)
+			// Return a default stop status with 0 pid and SIGKILL exit status
+			return shim.StopStatus{
+				ExitedAt:   time.Now(),
+				ExitStatus: 128 + int(unix.SIGKILL),
+				Pid:        0,
+			}, nil
+		}
 		return shim.StopStatus{}, err
 	}
 
-	// _, err = m.shimGrpcService.ShimKill(ctx, &runmv1.ShimKillRequest{})
-	// if err != nil {
-	// 	return shim.StopStatus{}, err
-	// }
-	// pid = int(killResponse.GetInitPid())
-
-	// kill the pid
+	// Try to kill the process, but don't fail if it doesn't exist
 	if err := syscall.Kill(pid, syscall.SIGKILL); err != nil {
-		slog.Error("failed to kill pid", "error", err)
+		if err == syscall.ESRCH { // No such process
+			slog.InfoContext(ctx, "process not found, continuing with cleanup", "pid", pid)
+		} else {
+			slog.WarnContext(ctx, "failed to kill pid", "error", err, "pid", pid)
+		}
 	}
-
-	// r := m.creator.Create(ctx, &runtime.RuntimeOptions{
-	// 	Root:          root,
-	// 	Path:          path,
-	// 	Namespace:     ns,
-	// 	Runtime:       runtimez,
-	// 	SystemdCgroup: opts.SystemdCgroup,
-	// })
 
 	if err := mount.UnmountRecursive(filepath.Join(path, "rootfs"), 0); err != nil {
 		log.G(ctx).WithError(err).Warn("failed to cleanup rootfs mount")
 	}
-	// pid, err := gorunc.ReadPidFile(filepath.Join(path, process.InitPidFile))
-	// if err != nil {
-	// 	log.G(ctx).WithError(err).Warn("failed to read init pid file")
-	// }
+
 	return shim.StopStatus{
 		ExitedAt:   time.Now(),
 		ExitStatus: 128 + int(unix.SIGKILL),

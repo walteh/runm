@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	SocketAllocatorService_AllocateSockets_FullMethodName      = "/runm.v1.SocketAllocatorService/AllocateSockets"
 	SocketAllocatorService_AllocateSocketStream_FullMethodName = "/runm.v1.SocketAllocatorService/AllocateSocketStream"
+	SocketAllocatorService_DialOpenListener_FullMethodName     = "/runm.v1.SocketAllocatorService/DialOpenListener"
 	SocketAllocatorService_AllocateIO_FullMethodName           = "/runm.v1.SocketAllocatorService/AllocateIO"
 	SocketAllocatorService_AllocateConsole_FullMethodName      = "/runm.v1.SocketAllocatorService/AllocateConsole"
 	SocketAllocatorService_BindConsoleToSocket_FullMethodName  = "/runm.v1.SocketAllocatorService/BindConsoleToSocket"
@@ -37,6 +38,7 @@ const (
 type SocketAllocatorServiceClient interface {
 	AllocateSockets(ctx context.Context, in *AllocateSocketsRequest, opts ...grpc.CallOption) (*AllocateSocketsResponse, error)
 	AllocateSocketStream(ctx context.Context, in *AllocateSocketStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[AllocateSocketStreamResponse], error)
+	DialOpenListener(ctx context.Context, in *DialOpenListenerRequest, opts ...grpc.CallOption) (*DialOpenListenerResponse, error)
 	// the same thing but with different name than "NewPipeIO"
 	AllocateIO(ctx context.Context, in *AllocateIORequest, opts ...grpc.CallOption) (*AllocateIOResponse, error)
 	// the same thing but with different name than "NewTempConsoleSocket"
@@ -85,6 +87,16 @@ func (c *socketAllocatorServiceClient) AllocateSocketStream(ctx context.Context,
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type SocketAllocatorService_AllocateSocketStreamClient = grpc.ServerStreamingClient[AllocateSocketStreamResponse]
+
+func (c *socketAllocatorServiceClient) DialOpenListener(ctx context.Context, in *DialOpenListenerRequest, opts ...grpc.CallOption) (*DialOpenListenerResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DialOpenListenerResponse)
+	err := c.cc.Invoke(ctx, SocketAllocatorService_DialOpenListener_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
 
 func (c *socketAllocatorServiceClient) AllocateIO(ctx context.Context, in *AllocateIORequest, opts ...grpc.CallOption) (*AllocateIOResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -172,6 +184,7 @@ func (c *socketAllocatorServiceClient) CloseConsole(ctx context.Context, in *Clo
 type SocketAllocatorServiceServer interface {
 	AllocateSockets(context.Context, *AllocateSocketsRequest) (*AllocateSocketsResponse, error)
 	AllocateSocketStream(*AllocateSocketStreamRequest, grpc.ServerStreamingServer[AllocateSocketStreamResponse]) error
+	DialOpenListener(context.Context, *DialOpenListenerRequest) (*DialOpenListenerResponse, error)
 	// the same thing but with different name than "NewPipeIO"
 	AllocateIO(context.Context, *AllocateIORequest) (*AllocateIOResponse, error)
 	// the same thing but with different name than "NewTempConsoleSocket"
@@ -196,6 +209,9 @@ func (UnimplementedSocketAllocatorServiceServer) AllocateSockets(context.Context
 }
 func (UnimplementedSocketAllocatorServiceServer) AllocateSocketStream(*AllocateSocketStreamRequest, grpc.ServerStreamingServer[AllocateSocketStreamResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method AllocateSocketStream not implemented")
+}
+func (UnimplementedSocketAllocatorServiceServer) DialOpenListener(context.Context, *DialOpenListenerRequest) (*DialOpenListenerResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DialOpenListener not implemented")
 }
 func (UnimplementedSocketAllocatorServiceServer) AllocateIO(context.Context, *AllocateIORequest) (*AllocateIOResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AllocateIO not implemented")
@@ -269,6 +285,24 @@ func _SocketAllocatorService_AllocateSocketStream_Handler(srv interface{}, strea
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type SocketAllocatorService_AllocateSocketStreamServer = grpc.ServerStreamingServer[AllocateSocketStreamResponse]
+
+func _SocketAllocatorService_DialOpenListener_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DialOpenListenerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SocketAllocatorServiceServer).DialOpenListener(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SocketAllocatorService_DialOpenListener_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SocketAllocatorServiceServer).DialOpenListener(ctx, req.(*DialOpenListenerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
 
 func _SocketAllocatorService_AllocateIO_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AllocateIORequest)
@@ -424,6 +458,10 @@ var SocketAllocatorService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AllocateSockets",
 			Handler:    _SocketAllocatorService_AllocateSockets_Handler,
+		},
+		{
+			MethodName: "DialOpenListener",
+			Handler:    _SocketAllocatorService_DialOpenListener_Handler,
 		},
 		{
 			MethodName: "AllocateIO",
