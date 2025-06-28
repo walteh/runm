@@ -5,15 +5,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
+	"gitlab.com/tozd/go/errors"
 	"golang.org/x/sys/unix"
 
-	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-spec/specs-go/features"
 
 	gorunc "github.com/containerd/go-runc"
@@ -25,17 +27,19 @@ var _ runtime.Runtime = (*GoRuncRuntime)(nil)
 var _ runtime.RuntimeExtras = (*GoRuncRuntime)(nil)
 
 type GoRuncRuntime struct {
-	*gorunc.Runc
-	sharedDirPathPrefix string
+	internal *gorunc.Runc
+	// sharedDirPathPrefix string
 }
 
-func (r *GoRuncRuntime) SharedDir() string {
-	return r.sharedDirPathPrefix
-}
+// Checkpoint implements runtime.Runtime.
+
+// func (r *GoRuncRuntime) SharedDir() string {
+// 	return r.internal.Root
+// }
 
 func WrapdGoRuncRuntime(rt *gorunc.Runc) *GoRuncRuntime {
 	return &GoRuncRuntime{
-		Runc: rt,
+		internal: rt,
 	}
 }
 
@@ -56,7 +60,7 @@ func (r *GoRuncRuntime) ReadPidFile(ctx context.Context, path string) (int, erro
 }
 
 func (r *GoRuncRuntime) RuncRun(ctx context.Context, id, bundle string, options *gorunc.CreateOpts) (int, error) {
-	return r.Runc.Run(ctx, id, bundle, options)
+	return r.internal.Run(ctx, id, bundle, options)
 }
 
 var _ runtime.RuntimeCreator = (*GoRuncRuntimeCreator)(nil)
@@ -98,122 +102,62 @@ func (c *GoRuncRuntimeCreator) Create(ctx context.Context, opts *runtime.Runtime
 	return r, nil
 }
 
-func (r *GoRuncRuntime) Create(ctx context.Context, id, bundle string, options *gorunc.CreateOpts) error {
-	// slog.Info(godump.DumpStr(options), "id", id, "bundle", bundle, "options", options)
+func getRawRuncError(ctx context.Context, r *GoRuncRuntime, err error) error {
+	rawStr := strings.TrimSpace(err.Error())
+	errMsg := r.TryGetLastRuntimeError(ctx)
+	if errMsg == "" {
+		return errors.ErrorfOffset(2, "[raw runc error]: %s: [no runc error found in logs]", rawStr)
+	}
+	if strings.HasSuffix(rawStr, errMsg) {
+		return errors.ErrorfOffset(2, "[raw runc error]: %s", rawStr)
+	}
+	return errors.ErrorfOffset(2, "[parsed runc error]: %s: [from logs] %s", rawStr, errMsg)
+}
 
-	output, err := exec.CommandContext(ctx, "/bin/busybox", "ls", "-lah", bundle).CombinedOutput()
+func WrapWithRuntimeError(ctx context.Context, r *GoRuncRuntime, f func() error) error {
+	err := f()
+	if err == nil {
+		return nil
+	}
+	return getRawRuncError(ctx, r, err)
+}
+
+func WrapWithRuntimeErrorResult[T any](ctx context.Context, r *GoRuncRuntime, f func() (T, error)) (T, error) {
+	var zero T
+	result, err := f()
+	if err == nil {
+		return result, nil
+	}
+	return zero, getRawRuncError(ctx, r, err)
+}
+
+func (r *GoRuncRuntime) TryGetLastRuntimeError(ctx context.Context) string {
+	f, err := os.OpenFile(r.internal.Log, os.O_RDONLY, 0400)
 	if err != nil {
-		return fmt.Errorf("failed to list bundle: %w (output: %q)", err, string(output))
+		slog.ErrorContext(ctx, "failed to open log file", "error", err, "log", r.internal.Log)
+		return ""
 	}
-	slog.InfoContext(ctx, "ls -lahr: "+string(output), "bundle", bundle)
+	defer f.Close()
 
-	// Handle the exec FIFO in a separate goroutine to ensure proper synchronization
-	// This is critical for container initialization
-	go func() {
-		// The FIFO is created in the container's state directory
-		stateDir := filepath.Join(r.Root, id)
-		fifoPath := filepath.Join(stateDir, "exec.fifo")
-
-		// Wait a bit to ensure the container has time to create the FIFO
-		time.Sleep(100 * time.Millisecond)
-
-		// Check if the FIFO exists
-		if _, err := os.Stat(fifoPath); err != nil {
-			slog.InfoContext(ctx, "Exec FIFO not found, skipping FIFO handling", "path", fifoPath, "error", err)
-			return
+	var (
+		errMsg string
+		log    struct {
+			Level string
+			Msg   string
+			Time  time.Time
 		}
+	)
 
-		slog.InfoContext(ctx, "Opening exec FIFO to synchronize with container", "path", fifoPath)
-
-		// Open the FIFO with a timeout to avoid hanging indefinitely
-		openDone := make(chan struct{})
-		var openErr error
-
-		go func() {
-			// Open the FIFO for reading (O_RDONLY)
-			// This will block until the container writes to it
-			_, openErr = os.OpenFile(fifoPath, os.O_RDONLY, 0)
-			close(openDone)
-		}()
-
-		// Wait for either the open to complete or a timeout
-		select {
-		case <-openDone:
-			if openErr != nil {
-				slog.InfoContext(ctx, "Failed to open exec FIFO", "path", fifoPath, "error", openErr)
-			} else {
-				slog.InfoContext(ctx, "Successfully opened exec FIFO", "path", fifoPath)
-			}
-		case <-time.After(2 * time.Second):
-			slog.InfoContext(ctx, "Timeout waiting for exec FIFO", "path", fifoPath)
+	dec := json.NewDecoder(f)
+	for err = nil; err == nil; {
+		if err = dec.Decode(&log); err != nil && err != io.EOF {
+			slog.ErrorContext(ctx, "failed to decode log", "error", err)
+			return ""
 		}
-	}()
-
-	files := []string{
-		"bootstrap.json",
-		"config.json",
-		"options.json",
-	}
-
-	for _, file := range files {
-		output, err = exec.CommandContext(ctx, "/bin/busybox", "cat", filepath.Join(bundle, file)).CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("failed to list bundle: %w (output: %q)", err, string(output))
-		}
-
-		// var out map[string]any
-		// if err := json.Unmarshal(output, &out); err != nil {
-		// 	return fmt.Errorf("failed to unmarshal %s: %w (output: %q)", file, err, string(output))
-		// }
-
-		slog.InfoContext(ctx, "cat: "+file, "bundle", bundle, "output", string(output))
-	}
-
-	// parse the config.json
-	config, err := os.ReadFile(filepath.Join(bundle, "config.json"))
-	if err != nil {
-		return fmt.Errorf("failed to read config.json: %w", err)
-	}
-
-	var configSpec specs.Spec
-	if err := json.Unmarshal(config, &configSpec); err != nil {
-		return fmt.Errorf("failed to unmarshal config.json: %w", err)
-	}
-
-	hoooksToProxy := []specs.Hook{}
-
-	hoooksToProxy = append(hoooksToProxy, configSpec.Hooks.Poststart...)
-	hoooksToProxy = append(hoooksToProxy, configSpec.Hooks.Poststop...)
-	hoooksToProxy = append(hoooksToProxy, configSpec.Hooks.CreateRuntime...)
-	hoooksToProxy = append(hoooksToProxy, configSpec.Hooks.CreateContainer...)
-	hoooksToProxy = append(hoooksToProxy, configSpec.Hooks.StartContainer...)
-
-	createdSymlinks := make(map[string]bool)
-	// for all the hooks, create symlinks to the host service
-	for _, hook := range hoooksToProxy {
-		if _, ok := createdSymlinks[hook.Path]; !ok {
-			os.MkdirAll(filepath.Dir(hook.Path), 0755)
-			os.Symlink("/mbin/runm-linux-host-fork-exec-proxy", hook.Path)
-			createdSymlinks[hook.Path] = true
-			slog.InfoContext(ctx, "created symlink", "path", hook.Path)
+		if log.Level == "error" {
+			errMsg = strings.TrimSpace(log.Msg)
 		}
 	}
 
-	done := false
-	defer func() {
-		done = true
-		slog.InfoContext(ctx, "done runc create")
-	}()
-	go func() {
-		ticker := time.NewTicker(time.Second)
-		defer ticker.Stop()
-		for !done {
-			select {
-			case <-ticker.C:
-				slog.InfoContext(ctx, "still running runc create")
-			}
-		}
-	}()
-
-	return r.Runc.Create(ctx, id, bundle, options)
+	return errMsg
 }

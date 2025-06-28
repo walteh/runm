@@ -22,9 +22,8 @@ func (x *RuncReadPidFileResponse) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
 	}
-	attrs := make([]slog.Attr, 0, 2)
+	attrs := make([]slog.Attr, 0, 1)
 	attrs = append(attrs, slog.Int64("pid", int64(x.GetPid())))
-	attrs = append(attrs, slog.String("go_error", x.GetGoError()))
 	return slog.GroupValue(attrs...)
 }
 
@@ -40,9 +39,8 @@ func (x *RuncNewTempConsoleSocketResponse) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
 	}
-	attrs := make([]slog.Attr, 0, 2)
+	attrs := make([]slog.Attr, 0, 1)
 	attrs = append(attrs, slog.String("console_reference_id", x.GetConsoleReferenceId()))
-	attrs = append(attrs, slog.String("go_error", x.GetGoError()))
 	return slog.GroupValue(attrs...)
 }
 
@@ -130,7 +128,7 @@ func (x *RuncListResponse) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
 	}
-	attrs := make([]slog.Attr, 0, 2)
+	attrs := make([]slog.Attr, 0, 1)
 	if len(x.GetContainers()) != 0 {
 		attrs0 := make([]slog.Attr, 0, len(x.GetContainers()))
 		for i, v := range x.GetContainers() {
@@ -142,7 +140,6 @@ func (x *RuncListResponse) LogValue() slog.Value {
 		}
 		attrs = append(attrs, slog.Any("containers", attrs0))
 	}
-	attrs = append(attrs, slog.String("go_error", x.GetGoError()))
 	return slog.GroupValue(attrs...)
 }
 
@@ -159,7 +156,7 @@ func (x *RuncStateResponse) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
 	}
-	attrs := make([]slog.Attr, 0, 2)
+	attrs := make([]slog.Attr, 0, 1)
 	if x.GetContainer() != nil {
 		if v, ok := interface{}(x.GetContainer()).(slog.LogValuer); ok {
 			attrs = append(attrs, slog.Attr{Key: "container", Value: v.LogValue()})
@@ -167,7 +164,6 @@ func (x *RuncStateResponse) LogValue() slog.Value {
 			attrs = append(attrs, slog.Any("container", x.GetContainer()))
 		}
 	}
-	attrs = append(attrs, slog.String("go_error", x.GetGoError()))
 	return slog.GroupValue(attrs...)
 }
 
@@ -220,8 +216,7 @@ func (x *RuncCreateResponse) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
 	}
-	attrs := make([]slog.Attr, 0, 1)
-	attrs = append(attrs, slog.String("go_error", x.GetGoError()))
+	attrs := make([]slog.Attr, 0, 0)
 	return slog.GroupValue(attrs...)
 }
 
@@ -238,8 +233,7 @@ func (x *RuncStartResponse) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
 	}
-	attrs := make([]slog.Attr, 0, 1)
-	attrs = append(attrs, slog.String("go_error", x.GetGoError()))
+	attrs := make([]slog.Attr, 0, 0)
 	return slog.GroupValue(attrs...)
 }
 
@@ -298,8 +292,7 @@ func (x *RuncExecResponse) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
 	}
-	attrs := make([]slog.Attr, 0, 1)
-	attrs = append(attrs, slog.String("go_error", x.GetGoError()))
+	attrs := make([]slog.Attr, 0, 0)
 	return slog.GroupValue(attrs...)
 }
 
@@ -324,9 +317,8 @@ func (x *RuncRunResponse) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
 	}
-	attrs := make([]slog.Attr, 0, 2)
+	attrs := make([]slog.Attr, 0, 1)
 	attrs = append(attrs, slog.Int64("status", int64(x.GetStatus())))
-	attrs = append(attrs, slog.String("go_error", x.GetGoError()))
 	return slog.GroupValue(attrs...)
 }
 
@@ -366,8 +358,7 @@ func (x *RuncDeleteResponse) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
 	}
-	attrs := make([]slog.Attr, 0, 1)
-	attrs = append(attrs, slog.String("go_error", x.GetGoError()))
+	attrs := make([]slog.Attr, 0, 0)
 	return slog.GroupValue(attrs...)
 }
 
@@ -408,8 +399,7 @@ func (x *RuncKillResponse) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
 	}
-	attrs := make([]slog.Attr, 0, 1)
-	attrs = append(attrs, slog.String("go_error", x.GetGoError()))
+	attrs := make([]slog.Attr, 0, 0)
 	return slog.GroupValue(attrs...)
 }
 
@@ -435,7 +425,7 @@ func (x *RuncStatsResponse) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
 	}
-	attrs := make([]slog.Attr, 0, 2)
+	attrs := make([]slog.Attr, 0, 1)
 	if x.GetStats() != nil {
 		if v, ok := interface{}(x.GetStats()).(slog.LogValuer); ok {
 			attrs = append(attrs, slog.Attr{Key: "stats", Value: v.LogValue()})
@@ -443,7 +433,6 @@ func (x *RuncStatsResponse) LogValue() slog.Value {
 			attrs = append(attrs, slog.Any("stats", x.GetStats()))
 		}
 	}
-	attrs = append(attrs, slog.String("go_error", x.GetGoError()))
 	return slog.GroupValue(attrs...)
 }
 
@@ -460,8 +449,7 @@ func (x *RuncPauseResponse) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
 	}
-	attrs := make([]slog.Attr, 0, 1)
-	attrs = append(attrs, slog.String("go_error", x.GetGoError()))
+	attrs := make([]slog.Attr, 0, 0)
 	return slog.GroupValue(attrs...)
 }
 
@@ -478,8 +466,7 @@ func (x *RuncResumeResponse) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
 	}
-	attrs := make([]slog.Attr, 0, 1)
-	attrs = append(attrs, slog.String("go_error", x.GetGoError()))
+	attrs := make([]slog.Attr, 0, 0)
 	return slog.GroupValue(attrs...)
 }
 
@@ -496,7 +483,7 @@ func (x *RuncPsResponse) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
 	}
-	attrs := make([]slog.Attr, 0, 2)
+	attrs := make([]slog.Attr, 0, 1)
 	if len(x.GetPids()) != 0 {
 		attrs0 := make([]slog.Attr, 0, len(x.GetPids()))
 		for i, v := range x.GetPids() {
@@ -504,7 +491,6 @@ func (x *RuncPsResponse) LogValue() slog.Value {
 		}
 		attrs = append(attrs, slog.Any("pids", attrs0))
 	}
-	attrs = append(attrs, slog.String("go_error", x.GetGoError()))
 	return slog.GroupValue(attrs...)
 }
 
@@ -520,11 +506,10 @@ func (x *RuncVersionResponse) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
 	}
-	attrs := make([]slog.Attr, 0, 4)
+	attrs := make([]slog.Attr, 0, 3)
 	attrs = append(attrs, slog.String("runc", x.GetRunc()))
 	attrs = append(attrs, slog.String("commit", x.GetCommit()))
 	attrs = append(attrs, slog.String("spec", x.GetSpec()))
-	attrs = append(attrs, slog.String("go_error", x.GetGoError()))
 	return slog.GroupValue(attrs...)
 }
 
@@ -668,8 +653,7 @@ func (x *RuncCheckpointResponse) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
 	}
-	attrs := make([]slog.Attr, 0, 1)
-	attrs = append(attrs, slog.String("go_error", x.GetGoError()))
+	attrs := make([]slog.Attr, 0, 0)
 	return slog.GroupValue(attrs...)
 }
 
@@ -694,9 +678,8 @@ func (x *RuncRestoreResponse) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
 	}
-	attrs := make([]slog.Attr, 0, 2)
+	attrs := make([]slog.Attr, 0, 1)
 	attrs = append(attrs, slog.Int64("status", int64(x.GetStatus())))
-	attrs = append(attrs, slog.String("go_error", x.GetGoError()))
 	return slog.GroupValue(attrs...)
 }
 
@@ -815,8 +798,7 @@ func (x *RuncUpdateResponse) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
 	}
-	attrs := make([]slog.Attr, 0, 1)
-	attrs = append(attrs, slog.String("go_error", x.GetGoError()))
+	attrs := make([]slog.Attr, 0, 0)
 	return slog.GroupValue(attrs...)
 }
 
@@ -843,7 +825,7 @@ func (x *RuncTopResponse) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
 	}
-	attrs := make([]slog.Attr, 0, 2)
+	attrs := make([]slog.Attr, 0, 1)
 	if x.GetResults() != nil {
 		if v, ok := interface{}(x.GetResults()).(slog.LogValuer); ok {
 			attrs = append(attrs, slog.Attr{Key: "results", Value: v.LogValue()})
@@ -851,7 +833,6 @@ func (x *RuncTopResponse) LogValue() slog.Value {
 			attrs = append(attrs, slog.Any("results", x.GetResults()))
 		}
 	}
-	attrs = append(attrs, slog.String("go_error", x.GetGoError()))
 	return slog.GroupValue(attrs...)
 }
 

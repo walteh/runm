@@ -46,7 +46,6 @@ import (
 
 	"github.com/walteh/runm/core/runc/process"
 	"github.com/walteh/runm/core/runc/runtime"
-	"github.com/walteh/runm/pkg/stackerr"
 )
 
 // Init represents an initial process for a container
@@ -107,7 +106,7 @@ func New(id string, runtime runtime.Runtime, cgroupAdapter runtime.CgroupAdapter
 func (p *Init) Create(ctx context.Context, r *process.CreateConfig) error {
 
 	defer func() {
-		slog.InfoContext(ctx, "SHIM IS SHUTTING DOWN")
+		slog.InfoContext(ctx, "shim init process create is complete")
 		if r := recover(); r != nil {
 			slog.ErrorContext(ctx, "panic in Create", "error", r)
 			panic(r)
@@ -155,7 +154,7 @@ func (p *Init) Create(ctx context.Context, r *process.CreateConfig) error {
 	if err := p.runtime.Create(ctx, r.ID, r.Bundle, opts); err != nil {
 		// fmt.Fprintf(logging.GetDefaultLogWriter(), "runtime error (%T): %+v\n", err, err)
 		// slog.ErrorContext(ctx, "runtime error", "error", err, "type", reflect.TypeOf(err))
-		return p.runtimeError(ctx, err, "OCI runtime create failed")
+		return errors.Errorf("OCI runtime create failed: %w", err)
 	}
 	slog.InfoContext(ctx, "done calling runtime.Create")
 	if r.Stdin != "" {
@@ -288,7 +287,10 @@ func (p *Init) Start(ctx context.Context) error {
 
 func (p *Init) start(ctx context.Context) error {
 	err := p.runtime.Start(ctx, p.id)
-	return p.runtimeError(ctx, err, "OCI runtime start failed")
+	if err != nil {
+		return errors.Errorf("starting init process: %w", err)
+	}
+	return nil
 }
 
 // SetExited of the init process with the next status
@@ -311,7 +313,10 @@ func (p *Init) Delete(ctx context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	return p.initState.Delete(ctx)
+	if err := p.initState.Delete(ctx); err != nil {
+		return errors.Errorf("deleting init process: %w", err)
+	}
+	return nil
 }
 
 func (p *Init) delete(ctx context.Context) error {
@@ -326,7 +331,7 @@ func (p *Init) delete(ctx context.Context) error {
 		if strings.Contains(err.Error(), "does not exist") {
 			err = nil
 		} else {
-			err = p.runtimeError(ctx, err, "failed to delete task")
+			err = errors.Errorf("failed to delete task: %w", err)
 		}
 	}
 	if p.io != nil {
@@ -360,7 +365,10 @@ func (p *Init) Pause(ctx context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	return p.initState.Pause(ctx)
+	if err := p.initState.Pause(ctx); err != nil {
+		return errors.Errorf("pausing init process: %w", err)
+	}
+	return nil
 }
 
 // Resume the init process and all its child processes
@@ -368,7 +376,10 @@ func (p *Init) Resume(ctx context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	return p.initState.Resume(ctx)
+	if err := p.initState.Resume(ctx); err != nil {
+		return errors.Errorf("resuming init process: %w", err)
+	}
+	return nil
 }
 
 // Kill the init process
@@ -376,7 +387,10 @@ func (p *Init) Kill(ctx context.Context, signal uint32, all bool) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	return p.initState.Kill(ctx, signal, all)
+	if err := p.initState.Kill(ctx, signal, all); err != nil {
+		return errors.Errorf("killing init process: %w", err)
+	}
+	return nil
 }
 
 func (p *Init) kill(ctx context.Context, signal uint32, all bool) error {
@@ -392,10 +406,12 @@ func (p *Init) KillAll(ctx context.Context) error {
 	defer p.mu.Unlock()
 
 	// gorunc:call Kill
-	err := p.runtime.Kill(ctx, p.id, int(unix.SIGKILL), &gorunc.KillOpts{
+	if err := p.runtime.Kill(ctx, p.id, int(unix.SIGKILL), &gorunc.KillOpts{
 		All: true,
-	})
-	return p.runtimeError(ctx, err, "OCI runtime killall failed")
+	}); err != nil {
+		return errors.Errorf("killing all processes: %w", err)
+	}
+	return nil
 }
 
 // Stdin of the process
@@ -418,7 +434,11 @@ func (p *Init) Exec(ctx context.Context, path string, r *process.ExecConfig) (Pr
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	return p.initState.Exec(ctx, path, r)
+	process, err := p.initState.Exec(ctx, path, r)
+	if err != nil {
+		return nil, errors.Errorf("executing init process: %w", err)
+	}
+	return process, nil
 }
 
 // exec returns a new exec'd process
@@ -456,7 +476,10 @@ func (p *Init) Checkpoint(ctx context.Context, r *process.CheckpointConfig) erro
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	return p.initState.Checkpoint(ctx, r)
+	if err := p.initState.Checkpoint(ctx, r); err != nil {
+		return errors.Errorf("checkpointing init process: %w", err)
+	}
+	return nil
 }
 
 func (p *Init) checkpoint(ctx context.Context, r *process.CheckpointConfig) error {
@@ -494,7 +517,10 @@ func (p *Init) Update(ctx context.Context, r *google_protobuf.Any) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	return p.initState.Update(ctx, r)
+	if err := p.initState.Update(ctx, r); err != nil {
+		return errors.Errorf("updating init process: %w", err)
+	}
+	return nil
 }
 
 func (p *Init) update(ctx context.Context, r *google_protobuf.Any) error {
@@ -502,7 +528,10 @@ func (p *Init) update(ctx context.Context, r *google_protobuf.Any) error {
 	if err := json.Unmarshal(r.Value, &resources); err != nil {
 		return err
 	}
-	return p.runtime.Update(ctx, p.id, &resources)
+	if err := p.runtime.Update(ctx, p.id, &resources); err != nil {
+		return errors.Errorf("updating init process: %w", err)
+	}
+	return nil
 }
 
 // Stdio of the process
@@ -510,26 +539,30 @@ func (p *Init) Stdio() stdio.Stdio {
 	return p.stdio
 }
 
-func (p *Init) runtimeError(ctx context.Context, rErr error, msg string) error {
+// func (p *Init) runtimeError(ctx context.Context, rErr error, msg string) error {
 
-	if rErr == nil {
-		return nil
-	}
+// 	if rErr == nil {
+// 		return nil
+// 	}
 
-	if enc, ok := rErr.(*stackerr.StackedEncodableError); ok {
-		return errors.Errorf("%s: %w", msg, enc)
-	}
+// 	if enc, ok := rErr.(*stackerr.StackedEncodableError); ok {
+// 		return errors.Errorf("%s: %w", msg, enc)
+// 	}
 
-	rMsg, err := getLastRuntimeError(ctx, p.runtime)
-	switch {
-	// case err != nil:
-	// return errors.Errorf("%s: %s (%s): %w", msg, "unable to retrieve OCI runtime error", err.Error(), rErr)
-	case err != nil, rMsg == "":
-		return errors.Errorf("%s: %w", msg, rErr)
-	default:
-		return errors.Errorf("%s: %s", msg, rMsg)
-	}
-}
+// 	if _, ok := rErr.(errors.E); ok {
+// 		return errors.Errorf("%s: %w", msg, rErr)
+// 	}
+
+// 	rMsg, err := getLastRuntimeError(ctx, p.runtime)
+// 	switch {
+// 	// case err != nil:
+// 	// return errors.Errorf("%s: %s (%s): %w", msg, "unable to retrieve OCI runtime error", err.Error(), rErr)
+// 	case err != nil, rMsg == "":
+// 		return errors.Errorf("%s: %w", msg, rErr)
+// 	default:
+// 		return errors.Errorf("%s: %s", msg, rMsg)
+// 	}
+// }
 
 func withConditionalIO(c stdio.Stdio) gorunc.IOOpt {
 	return func(o *gorunc.IOOption) {

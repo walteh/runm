@@ -19,6 +19,8 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sys/unix"
 
+	"github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/mdlayher/vsock"
 	"gitlab.com/tozd/go/errors"
@@ -115,11 +117,49 @@ func recoveryMain(ctx context.Context) (err error) {
 	return <-errChan
 }
 
+func proxyHooks(ctx context.Context) error {
+	spec, exists, err := loadSpec(ctx)
+	if err != nil {
+		return errors.Errorf("failed to load spec: %w", err)
+	}
+
+	if !exists {
+		return errors.Errorf("spec does not exist")
+	}
+
+	hoooksToProxy := []specs.Hook{}
+
+	hoooksToProxy = append(hoooksToProxy, spec.Hooks.Poststart...)
+	hoooksToProxy = append(hoooksToProxy, spec.Hooks.Poststop...)
+	hoooksToProxy = append(hoooksToProxy, spec.Hooks.CreateRuntime...)
+	hoooksToProxy = append(hoooksToProxy, spec.Hooks.CreateContainer...)
+	hoooksToProxy = append(hoooksToProxy, spec.Hooks.StartContainer...)
+
+	createdSymlinks := make(map[string]bool)
+	// for all the hooks, create symlinks to the host service
+	for _, hook := range hoooksToProxy {
+		if _, ok := createdSymlinks[hook.Path]; !ok {
+			os.MkdirAll(filepath.Dir(hook.Path), 0755)
+			os.Symlink("/mbin/runm-linux-host-fork-exec-proxy", hook.Path)
+			createdSymlinks[hook.Path] = true
+			slog.InfoContext(ctx, "created symlink", "path", hook.Path)
+		}
+	}
+
+	return nil
+}
+
 func runGrpcVsockServer(ctx context.Context) error {
 
 	ticker := time.NewTicker(1 * time.Second)
 	ticks := 0
 	defer ticker.Stop()
+
+	go func() {
+		if err := proxyHooks(ctx); err != nil {
+			slog.ErrorContext(ctx, "problem proxying hooks", "error", err)
+		}
+	}()
 
 	go func() {
 		for tick := range ticker.C {

@@ -90,15 +90,15 @@ message RuncReadPidFileRequest {
 }
 
 message RuncReadPidFileResponse {
-	int32  pid      = 1;
-	string go_error = 2;
+	int32 pid = 1;
+	// string go_error = 2;
 }
 
 message RuncNewTempConsoleSocketRequest {}
 
 message RuncNewTempConsoleSocketResponse {
 	string console_reference_id = 1;
-	string go_error             = 2;
+	// string go_error             = 2;
 }
 
 message RuncCloseIORequest {
@@ -134,7 +134,7 @@ message RuncContainer {
 
 message RuncListResponse {
 	repeated RuncContainer containers = 1;
-	string                 go_error   = 2;
+	// string                 go_error   = 2;
 }
 
 // State related messages
@@ -144,7 +144,7 @@ message RuncStateRequest {
 
 message RuncStateResponse {
 	RuncContainer container = 1;
-	string        go_error  = 2;
+	// string        go_error  = 2;
 }
 
 // Create related messages
@@ -166,7 +166,7 @@ message RuncCreateOptions {
 }
 
 message RuncCreateResponse {
-	string go_error = 1;
+	// string go_error = 1;
 }
 
 // Start related messages
@@ -175,7 +175,7 @@ message RuncStartRequest {
 }
 
 message RuncStartResponse {
-	string go_error = 1;
+	// string go_error = 1;
 }
 
 // Exec related messages
@@ -199,7 +199,7 @@ message RuncExecOptions {
 }
 
 message RuncExecResponse {
-	string go_error = 1;
+	// string go_error = 1;
 }
 
 // Run related messages
@@ -210,8 +210,8 @@ message RuncRunRequest {
 }
 
 message RuncRunResponse {
-	int32  status   = 1;
-	string go_error = 2;
+	int32 status = 1;
+	// string go_error = 2;
 }
 
 // Delete related messages
@@ -226,7 +226,7 @@ message RuncDeleteOptions {
 }
 
 message RuncDeleteResponse {
-	string go_error = 1;
+	// string go_error = 1;
 }
 
 // Kill related messages
@@ -242,7 +242,7 @@ message RuncKillOptions {
 }
 
 message RuncKillResponse {
-	string go_error = 1;
+	// string go_error = 1;
 }
 
 // Stats related messages
@@ -255,8 +255,8 @@ message RuncStats {
 }
 
 message RuncStatsResponse {
-	RuncStats stats    = 1;
-	string    go_error = 2;
+	RuncStats stats = 1;
+	// string    go_error = 2;
 }
 
 // Pause related messages
@@ -265,7 +265,7 @@ message RuncPauseRequest {
 }
 
 message RuncPauseResponse {
-	string go_error = 1;
+	// string go_error = 1;
 }
 
 // Resume related messages
@@ -274,7 +274,7 @@ message RuncResumeRequest {
 }
 
 message RuncResumeResponse {
-	string go_error = 1;
+	// string go_error = 1;
 }
 
 // Ps related messages
@@ -283,18 +283,18 @@ message RuncPsRequest {
 }
 
 message RuncPsResponse {
-	repeated int32 pids     = 1;
-	string         go_error = 2;
+	repeated int32 pids = 1;
+	// string         go_error = 2;
 }
 
 // Version related messages
 message RuncVersionRequest {}
 
 message RuncVersionResponse {
-	string runc     = 1;
-	string commit   = 2;
-	string spec     = 3;
-	string go_error = 4;
+	string runc   = 1;
+	string commit = 2;
+	string spec   = 3;
+	// string go_error = 4;
 }
 
 message RuncCheckpointAction {
@@ -343,7 +343,7 @@ message RuncIO {
 }
 
 message RuncCheckpointResponse {
-	string go_error = 1;
+	// string go_error = 1;
 }
 
 message RuncRestoreRequest {
@@ -353,8 +353,8 @@ message RuncRestoreRequest {
 }
 
 message RuncRestoreResponse {
-	int32  status   = 1;
-	string go_error = 2;
+	int32 status = 1;
+	// string go_error = 2;
 }
 
 message RuncCheckpointOptions {
@@ -402,7 +402,7 @@ message RuncUpdateRequest {
 }
 
 message RuncUpdateResponse {
-	string go_error = 1;
+	// string go_error = 1;
 }
 
 message RuncLinuxResources {
@@ -415,8 +415,8 @@ message RuncTopRequest {
 }
 
 message RuncTopResponse {
-	RuncTopResults results  = 1;
-	string         go_error = 2;
+	RuncTopResults results = 1;
+	// string         go_error = 2;
 }
 
 message RuncTopResults {

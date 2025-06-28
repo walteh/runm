@@ -115,7 +115,7 @@ func (s *Server) Start(ctx context.Context, req *runmv1.RuncStartRequest) (*runm
 
 	err := s.runtime.Start(ctx, req.GetId())
 	if err != nil {
-		resp.SetGoError(err.Error())
+		return nil, errors.Errorf("starting container: %w", err)
 	}
 	return resp, nil
 }
@@ -130,7 +130,7 @@ func (s *Server) Delete(ctx context.Context, req *runmv1.RuncDeleteRequest) (*ru
 
 	err := s.runtime.Delete(ctx, req.GetId(), opts)
 	if err != nil {
-		resp.SetGoError(err.Error())
+		return nil, errors.Errorf("deleting container: %w", err)
 	}
 	return resp, nil
 }
@@ -143,7 +143,7 @@ func (s *Server) Kill(ctx context.Context, req *runmv1.RuncKillRequest) (*runmv1
 
 	err := s.runtime.Kill(ctx, req.GetId(), int(req.GetSignal()), opts)
 	if err != nil {
-		resp.SetGoError(err.Error())
+		return nil, errors.Errorf("killing container: %w", err)
 	}
 	return resp, nil
 }
@@ -154,7 +154,7 @@ func (s *Server) Pause(ctx context.Context, req *runmv1.RuncPauseRequest) (*runm
 
 	err := s.runtime.Pause(ctx, req.GetId())
 	if err != nil {
-		resp.SetGoError(err.Error())
+		return nil, errors.Errorf("pausing container: %w", err)
 	}
 	return resp, nil
 }
@@ -165,7 +165,7 @@ func (s *Server) Resume(ctx context.Context, req *runmv1.RuncResumeRequest) (*ru
 
 	err := s.runtime.Resume(ctx, req.GetId())
 	if err != nil {
-		resp.SetGoError(err.Error())
+		return nil, errors.Errorf("resuming container: %w", err)
 	}
 	return resp, nil
 }
@@ -176,8 +176,7 @@ func (s *Server) Ps(ctx context.Context, req *runmv1.RuncPsRequest) (*runmv1.Run
 
 	pids, err := s.runtime.Ps(ctx, req.GetId())
 	if err != nil {
-		resp.SetGoError(err.Error())
-		return resp, nil
+		return nil, errors.Errorf("ps: %w", err)
 	}
 
 	pidsList := make([]int32, len(pids))
@@ -209,7 +208,7 @@ func (s *Server) Exec(ctx context.Context, req *runmv1.RuncExecRequest) (*runmv1
 
 	err = s.runtime.Exec(ctx, req.GetId(), *processSpec, opts)
 	if err != nil {
-		resp.SetGoError(err.Error())
+		return nil, errors.Errorf("exec: %w", err)
 	}
 
 	return resp, nil

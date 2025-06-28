@@ -62,9 +62,6 @@ var _ runtime.Runtime = &MockRuntime{}
 //			ResumeFunc: func(ctx context.Context, id string) error {
 //				panic("mock out the Resume method")
 //			},
-//			SharedDirFunc: func() string {
-//				panic("mock out the SharedDir method")
-//			},
 //			StartFunc: func(ctx context.Context, id string) error {
 //				panic("mock out the Start method")
 //			},
@@ -116,9 +113,6 @@ type MockRuntime struct {
 
 	// ResumeFunc mocks the Resume method.
 	ResumeFunc func(ctx context.Context, id string) error
-
-	// SharedDirFunc mocks the SharedDir method.
-	SharedDirFunc func() string
 
 	// StartFunc mocks the Start method.
 	StartFunc func(ctx context.Context, id string) error
@@ -239,9 +233,6 @@ type MockRuntime struct {
 			// ID is the id argument value.
 			ID string
 		}
-		// SharedDir holds details about calls to the SharedDir method.
-		SharedDir []struct {
-		}
 		// Start holds details about calls to the Start method.
 		Start []struct {
 			// Ctx is the ctx argument value.
@@ -272,7 +263,6 @@ type MockRuntime struct {
 	lockReadPidFile          sync.RWMutex
 	lockRestore              sync.RWMutex
 	lockResume               sync.RWMutex
-	lockSharedDir            sync.RWMutex
 	lockStart                sync.RWMutex
 	lockUpdate               sync.RWMutex
 }
@@ -781,33 +771,6 @@ func (mock *MockRuntime) ResumeCalls() []struct {
 	mock.lockResume.RLock()
 	calls = mock.calls.Resume
 	mock.lockResume.RUnlock()
-	return calls
-}
-
-// SharedDir calls SharedDirFunc.
-func (mock *MockRuntime) SharedDir() string {
-	if mock.SharedDirFunc == nil {
-		panic("MockRuntime.SharedDirFunc: method is nil but Runtime.SharedDir was just called")
-	}
-	callInfo := struct {
-	}{}
-	mock.lockSharedDir.Lock()
-	mock.calls.SharedDir = append(mock.calls.SharedDir, callInfo)
-	mock.lockSharedDir.Unlock()
-	return mock.SharedDirFunc()
-}
-
-// SharedDirCalls gets all the calls that were made to SharedDir.
-// Check the length with:
-//
-//	len(mockedRuntime.SharedDirCalls())
-func (mock *MockRuntime) SharedDirCalls() []struct {
-} {
-	var calls []struct {
-	}
-	mock.lockSharedDir.RLock()
-	calls = mock.calls.SharedDir
-	mock.lockSharedDir.RUnlock()
 	return calls
 }
 

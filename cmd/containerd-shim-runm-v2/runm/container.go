@@ -56,6 +56,15 @@ func NewContainer(
 	publisher events.Publisher,
 	rtc runtime.RuntimeCreator,
 ) (_ *Container, retErr error) {
+
+	defer func() {
+		slog.InfoContext(ctx, "shim new container create is complete")
+		if r := recover(); r != nil {
+			slog.ErrorContext(ctx, "panic in NewContainer", "error", r)
+			panic(r)
+		}
+	}()
+
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, errors.Errorf("create namespace: %w", err)
@@ -127,6 +136,7 @@ func NewContainer(
 	}
 	defer func() {
 		if retErr != nil {
+			slog.InfoContext(ctx, "attempting to cleanup rootfs mount", "id", r.ID, "retErr", retErr)
 			if err := mount.UnmountMounts(mounts, rootfs, 0); err != nil {
 				log.G(ctx).WithError(err).Warn("failed to cleanup rootfs mount")
 			}
@@ -136,10 +146,10 @@ func NewContainer(
 		return nil, errors.Errorf("failed to mount rootfs component: %w", err)
 	}
 
-	defer func() {
-		<-ctx.Done()
-		slog.InfoContext(ctx, "DONE, cleaning up container", "id", r.ID)
-	}()
+	// defer func() {
+	// 	<-ctx.Done()
+	// 	slog.InfoContext(ctx, "DONE, cleaning up container", "id", r.ID)
+	// }()
 	if ctx.Err() != nil {
 		slog.ErrorContext(ctx, "context done before creating container runtime", "id", r.ID)
 	}
@@ -225,7 +235,7 @@ func NewContainer(
 		return nil, grpcerr.ToContainerdTTRPC(ctx, err)
 	}
 
-	slog.InfoContext(ctx, "creating container struct")
+	slog.InfoContext(ctx, "creating container struct", "r_is_nil", r == nil, "p_is_nil", p == nil)
 	container := &Container{
 		ID:              r.ID,
 		Bundle:          r.Bundle,
@@ -239,6 +249,8 @@ func NewContainer(
 		// 	// container.cgroup = cg
 		// }
 	}
+
+	slog.InfoContext(ctx, "container struct created", "id", r.ID, "pid", pid)
 
 	return container, nil
 }

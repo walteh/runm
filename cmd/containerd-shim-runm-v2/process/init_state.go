@@ -20,10 +20,9 @@ package process
 
 import (
 	"context"
-	"errors"
-	"fmt"
 
 	"github.com/containerd/log"
+	"gitlab.com/tozd/go/errors"
 
 	google_protobuf "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	gorunc "github.com/containerd/go-runc"
@@ -58,7 +57,7 @@ func (s *createdState) transition(name string) error {
 	case "deleted":
 		s.p.initState = &deletedState{}
 	default:
-		return fmt.Errorf("invalid state transition %q to %q", stateName(s), name)
+		return errors.Errorf("invalid state transition %q to %q", stateName(s), name)
 	}
 	return nil
 }
@@ -81,7 +80,7 @@ func (s *createdState) Checkpoint(ctx context.Context, r *process.CheckpointConf
 
 func (s *createdState) Start(ctx context.Context) error {
 	if err := s.p.start(ctx); err != nil {
-		return err
+		return errors.Errorf("start - %T: %w", err, err)
 	}
 	return s.transition("running")
 }
@@ -127,7 +126,7 @@ func (s *createdCheckpointState) transition(name string) error {
 	case "deleted":
 		s.p.initState = &deletedState{}
 	default:
-		return fmt.Errorf("invalid state transition %q to %q", stateName(s), name)
+		return errors.Errorf("invalid state transition %q to %q", stateName(s), name)
 	}
 	return nil
 }
@@ -158,38 +157,38 @@ func (s *createdCheckpointState) Start(ctx context.Context) error {
 	)
 	if sio.Terminal {
 		if socket, err = p.runtime.NewTempConsoleSocket(ctx); err != nil {
-			return fmt.Errorf("failed to create OCI runtime console socket: %w", err)
+			return errors.Errorf("failed to create OCI runtime console socket: %w", err)
 		}
 		defer socket.Close()
 		s.opts.ConsoleSocket = socket
 	}
 
 	if _, err := s.p.runtime.Restore(ctx, p.id, p.Bundle, s.opts); err != nil {
-		return p.runtimeError(ctx, err, "OCI runtime restore failed")
+		return errors.Errorf("OCI runtime restore failed: %w", err)
 	}
 	if sio.Stdin != "" {
 		if err := p.openStdin(sio.Stdin); err != nil {
-			return fmt.Errorf("failed to open stdin fifo %s: %w", sio.Stdin, err)
+			return errors.Errorf("failed to open stdin fifo %s: %w", sio.Stdin, err)
 		}
 	}
 	if socket != nil {
 		console, err := socket.ReceiveMaster()
 		if err != nil {
-			return fmt.Errorf("failed to retrieve console master: %w", err)
+			return errors.Errorf("failed to retrieve console master: %w", err)
 		}
 		console, err = p.Platform.CopyConsole(ctx, console, p.id, sio.Stdin, sio.Stdout, sio.Stderr, &p.wg)
 		if err != nil {
-			return fmt.Errorf("failed to start console copy: %w", err)
+			return errors.Errorf("failed to start console copy: %w", err)
 		}
 		p.console = console
 	} else {
 		if err := p.io.Copy(ctx, &p.wg); err != nil {
-			return fmt.Errorf("failed to start io pipe copy: %w", err)
+			return errors.Errorf("failed to start io pipe copy: %w", err)
 		}
 	}
 	pid, err := gorunc.ReadPidFile(s.opts.PidFile)
 	if err != nil {
-		return fmt.Errorf("failed to retrieve OCI runtime container pid: %w", err)
+		return errors.Errorf("failed to retrieve OCI runtime container pid: %w", err)
 	}
 	p.pid = pid
 	return s.transition("running")
@@ -233,7 +232,7 @@ func (s *runningState) transition(name string) error {
 	case "paused":
 		s.p.initState = &pausedState{p: s.p}
 	default:
-		return fmt.Errorf("invalid state transition %q to %q", stateName(s), name)
+		return errors.Errorf("invalid state transition %q to %q", stateName(s), name)
 	}
 	return nil
 }
@@ -247,7 +246,7 @@ func (s *runningState) Pause(ctx context.Context) error {
 	defer s.p.pausing.Store(false)
 
 	if err := s.p.runtime.Pause(ctx, s.p.id); err != nil {
-		return s.p.runtimeError(ctx, err, "OCI runtime pause failed")
+		return errors.Errorf("OCI runtime pause failed: %w", err)
 	}
 
 	return s.transition("paused")
@@ -304,7 +303,7 @@ func (s *pausedState) transition(name string) error {
 	case "stopped":
 		s.p.initState = &stoppedState{p: s.p}
 	default:
-		return fmt.Errorf("invalid state transition %q to %q", stateName(s), name)
+		return errors.Errorf("invalid state transition %q to %q", stateName(s), name)
 	}
 	return nil
 }
@@ -315,7 +314,7 @@ func (s *pausedState) Pause(ctx context.Context) error {
 
 func (s *pausedState) Resume(ctx context.Context) error {
 	if err := s.p.runtime.Resume(ctx, s.p.id); err != nil {
-		return s.p.runtimeError(ctx, err, "OCI runtime resume failed")
+		return errors.Errorf("OCI runtime resume failed: %w", err)
 	}
 
 	return s.transition("running")
@@ -370,7 +369,7 @@ func (s *stoppedState) transition(name string) error {
 	case "deleted":
 		s.p.initState = &deletedState{}
 	default:
-		return fmt.Errorf("invalid state transition %q to %q", stateName(s), name)
+		return errors.Errorf("invalid state transition %q to %q", stateName(s), name)
 	}
 	return nil
 }

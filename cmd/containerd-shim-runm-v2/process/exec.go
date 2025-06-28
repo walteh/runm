@@ -219,7 +219,7 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 	// gorunc:call Exec
 	if err := e.parent.runtime.Exec(ctx, e.parent.id, e.spec, opts); err != nil {
 		close(e.waitBlock)
-		return e.parent.runtimeError(ctx, err, "OCI runtime exec failed")
+		return errors.Errorf("OCI runtime exec failed: %w", err)
 	}
 	if e.stdio.Stdin != "" {
 		if err := e.openStdin(e.stdio.Stdin); err != nil {

@@ -80,11 +80,10 @@ func (b0 RuncReadPidFileRequest_builder) Build() *RuncReadPidFileRequest {
 }
 
 type RuncReadPidFileResponse struct {
-	state              protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_Pid     int32                  `protobuf:"varint,1,opt,name=pid"`
-	xxx_hidden_GoError string                 `protobuf:"bytes,2,opt,name=go_error,json=goError"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Pid int32                  `protobuf:"varint,1,opt,name=pid"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *RuncReadPidFileResponse) Reset() {
@@ -119,26 +118,14 @@ func (x *RuncReadPidFileResponse) GetPid() int32 {
 	return 0
 }
 
-func (x *RuncReadPidFileResponse) GetGoError() string {
-	if x != nil {
-		return x.xxx_hidden_GoError
-	}
-	return ""
-}
-
 func (x *RuncReadPidFileResponse) SetPid(v int32) {
 	x.xxx_hidden_Pid = v
-}
-
-func (x *RuncReadPidFileResponse) SetGoError(v string) {
-	x.xxx_hidden_GoError = v
 }
 
 type RuncReadPidFileResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	Pid     int32
-	GoError string
+	Pid int32
 }
 
 func (b0 RuncReadPidFileResponse_builder) Build() *RuncReadPidFileResponse {
@@ -146,7 +133,6 @@ func (b0 RuncReadPidFileResponse_builder) Build() *RuncReadPidFileResponse {
 	b, x := &b0, m0
 	_, _ = b, x
 	x.xxx_hidden_Pid = b.Pid
-	x.xxx_hidden_GoError = b.GoError
 	return m0
 }
 
@@ -196,7 +182,6 @@ func (b0 RuncNewTempConsoleSocketRequest_builder) Build() *RuncNewTempConsoleSoc
 type RuncNewTempConsoleSocketResponse struct {
 	state                         protoimpl.MessageState `protogen:"opaque.v1"`
 	xxx_hidden_ConsoleReferenceId string                 `protobuf:"bytes,1,opt,name=console_reference_id,json=consoleReferenceId"`
-	xxx_hidden_GoError            string                 `protobuf:"bytes,2,opt,name=go_error,json=goError"`
 	unknownFields                 protoimpl.UnknownFields
 	sizeCache                     protoimpl.SizeCache
 }
@@ -233,26 +218,14 @@ func (x *RuncNewTempConsoleSocketResponse) GetConsoleReferenceId() string {
 	return ""
 }
 
-func (x *RuncNewTempConsoleSocketResponse) GetGoError() string {
-	if x != nil {
-		return x.xxx_hidden_GoError
-	}
-	return ""
-}
-
 func (x *RuncNewTempConsoleSocketResponse) SetConsoleReferenceId(v string) {
 	x.xxx_hidden_ConsoleReferenceId = v
-}
-
-func (x *RuncNewTempConsoleSocketResponse) SetGoError(v string) {
-	x.xxx_hidden_GoError = v
 }
 
 type RuncNewTempConsoleSocketResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
 	ConsoleReferenceId string
-	GoError            string
 }
 
 func (b0 RuncNewTempConsoleSocketResponse_builder) Build() *RuncNewTempConsoleSocketResponse {
@@ -260,7 +233,6 @@ func (b0 RuncNewTempConsoleSocketResponse_builder) Build() *RuncNewTempConsoleSo
 	b, x := &b0, m0
 	_, _ = b, x
 	x.xxx_hidden_ConsoleReferenceId = b.ConsoleReferenceId
-	x.xxx_hidden_GoError = b.GoError
 	return m0
 }
 
@@ -752,7 +724,6 @@ func (b0 RuncContainer_builder) Build() *RuncContainer {
 type RuncListResponse struct {
 	state                 protoimpl.MessageState `protogen:"opaque.v1"`
 	xxx_hidden_Containers *[]*RuncContainer      `protobuf:"bytes,1,rep,name=containers"`
-	xxx_hidden_GoError    string                 `protobuf:"bytes,2,opt,name=go_error,json=goError"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -791,26 +762,14 @@ func (x *RuncListResponse) GetContainers() []*RuncContainer {
 	return nil
 }
 
-func (x *RuncListResponse) GetGoError() string {
-	if x != nil {
-		return x.xxx_hidden_GoError
-	}
-	return ""
-}
-
 func (x *RuncListResponse) SetContainers(v []*RuncContainer) {
 	x.xxx_hidden_Containers = &v
-}
-
-func (x *RuncListResponse) SetGoError(v string) {
-	x.xxx_hidden_GoError = v
 }
 
 type RuncListResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
 	Containers []*RuncContainer
-	GoError    string
 }
 
 func (b0 RuncListResponse_builder) Build() *RuncListResponse {
@@ -818,7 +777,6 @@ func (b0 RuncListResponse_builder) Build() *RuncListResponse {
 	b, x := &b0, m0
 	_, _ = b, x
 	x.xxx_hidden_Containers = &b.Containers
-	x.xxx_hidden_GoError = b.GoError
 	return m0
 }
 
@@ -883,7 +841,6 @@ func (b0 RuncStateRequest_builder) Build() *RuncStateRequest {
 type RuncStateResponse struct {
 	state                protoimpl.MessageState `protogen:"opaque.v1"`
 	xxx_hidden_Container *RuncContainer         `protobuf:"bytes,1,opt,name=container"`
-	xxx_hidden_GoError   string                 `protobuf:"bytes,2,opt,name=go_error,json=goError"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -920,19 +877,8 @@ func (x *RuncStateResponse) GetContainer() *RuncContainer {
 	return nil
 }
 
-func (x *RuncStateResponse) GetGoError() string {
-	if x != nil {
-		return x.xxx_hidden_GoError
-	}
-	return ""
-}
-
 func (x *RuncStateResponse) SetContainer(v *RuncContainer) {
 	x.xxx_hidden_Container = v
-}
-
-func (x *RuncStateResponse) SetGoError(v string) {
-	x.xxx_hidden_GoError = v
 }
 
 func (x *RuncStateResponse) HasContainer() bool {
@@ -950,7 +896,6 @@ type RuncStateResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
 	Container *RuncContainer
-	GoError   string
 }
 
 func (b0 RuncStateResponse_builder) Build() *RuncStateResponse {
@@ -958,7 +903,6 @@ func (b0 RuncStateResponse_builder) Build() *RuncStateResponse {
 	b, x := &b0, m0
 	_, _ = b, x
 	x.xxx_hidden_Container = b.Container
-	x.xxx_hidden_GoError = b.GoError
 	return m0
 }
 
@@ -1215,10 +1159,9 @@ func (b0 RuncCreateOptions_builder) Build() *RuncCreateOptions {
 }
 
 type RuncCreateResponse struct {
-	state              protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_GoError string                 `protobuf:"bytes,1,opt,name=go_error,json=goError"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"opaque.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RuncCreateResponse) Reset() {
@@ -1246,28 +1189,15 @@ func (x *RuncCreateResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *RuncCreateResponse) GetGoError() string {
-	if x != nil {
-		return x.xxx_hidden_GoError
-	}
-	return ""
-}
-
-func (x *RuncCreateResponse) SetGoError(v string) {
-	x.xxx_hidden_GoError = v
-}
-
 type RuncCreateResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	GoError string
 }
 
 func (b0 RuncCreateResponse_builder) Build() *RuncCreateResponse {
 	m0 := &RuncCreateResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.xxx_hidden_GoError = b.GoError
 	return m0
 }
 
@@ -1330,10 +1260,9 @@ func (b0 RuncStartRequest_builder) Build() *RuncStartRequest {
 }
 
 type RuncStartResponse struct {
-	state              protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_GoError string                 `protobuf:"bytes,1,opt,name=go_error,json=goError"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"opaque.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RuncStartResponse) Reset() {
@@ -1361,28 +1290,15 @@ func (x *RuncStartResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *RuncStartResponse) GetGoError() string {
-	if x != nil {
-		return x.xxx_hidden_GoError
-	}
-	return ""
-}
-
-func (x *RuncStartResponse) SetGoError(v string) {
-	x.xxx_hidden_GoError = v
-}
-
 type RuncStartResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	GoError string
 }
 
 func (b0 RuncStartResponse_builder) Build() *RuncStartResponse {
 	m0 := &RuncStartResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.xxx_hidden_GoError = b.GoError
 	return m0
 }
 
@@ -1667,10 +1583,9 @@ func (b0 RuncExecOptions_builder) Build() *RuncExecOptions {
 }
 
 type RuncExecResponse struct {
-	state              protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_GoError string                 `protobuf:"bytes,1,opt,name=go_error,json=goError"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"opaque.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RuncExecResponse) Reset() {
@@ -1698,28 +1613,15 @@ func (x *RuncExecResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *RuncExecResponse) GetGoError() string {
-	if x != nil {
-		return x.xxx_hidden_GoError
-	}
-	return ""
-}
-
-func (x *RuncExecResponse) SetGoError(v string) {
-	x.xxx_hidden_GoError = v
-}
-
 type RuncExecResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	GoError string
 }
 
 func (b0 RuncExecResponse_builder) Build() *RuncExecResponse {
 	m0 := &RuncExecResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.xxx_hidden_GoError = b.GoError
 	return m0
 }
 
@@ -1821,11 +1723,10 @@ func (b0 RuncRunRequest_builder) Build() *RuncRunRequest {
 }
 
 type RuncRunResponse struct {
-	state              protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_Status  int32                  `protobuf:"varint,1,opt,name=status"`
-	xxx_hidden_GoError string                 `protobuf:"bytes,2,opt,name=go_error,json=goError"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Status int32                  `protobuf:"varint,1,opt,name=status"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *RuncRunResponse) Reset() {
@@ -1860,26 +1761,14 @@ func (x *RuncRunResponse) GetStatus() int32 {
 	return 0
 }
 
-func (x *RuncRunResponse) GetGoError() string {
-	if x != nil {
-		return x.xxx_hidden_GoError
-	}
-	return ""
-}
-
 func (x *RuncRunResponse) SetStatus(v int32) {
 	x.xxx_hidden_Status = v
-}
-
-func (x *RuncRunResponse) SetGoError(v string) {
-	x.xxx_hidden_GoError = v
 }
 
 type RuncRunResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	Status  int32
-	GoError string
+	Status int32
 }
 
 func (b0 RuncRunResponse_builder) Build() *RuncRunResponse {
@@ -1887,7 +1776,6 @@ func (b0 RuncRunResponse_builder) Build() *RuncRunResponse {
 	b, x := &b0, m0
 	_, _ = b, x
 	x.xxx_hidden_Status = b.Status
-	x.xxx_hidden_GoError = b.GoError
 	return m0
 }
 
@@ -2046,10 +1934,9 @@ func (b0 RuncDeleteOptions_builder) Build() *RuncDeleteOptions {
 }
 
 type RuncDeleteResponse struct {
-	state              protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_GoError string                 `protobuf:"bytes,1,opt,name=go_error,json=goError"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"opaque.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RuncDeleteResponse) Reset() {
@@ -2077,28 +1964,15 @@ func (x *RuncDeleteResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *RuncDeleteResponse) GetGoError() string {
-	if x != nil {
-		return x.xxx_hidden_GoError
-	}
-	return ""
-}
-
-func (x *RuncDeleteResponse) SetGoError(v string) {
-	x.xxx_hidden_GoError = v
-}
-
 type RuncDeleteResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	GoError string
 }
 
 func (b0 RuncDeleteResponse_builder) Build() *RuncDeleteResponse {
 	m0 := &RuncDeleteResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.xxx_hidden_GoError = b.GoError
 	return m0
 }
 
@@ -2271,10 +2145,9 @@ func (b0 RuncKillOptions_builder) Build() *RuncKillOptions {
 }
 
 type RuncKillResponse struct {
-	state              protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_GoError string                 `protobuf:"bytes,1,opt,name=go_error,json=goError"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"opaque.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RuncKillResponse) Reset() {
@@ -2302,28 +2175,15 @@ func (x *RuncKillResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *RuncKillResponse) GetGoError() string {
-	if x != nil {
-		return x.xxx_hidden_GoError
-	}
-	return ""
-}
-
-func (x *RuncKillResponse) SetGoError(v string) {
-	x.xxx_hidden_GoError = v
-}
-
 type RuncKillResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	GoError string
 }
 
 func (b0 RuncKillResponse_builder) Build() *RuncKillResponse {
 	m0 := &RuncKillResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.xxx_hidden_GoError = b.GoError
 	return m0
 }
 
@@ -2446,11 +2306,10 @@ func (b0 RuncStats_builder) Build() *RuncStats {
 }
 
 type RuncStatsResponse struct {
-	state              protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_Stats   *RuncStats             `protobuf:"bytes,1,opt,name=stats"`
-	xxx_hidden_GoError string                 `protobuf:"bytes,2,opt,name=go_error,json=goError"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Stats *RuncStats             `protobuf:"bytes,1,opt,name=stats"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *RuncStatsResponse) Reset() {
@@ -2485,19 +2344,8 @@ func (x *RuncStatsResponse) GetStats() *RuncStats {
 	return nil
 }
 
-func (x *RuncStatsResponse) GetGoError() string {
-	if x != nil {
-		return x.xxx_hidden_GoError
-	}
-	return ""
-}
-
 func (x *RuncStatsResponse) SetStats(v *RuncStats) {
 	x.xxx_hidden_Stats = v
-}
-
-func (x *RuncStatsResponse) SetGoError(v string) {
-	x.xxx_hidden_GoError = v
 }
 
 func (x *RuncStatsResponse) HasStats() bool {
@@ -2514,8 +2362,7 @@ func (x *RuncStatsResponse) ClearStats() {
 type RuncStatsResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	Stats   *RuncStats
-	GoError string
+	Stats *RuncStats
 }
 
 func (b0 RuncStatsResponse_builder) Build() *RuncStatsResponse {
@@ -2523,7 +2370,6 @@ func (b0 RuncStatsResponse_builder) Build() *RuncStatsResponse {
 	b, x := &b0, m0
 	_, _ = b, x
 	x.xxx_hidden_Stats = b.Stats
-	x.xxx_hidden_GoError = b.GoError
 	return m0
 }
 
@@ -2586,10 +2432,9 @@ func (b0 RuncPauseRequest_builder) Build() *RuncPauseRequest {
 }
 
 type RuncPauseResponse struct {
-	state              protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_GoError string                 `protobuf:"bytes,1,opt,name=go_error,json=goError"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"opaque.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RuncPauseResponse) Reset() {
@@ -2617,28 +2462,15 @@ func (x *RuncPauseResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *RuncPauseResponse) GetGoError() string {
-	if x != nil {
-		return x.xxx_hidden_GoError
-	}
-	return ""
-}
-
-func (x *RuncPauseResponse) SetGoError(v string) {
-	x.xxx_hidden_GoError = v
-}
-
 type RuncPauseResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	GoError string
 }
 
 func (b0 RuncPauseResponse_builder) Build() *RuncPauseResponse {
 	m0 := &RuncPauseResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.xxx_hidden_GoError = b.GoError
 	return m0
 }
 
@@ -2701,10 +2533,9 @@ func (b0 RuncResumeRequest_builder) Build() *RuncResumeRequest {
 }
 
 type RuncResumeResponse struct {
-	state              protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_GoError string                 `protobuf:"bytes,1,opt,name=go_error,json=goError"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"opaque.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RuncResumeResponse) Reset() {
@@ -2732,28 +2563,15 @@ func (x *RuncResumeResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *RuncResumeResponse) GetGoError() string {
-	if x != nil {
-		return x.xxx_hidden_GoError
-	}
-	return ""
-}
-
-func (x *RuncResumeResponse) SetGoError(v string) {
-	x.xxx_hidden_GoError = v
-}
-
 type RuncResumeResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	GoError string
 }
 
 func (b0 RuncResumeResponse_builder) Build() *RuncResumeResponse {
 	m0 := &RuncResumeResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.xxx_hidden_GoError = b.GoError
 	return m0
 }
 
@@ -2816,11 +2634,10 @@ func (b0 RuncPsRequest_builder) Build() *RuncPsRequest {
 }
 
 type RuncPsResponse struct {
-	state              protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_Pids    []int32                `protobuf:"varint,1,rep,packed,name=pids"`
-	xxx_hidden_GoError string                 `protobuf:"bytes,2,opt,name=go_error,json=goError"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Pids []int32                `protobuf:"varint,1,rep,packed,name=pids"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *RuncPsResponse) Reset() {
@@ -2855,26 +2672,14 @@ func (x *RuncPsResponse) GetPids() []int32 {
 	return nil
 }
 
-func (x *RuncPsResponse) GetGoError() string {
-	if x != nil {
-		return x.xxx_hidden_GoError
-	}
-	return ""
-}
-
 func (x *RuncPsResponse) SetPids(v []int32) {
 	x.xxx_hidden_Pids = v
-}
-
-func (x *RuncPsResponse) SetGoError(v string) {
-	x.xxx_hidden_GoError = v
 }
 
 type RuncPsResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	Pids    []int32
-	GoError string
+	Pids []int32
 }
 
 func (b0 RuncPsResponse_builder) Build() *RuncPsResponse {
@@ -2882,7 +2687,6 @@ func (b0 RuncPsResponse_builder) Build() *RuncPsResponse {
 	b, x := &b0, m0
 	_, _ = b, x
 	x.xxx_hidden_Pids = b.Pids
-	x.xxx_hidden_GoError = b.GoError
 	return m0
 }
 
@@ -2931,13 +2735,12 @@ func (b0 RuncVersionRequest_builder) Build() *RuncVersionRequest {
 }
 
 type RuncVersionResponse struct {
-	state              protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_Runc    string                 `protobuf:"bytes,1,opt,name=runc"`
-	xxx_hidden_Commit  string                 `protobuf:"bytes,2,opt,name=commit"`
-	xxx_hidden_Spec    string                 `protobuf:"bytes,3,opt,name=spec"`
-	xxx_hidden_GoError string                 `protobuf:"bytes,4,opt,name=go_error,json=goError"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Runc   string                 `protobuf:"bytes,1,opt,name=runc"`
+	xxx_hidden_Commit string                 `protobuf:"bytes,2,opt,name=commit"`
+	xxx_hidden_Spec   string                 `protobuf:"bytes,3,opt,name=spec"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *RuncVersionResponse) Reset() {
@@ -2986,13 +2789,6 @@ func (x *RuncVersionResponse) GetSpec() string {
 	return ""
 }
 
-func (x *RuncVersionResponse) GetGoError() string {
-	if x != nil {
-		return x.xxx_hidden_GoError
-	}
-	return ""
-}
-
 func (x *RuncVersionResponse) SetRunc(v string) {
 	x.xxx_hidden_Runc = v
 }
@@ -3005,17 +2801,12 @@ func (x *RuncVersionResponse) SetSpec(v string) {
 	x.xxx_hidden_Spec = v
 }
 
-func (x *RuncVersionResponse) SetGoError(v string) {
-	x.xxx_hidden_GoError = v
-}
-
 type RuncVersionResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	Runc    string
-	Commit  string
-	Spec    string
-	GoError string
+	Runc   string
+	Commit string
+	Spec   string
 }
 
 func (b0 RuncVersionResponse_builder) Build() *RuncVersionResponse {
@@ -3025,7 +2816,6 @@ func (b0 RuncVersionResponse_builder) Build() *RuncVersionResponse {
 	x.xxx_hidden_Runc = b.Runc
 	x.xxx_hidden_Commit = b.Commit
 	x.xxx_hidden_Spec = b.Spec
-	x.xxx_hidden_GoError = b.GoError
 	return m0
 }
 
@@ -3797,10 +3587,9 @@ func (*runcIO_Unix) isRuncIO_Io() {}
 func (*runcIO_Null) isRuncIO_Io() {}
 
 type RuncCheckpointResponse struct {
-	state              protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_GoError string                 `protobuf:"bytes,1,opt,name=go_error,json=goError"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"opaque.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RuncCheckpointResponse) Reset() {
@@ -3828,28 +3617,15 @@ func (x *RuncCheckpointResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *RuncCheckpointResponse) GetGoError() string {
-	if x != nil {
-		return x.xxx_hidden_GoError
-	}
-	return ""
-}
-
-func (x *RuncCheckpointResponse) SetGoError(v string) {
-	x.xxx_hidden_GoError = v
-}
-
 type RuncCheckpointResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	GoError string
 }
 
 func (b0 RuncCheckpointResponse_builder) Build() *RuncCheckpointResponse {
 	m0 := &RuncCheckpointResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.xxx_hidden_GoError = b.GoError
 	return m0
 }
 
@@ -3950,11 +3726,10 @@ func (b0 RuncRestoreRequest_builder) Build() *RuncRestoreRequest {
 }
 
 type RuncRestoreResponse struct {
-	state              protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_Status  int32                  `protobuf:"varint,1,opt,name=status"`
-	xxx_hidden_GoError string                 `protobuf:"bytes,2,opt,name=go_error,json=goError"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Status int32                  `protobuf:"varint,1,opt,name=status"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *RuncRestoreResponse) Reset() {
@@ -3989,26 +3764,14 @@ func (x *RuncRestoreResponse) GetStatus() int32 {
 	return 0
 }
 
-func (x *RuncRestoreResponse) GetGoError() string {
-	if x != nil {
-		return x.xxx_hidden_GoError
-	}
-	return ""
-}
-
 func (x *RuncRestoreResponse) SetStatus(v int32) {
 	x.xxx_hidden_Status = v
-}
-
-func (x *RuncRestoreResponse) SetGoError(v string) {
-	x.xxx_hidden_GoError = v
 }
 
 type RuncRestoreResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	Status  int32
-	GoError string
+	Status int32
 }
 
 func (b0 RuncRestoreResponse_builder) Build() *RuncRestoreResponse {
@@ -4016,7 +3779,6 @@ func (b0 RuncRestoreResponse_builder) Build() *RuncRestoreResponse {
 	b, x := &b0, m0
 	_, _ = b, x
 	x.xxx_hidden_Status = b.Status
-	x.xxx_hidden_GoError = b.GoError
 	return m0
 }
 
@@ -4686,10 +4448,9 @@ func (b0 RuncUpdateRequest_builder) Build() *RuncUpdateRequest {
 }
 
 type RuncUpdateResponse struct {
-	state              protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_GoError string                 `protobuf:"bytes,1,opt,name=go_error,json=goError"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"opaque.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RuncUpdateResponse) Reset() {
@@ -4717,28 +4478,15 @@ func (x *RuncUpdateResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *RuncUpdateResponse) GetGoError() string {
-	if x != nil {
-		return x.xxx_hidden_GoError
-	}
-	return ""
-}
-
-func (x *RuncUpdateResponse) SetGoError(v string) {
-	x.xxx_hidden_GoError = v
-}
-
 type RuncUpdateResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	GoError string
 }
 
 func (b0 RuncUpdateResponse_builder) Build() *RuncUpdateResponse {
 	m0 := &RuncUpdateResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.xxx_hidden_GoError = b.GoError
 	return m0
 }
 
@@ -4876,7 +4624,6 @@ func (b0 RuncTopRequest_builder) Build() *RuncTopRequest {
 type RuncTopResponse struct {
 	state              protoimpl.MessageState `protogen:"opaque.v1"`
 	xxx_hidden_Results *RuncTopResults        `protobuf:"bytes,1,opt,name=results"`
-	xxx_hidden_GoError string                 `protobuf:"bytes,2,opt,name=go_error,json=goError"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -4913,19 +4660,8 @@ func (x *RuncTopResponse) GetResults() *RuncTopResults {
 	return nil
 }
 
-func (x *RuncTopResponse) GetGoError() string {
-	if x != nil {
-		return x.xxx_hidden_GoError
-	}
-	return ""
-}
-
 func (x *RuncTopResponse) SetResults(v *RuncTopResults) {
 	x.xxx_hidden_Results = v
-}
-
-func (x *RuncTopResponse) SetGoError(v string) {
-	x.xxx_hidden_GoError = v
 }
 
 func (x *RuncTopResponse) HasResults() bool {
@@ -4943,7 +4679,6 @@ type RuncTopResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
 	Results *RuncTopResults
-	GoError string
 }
 
 func (b0 RuncTopResponse_builder) Build() *RuncTopResponse {
@@ -4951,7 +4686,6 @@ func (b0 RuncTopResponse_builder) Build() *RuncTopResponse {
 	b, x := &b0, m0
 	_, _ = b, x
 	x.xxx_hidden_Results = b.Results
-	x.xxx_hidden_GoError = b.GoError
 	return m0
 }
 
@@ -5091,14 +4825,12 @@ const file_v1_runc_proto_rawDesc = "" +
 	"\n" +
 	"\rv1/runc.proto\x12\arunm.v1\x1a\x1egoogle/protobuf/duration.proto\x1a!google/protobuf/go_features.proto\",\n" +
 	"\x16RuncReadPidFileRequest\x12\x12\n" +
-	"\x04path\x18\x01 \x01(\tR\x04path\"F\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\"+\n" +
 	"\x17RuncReadPidFileResponse\x12\x10\n" +
-	"\x03pid\x18\x01 \x01(\x05R\x03pid\x12\x19\n" +
-	"\bgo_error\x18\x02 \x01(\tR\agoError\"!\n" +
-	"\x1fRuncNewTempConsoleSocketRequest\"o\n" +
+	"\x03pid\x18\x01 \x01(\x05R\x03pid\"!\n" +
+	"\x1fRuncNewTempConsoleSocketRequest\"T\n" +
 	" RuncNewTempConsoleSocketResponse\x120\n" +
-	"\x14console_reference_id\x18\x01 \x01(\tR\x12consoleReferenceId\x12\x19\n" +
-	"\bgo_error\x18\x02 \x01(\tR\agoError\"<\n" +
+	"\x14console_reference_id\x18\x01 \x01(\tR\x12consoleReferenceId\"<\n" +
 	"\x12RuncCloseIORequest\x12&\n" +
 	"\x0fio_reference_id\x18\x01 \x01(\x04R\rioReferenceId\"\x15\n" +
 	"\x13RuncCloseIOResponse\"\x18\n" +
@@ -5119,17 +4851,15 @@ const file_v1_runc_proto_rawDesc = "" +
 	"\vannotations\x18\a \x03(\v2'.runm.v1.RuncContainer.AnnotationsEntryR\vannotations\x1a>\n" +
 	"\x10AnnotationsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"e\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"J\n" +
 	"\x10RuncListResponse\x126\n" +
 	"\n" +
 	"containers\x18\x01 \x03(\v2\x16.runm.v1.RuncContainerR\n" +
-	"containers\x12\x19\n" +
-	"\bgo_error\x18\x02 \x01(\tR\agoError\"\"\n" +
+	"containers\"\"\n" +
 	"\x10RuncStateRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"d\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"I\n" +
 	"\x11RuncStateResponse\x124\n" +
-	"\tcontainer\x18\x01 \x01(\v2\x16.runm.v1.RuncContainerR\tcontainer\x12\x19\n" +
-	"\bgo_error\x18\x02 \x01(\tR\agoError\"q\n" +
+	"\tcontainer\x18\x01 \x01(\v2\x16.runm.v1.RuncContainerR\tcontainer\"q\n" +
 	"\x11RuncCreateRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06bundle\x18\x02 \x01(\tR\x06bundle\x124\n" +
@@ -5144,13 +4874,11 @@ const file_v1_runc_proto_rawDesc = "" +
 	"\vextra_files\x18\x06 \x03(\tR\n" +
 	"extraFiles\x120\n" +
 	"\x14console_reference_id\x18\a \x01(\tR\x12consoleReferenceId\x12&\n" +
-	"\x0fio_reference_id\x18\b \x01(\tR\rioReferenceId\"/\n" +
-	"\x12RuncCreateResponse\x12\x19\n" +
-	"\bgo_error\x18\x01 \x01(\tR\agoError\"\"\n" +
+	"\x0fio_reference_id\x18\b \x01(\tR\rioReferenceId\"\x14\n" +
+	"\x12RuncCreateResponse\"\"\n" +
 	"\x10RuncStartRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\".\n" +
-	"\x11RuncStartResponse\x12\x19\n" +
-	"\bgo_error\x18\x01 \x01(\tR\agoError\"\x83\x01\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\x13\n" +
+	"\x11RuncStartResponse\"\x83\x01\n" +
 	"\x0fRuncExecRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12,\n" +
 	"\x04spec\x18\x02 \x01(\v2\x18.runm.v1.RuncProcessSpecR\x04spec\x122\n" +
@@ -5163,25 +4891,22 @@ const file_v1_runc_proto_rawDesc = "" +
 	"\n" +
 	"extra_args\x18\x03 \x03(\tR\textraArgs\x12&\n" +
 	"\x0fio_reference_id\x18\x04 \x01(\tR\rioReferenceId\x120\n" +
-	"\x14console_reference_id\x18\x05 \x01(\tR\x12consoleReferenceId\"-\n" +
-	"\x10RuncExecResponse\x12\x19\n" +
-	"\bgo_error\x18\x01 \x01(\tR\agoError\"n\n" +
+	"\x14console_reference_id\x18\x05 \x01(\tR\x12consoleReferenceId\"\x12\n" +
+	"\x10RuncExecResponse\"n\n" +
 	"\x0eRuncRunRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06bundle\x18\x02 \x01(\tR\x06bundle\x124\n" +
-	"\aoptions\x18\x03 \x01(\v2\x1a.runm.v1.RuncCreateOptionsR\aoptions\"D\n" +
+	"\aoptions\x18\x03 \x01(\v2\x1a.runm.v1.RuncCreateOptionsR\aoptions\")\n" +
 	"\x0fRuncRunResponse\x12\x16\n" +
-	"\x06status\x18\x01 \x01(\x05R\x06status\x12\x19\n" +
-	"\bgo_error\x18\x02 \x01(\tR\agoError\"Y\n" +
+	"\x06status\x18\x01 \x01(\x05R\x06status\"Y\n" +
 	"\x11RuncDeleteRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x124\n" +
 	"\aoptions\x18\x02 \x01(\v2\x1a.runm.v1.RuncDeleteOptionsR\aoptions\"H\n" +
 	"\x11RuncDeleteOptions\x12\x14\n" +
 	"\x05force\x18\x01 \x01(\bR\x05force\x12\x1d\n" +
 	"\n" +
-	"extra_args\x18\x02 \x03(\tR\textraArgs\"/\n" +
-	"\x12RuncDeleteResponse\x12\x19\n" +
-	"\bgo_error\x18\x01 \x01(\tR\agoError\"m\n" +
+	"extra_args\x18\x02 \x03(\tR\textraArgs\"\x14\n" +
+	"\x12RuncDeleteResponse\"m\n" +
 	"\x0fRuncKillRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06signal\x18\x02 \x01(\x05R\x06signal\x122\n" +
@@ -5189,35 +4914,29 @@ const file_v1_runc_proto_rawDesc = "" +
 	"\x0fRuncKillOptions\x12\x10\n" +
 	"\x03all\x18\x03 \x01(\bR\x03all\x12\x1d\n" +
 	"\n" +
-	"extra_args\x18\x04 \x03(\tR\textraArgs\"-\n" +
-	"\x10RuncKillResponse\x12\x19\n" +
-	"\bgo_error\x18\x01 \x01(\tR\agoError\"\"\n" +
+	"extra_args\x18\x04 \x03(\tR\textraArgs\"\x12\n" +
+	"\x10RuncKillResponse\"\"\n" +
 	"\x10RuncStatsRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"&\n" +
 	"\tRuncStats\x12\x19\n" +
-	"\braw_json\x18\x01 \x01(\fR\arawJson\"X\n" +
+	"\braw_json\x18\x01 \x01(\fR\arawJson\"=\n" +
 	"\x11RuncStatsResponse\x12(\n" +
-	"\x05stats\x18\x01 \x01(\v2\x12.runm.v1.RuncStatsR\x05stats\x12\x19\n" +
-	"\bgo_error\x18\x02 \x01(\tR\agoError\"\"\n" +
+	"\x05stats\x18\x01 \x01(\v2\x12.runm.v1.RuncStatsR\x05stats\"\"\n" +
 	"\x10RuncPauseRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\".\n" +
-	"\x11RuncPauseResponse\x12\x19\n" +
-	"\bgo_error\x18\x01 \x01(\tR\agoError\"#\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\x13\n" +
+	"\x11RuncPauseResponse\"#\n" +
 	"\x11RuncResumeRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"/\n" +
-	"\x12RuncResumeResponse\x12\x19\n" +
-	"\bgo_error\x18\x01 \x01(\tR\agoError\"\x1f\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\x14\n" +
+	"\x12RuncResumeResponse\"\x1f\n" +
 	"\rRuncPsRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"?\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"$\n" +
 	"\x0eRuncPsResponse\x12\x12\n" +
-	"\x04pids\x18\x01 \x03(\x05R\x04pids\x12\x19\n" +
-	"\bgo_error\x18\x02 \x01(\tR\agoError\"\x14\n" +
-	"\x12RuncVersionRequest\"p\n" +
+	"\x04pids\x18\x01 \x03(\x05R\x04pids\"\x14\n" +
+	"\x12RuncVersionRequest\"U\n" +
 	"\x13RuncVersionResponse\x12\x12\n" +
 	"\x04runc\x18\x01 \x01(\tR\x04runc\x12\x16\n" +
 	"\x06commit\x18\x02 \x01(\tR\x06commit\x12\x12\n" +
-	"\x04spec\x18\x03 \x01(\tR\x04spec\x12\x19\n" +
-	"\bgo_error\x18\x04 \x01(\tR\agoError\".\n" +
+	"\x04spec\x18\x03 \x01(\tR\x04spec\".\n" +
 	"\x14RuncCheckpointAction\x12\x16\n" +
 	"\x06action\x18\x01 \x03(\tR\x06action\"\x9a\x01\n" +
 	"\x15RuncCheckpointRequest\x12\x0e\n" +
@@ -5254,16 +4973,14 @@ const file_v1_runc_proto_rawDesc = "" +
 	"\x05vsock\x18\x02 \x01(\v2\x14.runm.v1.RuncVsockIOH\x00R\x05vsock\x12)\n" +
 	"\x04unix\x18\x03 \x01(\v2\x13.runm.v1.RuncUnixIOH\x00R\x04unix\x12)\n" +
 	"\x04null\x18\x04 \x01(\v2\x13.runm.v1.RuncNullIOH\x00R\x04nullB\x04\n" +
-	"\x02io\"3\n" +
-	"\x16RuncCheckpointResponse\x12\x19\n" +
-	"\bgo_error\x18\x01 \x01(\tR\agoError\"s\n" +
+	"\x02io\"\x18\n" +
+	"\x16RuncCheckpointResponse\"s\n" +
 	"\x12RuncRestoreRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06bundle\x18\x02 \x01(\tR\x06bundle\x125\n" +
-	"\aoptions\x18\x03 \x01(\v2\x1b.runm.v1.RuncRestoreOptionsR\aoptions\"H\n" +
+	"\aoptions\x18\x03 \x01(\v2\x1b.runm.v1.RuncRestoreOptionsR\aoptions\"-\n" +
 	"\x13RuncRestoreResponse\x12\x16\n" +
-	"\x06status\x18\x01 \x01(\x05R\x06status\x12\x19\n" +
-	"\bgo_error\x18\x02 \x01(\tR\agoError\"\xeb\x03\n" +
+	"\x06status\x18\x01 \x01(\x05R\x06status\"\xeb\x03\n" +
 	"\x15RuncCheckpointOptions\x12\x1d\n" +
 	"\n" +
 	"image_path\x18\x01 \x01(\tR\timagePath\x12\x19\n" +
@@ -5305,18 +5022,16 @@ const file_v1_runc_proto_rawDesc = "" +
 	"\x03err\x18\x04 \x01(\tR\x03err\"^\n" +
 	"\x11RuncUpdateRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x129\n" +
-	"\tresources\x18\x02 \x01(\v2\x1b.runm.v1.RuncLinuxResourcesR\tresources\"/\n" +
-	"\x12RuncUpdateResponse\x12\x19\n" +
-	"\bgo_error\x18\x01 \x01(\tR\agoError\"/\n" +
+	"\tresources\x18\x02 \x01(\v2\x1b.runm.v1.RuncLinuxResourcesR\tresources\"\x14\n" +
+	"\x12RuncUpdateResponse\"/\n" +
 	"\x12RuncLinuxResources\x12\x19\n" +
 	"\braw_json\x18\x01 \x01(\fR\arawJson\"?\n" +
 	"\x0eRuncTopRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
-	"ps_options\x18\x02 \x01(\tR\tpsOptions\"_\n" +
+	"ps_options\x18\x02 \x01(\tR\tpsOptions\"D\n" +
 	"\x0fRuncTopResponse\x121\n" +
-	"\aresults\x18\x01 \x01(\v2\x17.runm.v1.RuncTopResultsR\aresults\x12\x19\n" +
-	"\bgo_error\x18\x02 \x01(\tR\agoError\"c\n" +
+	"\aresults\x18\x01 \x01(\v2\x17.runm.v1.RuncTopResultsR\aresults\"c\n" +
 	"\x0eRuncTopResults\x12\x18\n" +
 	"\aheaders\x18\x01 \x03(\tR\aheaders\x127\n" +
 	"\tprocesses\x18\x02 \x03(\v2\x19.runm.v1.RuncTopProcessesR\tprocesses\",\n" +

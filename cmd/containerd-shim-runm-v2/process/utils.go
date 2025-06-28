@@ -20,7 +20,6 @@ package process
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -32,8 +31,6 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/errdefs"
-
-	"github.com/walteh/runm/core/runc/runtime"
 )
 
 const (
@@ -56,35 +53,35 @@ func (s *safePid) get() int {
 }
 
 // TODO(mlaventure): move to runc package?
-func getLastRuntimeError(ctx context.Context, r runtime.Runtime) (string, error) {
-	logPath := filepath.Join(r.SharedDir(), runtime.LogFileBase)
-	f, err := os.OpenFile(logPath, os.O_RDONLY, 0400)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
+// func getLastRuntimeError(ctx context.Context, r runtime.Runtime) (string, error) {
+// 	logPath := filepath.Join(r.SharedDir(), runtime.LogFileBase)
+// 	f, err := os.OpenFile(logPath, os.O_RDONLY, 0400)
+// 	if err != nil {
+// 		return "", err
+// 	}
+// 	defer f.Close()
 
-	var (
-		errMsg string
-		log    struct {
-			Level string
-			Msg   string
-			Time  time.Time
-		}
-	)
+// 	var (
+// 		errMsg string
+// 		log    struct {
+// 			Level string
+// 			Msg   string
+// 			Time  time.Time
+// 		}
+// 	)
 
-	dec := json.NewDecoder(f)
-	for err = nil; err == nil; {
-		if err = dec.Decode(&log); err != nil && err != io.EOF {
-			return "", err
-		}
-		if log.Level == "error" {
-			errMsg = strings.TrimSpace(log.Msg)
-		}
-	}
+// 	dec := json.NewDecoder(f)
+// 	for err = nil; err == nil; {
+// 		if err = dec.Decode(&log); err != nil && err != io.EOF {
+// 			return "", err
+// 		}
+// 		if log.Level == "error" {
+// 			errMsg = strings.TrimSpace(log.Msg)
+// 		}
+// 	}
 
-	return errMsg, nil
-}
+// 	return errMsg, nil
+// }
 
 // criuError returns only the first line of the error message from criu
 // it tries to add an invalid dump log location when returning the message

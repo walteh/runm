@@ -2,10 +2,10 @@ package grpcruntime
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"time"
 
+	"gitlab.com/tozd/go/errors"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	gorunc "github.com/containerd/go-runc"
@@ -25,11 +25,11 @@ func (c *GRPCClientRuntime) Stats(ctx context.Context, id string) (*gorunc.Stats
 
 	resp, err := c.runtimeExtrasGprcService.Stats(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("getting stats: %w", err)
 	}
-	if resp.GetGoError() != "" {
-		return nil, errors.New(resp.GetGoError())
-	}
+	// if resp.GetGoError() != "" {
+	// 	return nil, errors.New(resp.GetGoError())
+	// }
 	stats, err := conversion.ConvertStatsFromProto(resp.GetStats())
 	if err != nil {
 		return nil, err
@@ -96,11 +96,11 @@ func (c *GRPCClientRuntime) Top(ctx context.Context, id string, psOptions string
 
 	resp, err := c.runtimeExtrasGprcService.Top(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("getting top: %w", err)
 	}
-	if resp.GetGoError() != "" {
-		return nil, errors.New(resp.GetGoError())
-	}
+	// if resp.GetGoError() != "" {
+	// 	return nil, errors.New(resp.GetGoError())
+	// }
 
 	results := conversion.ConvertTopResultsFromProto(resp.GetResults())
 
@@ -111,11 +111,11 @@ func (c *GRPCClientRuntime) Top(ctx context.Context, id string, psOptions string
 func (c *GRPCClientRuntime) Version(ctx context.Context) (gorunc.Version, error) {
 	resp, err := c.runtimeExtrasGprcService.Version(ctx, &runmv1.RuncVersionRequest{})
 	if err != nil {
-		return gorunc.Version{}, err
+		return gorunc.Version{}, errors.Errorf("getting version: %w", err)
 	}
-	if resp.GetGoError() != "" {
-		return gorunc.Version{}, errors.New(resp.GetGoError())
-	}
+	// if resp.GetGoError() != "" {
+	// 	return gorunc.Version{}, errors.New(resp.GetGoError())
+	// }
 	return gorunc.Version{
 		Runc:   resp.GetRunc(),
 		Spec:   resp.GetSpec(),

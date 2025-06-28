@@ -57,11 +57,11 @@ func (c *GRPCClientRuntime) NewTempConsoleSocket(ctx context.Context) (runtime.C
 
 	cons, err := c.runtimeGrpcService.NewTempConsoleSocket(ctx, &runmv1.RuncNewTempConsoleSocketRequest{})
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("creating temp console socket: %w", err)
 	}
-	if cons.GetGoError() != "" {
-		return nil, errors.New(cons.GetGoError())
-	}
+	// if cons.GetGoError() != "" {
+	// 	return nil, errors.New(cons.GetGoError())
+	// }
 
 	slog.InfoContext(ctx, "creating console - A")
 
@@ -102,11 +102,11 @@ func (c *GRPCClientRuntime) ReadPidFile(ctx context.Context, path string) (int, 
 	req.SetPath(path)
 	resp, err := c.runtimeGrpcService.ReadPidFile(ctx, req)
 	if err != nil {
-		return -1, err
+		return -1, errors.Errorf("reading pid file: %w", err)
 	}
-	if resp.GetGoError() != "" {
-		return -1, errors.New(resp.GetGoError())
-	}
+	// if resp.GetGoError() != "" {
+	// 	return -1, errors.New(resp.GetGoError())
+	// }
 	return int(resp.GetPid()), nil
 }
 
@@ -263,7 +263,7 @@ func (c *GRPCClientRuntime) NewPipeIO(ctx context.Context, ioUID, ioGID int, opt
 func (c *GRPCClientRuntime) Create(ctx context.Context, id, bundle string, options *gorunc.CreateOpts) error {
 	conv, err := conversion.ConvertCreateOptsToProto(ctx, options)
 	if err != nil {
-		return errors.Errorf("creating container - %T: %w", err, err)
+		return errors.Errorf("converting create opts to proto: %w", err)
 	}
 
 	req := &runmv1.RuncCreateRequest{}
@@ -282,13 +282,13 @@ func (c *GRPCClientRuntime) Create(ctx context.Context, id, bundle string, optio
 
 	slog.InfoContext(ctx, "creating container", "id", id, "bundle", bundle)
 
-	resp, err := c.runtimeGrpcService.Create(ctx, req)
+	_, err = c.runtimeGrpcService.Create(ctx, req)
 	if err != nil {
-		return errors.Errorf("creating container - %T: %w", err, err)
+		return errors.Errorf("creating container: %w", err)
 	}
-	if resp.GetGoError() != "" {
-		return errors.New(resp.GetGoError())
-	}
+	// if resp.GetGoError() != "" {
+	// 	return errors.Errorf("go error in create: %s", resp.GetGoError())
+	// }
 	return nil
 }
 
@@ -297,13 +297,13 @@ func (c *GRPCClientRuntime) Start(ctx context.Context, id string) error {
 	req := &runmv1.RuncStartRequest{}
 	req.SetId(id)
 
-	resp, err := c.runtimeGrpcService.Start(ctx, req)
+	_, err := c.runtimeGrpcService.Start(ctx, req)
 	if err != nil {
-		return err
+		return errors.Errorf("starting container: %w", err)
 	}
-	if resp.GetGoError() != "" {
-		return errors.New(resp.GetGoError())
-	}
+	// if resp.GetGoError() != "" {
+	// 	return errors.Errorf("go error in start: %s", resp.GetGoError())
+	// }
 	return nil
 }
 
@@ -313,13 +313,13 @@ func (c *GRPCClientRuntime) Delete(ctx context.Context, id string, opts *gorunc.
 	req.SetId(id)
 	req.SetOptions(conversion.ConvertDeleteOptsToProto(opts))
 
-	resp, err := c.runtimeGrpcService.Delete(ctx, req)
+	_, err := c.runtimeGrpcService.Delete(ctx, req)
 	if err != nil {
-		return err
+		return errors.Errorf("deleting container: %w", err)
 	}
-	if resp.GetGoError() != "" {
-		return errors.New(resp.GetGoError())
-	}
+	// if resp.GetGoError() != "" {
+	// 	return errors.Errorf("go error in start: %s", resp.GetGoError())
+	// }
 	return nil
 }
 
@@ -330,13 +330,13 @@ func (c *GRPCClientRuntime) Kill(ctx context.Context, id string, signal int, opt
 	req.SetSignal(int32(signal))
 	req.SetOptions(conversion.ConvertKillOptsToProto(opts))
 
-	resp, err := c.runtimeGrpcService.Kill(ctx, req)
+	_, err := c.runtimeGrpcService.Kill(ctx, req)
 	if err != nil {
-		return err
+		return errors.Errorf("killing container: %w", err)
 	}
-	if resp.GetGoError() != "" {
-		return errors.New(resp.GetGoError())
-	}
+	// if resp.GetGoError() != "" {
+	// 	return errors.Errorf("go error in kill: %s", resp.GetGoError())
+	// }
 	return nil
 }
 
@@ -345,12 +345,9 @@ func (c *GRPCClientRuntime) Pause(ctx context.Context, id string) error {
 	req := &runmv1.RuncPauseRequest{}
 	req.SetId(id)
 
-	resp, err := c.runtimeGrpcService.Pause(ctx, req)
+	_, err := c.runtimeGrpcService.Pause(ctx, req)
 	if err != nil {
-		return err
-	}
-	if resp.GetGoError() != "" {
-		return errors.New(resp.GetGoError())
+		return errors.Errorf("pausing container: %w", err)
 	}
 	return nil
 }
@@ -360,12 +357,9 @@ func (c *GRPCClientRuntime) Resume(ctx context.Context, id string) error {
 	req := &runmv1.RuncResumeRequest{}
 	req.SetId(id)
 
-	resp, err := c.runtimeGrpcService.Resume(ctx, req)
+	_, err := c.runtimeGrpcService.Resume(ctx, req)
 	if err != nil {
-		return err
-	}
-	if resp.GetGoError() != "" {
-		return errors.New(resp.GetGoError())
+		return errors.Errorf("resuming container: %w", err)
 	}
 	return nil
 }
@@ -377,10 +371,7 @@ func (c *GRPCClientRuntime) Ps(ctx context.Context, id string) ([]int, error) {
 
 	resp, err := c.runtimeGrpcService.Ps(ctx, req)
 	if err != nil {
-		return nil, err
-	}
-	if resp.GetGoError() != "" {
-		return nil, errors.New(resp.GetGoError())
+		return nil, errors.Errorf("ps: %w", err)
 	}
 	pids := make([]int, len(resp.GetPids()))
 	for i, pid := range resp.GetPids() {
@@ -396,19 +387,19 @@ func (c *GRPCClientRuntime) Exec(ctx context.Context, id string, spec specs.Proc
 
 	specOut, err := conversion.ConvertProcessSpecToProto(&spec)
 	if err != nil {
-		return err
+		return errors.Errorf("converting process spec to proto: %w", err)
 	}
 	req.SetSpec(specOut)
 
 	req.SetOptions(conversion.ConvertExecOptsToProto(options))
 
-	resp, err := c.runtimeGrpcService.Exec(ctx, req)
+	_, err = c.runtimeGrpcService.Exec(ctx, req)
 	if err != nil {
-		return err
+		return errors.Errorf("exec: %w", err)
 	}
-	if resp.GetGoError() != "" {
-		return errors.New(resp.GetGoError())
-	}
+	// if resp.GetGoError() != "" {
+	// 	return errors.Errorf("go error in exec: %s", resp.GetGoError())
+	// }
 	return nil
 }
 
@@ -418,13 +409,13 @@ func (c *GRPCClientRuntime) Checkpoint(ctx context.Context, id string, options *
 	req.SetOptions(conversion.ConvertCheckpointOptsToProto(options))
 	req.SetActions(conversion.ConvertCheckpointActionsToProto(actions...))
 
-	resp, err := c.runtimeGrpcService.Checkpoint(ctx, req)
+	_, err := c.runtimeGrpcService.Checkpoint(ctx, req)
 	if err != nil {
-		return err
+		return errors.Errorf("checkpoint: %w", err)
 	}
-	if resp.GetGoError() != "" {
-		return errors.New(resp.GetGoError())
-	}
+	// if resp.GetGoError() != "" {
+	// 	return errors.Errorf("go error in checkpoint: %s", resp.GetGoError())
+	// }
 	return nil
 }
 
@@ -436,10 +427,10 @@ func (c *GRPCClientRuntime) Restore(ctx context.Context, id, bundle string, opti
 
 	resp, err := c.runtimeGrpcService.Restore(ctx, req)
 	if err != nil {
-		return -1, err
+		return -1, errors.Errorf("restore: %w", err)
 	}
-	if resp.GetGoError() != "" {
-		return -1, errors.New(resp.GetGoError())
-	}
+	// if resp.GetGoError() != "" {
+	// 	return -1, errors.Errorf("go error in restore: %s", resp.GetGoError())
+	// }
 	return int(resp.GetStatus()), nil
 }

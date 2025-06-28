@@ -17,6 +17,7 @@ vars:
       - ../nerdctl
       - ../containerd
       - ../runc
+      - ../vz
     BUILD_OUT_DIR: gen/build
 
 env:

@@ -81,7 +81,7 @@ type EventHandler interface {
 
 //go:mock
 type Runtime interface {
-	SharedDir() string
+	// SharedDir() string
 	// io: yes
 	// ✅
 	NewPipeIO(ctx context.Context, cioUID, ioGID int, opts ...gorunc.IOOpt) (IO, error)
