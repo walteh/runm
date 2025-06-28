@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"os/exec"
+	"syscall"
 	"time"
 
 	"golang.org/x/net/proxy"
@@ -187,8 +188,15 @@ type AllocatedSocketReference interface {
 	ReferableByReferenceId
 }
 
+type FileConn interface {
+	syscall.Conn
+	Read(p []byte) (n int, err error)
+	Write(p []byte) (n int, err error)
+	Close() error
+}
+
 type AllocatedSocket interface {
-	isAllocatedSocket()
+	// isAllocatedSocket()
 	proxy.ContextDialer
 	io.Closer
 	Conn() FileConn

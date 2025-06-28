@@ -27,12 +27,17 @@ func (v *vsockAllocatedReferenceIdSocket) Port() int {
 
 func NewSocketReferenceId(allocatedSocket AllocatedSocket) string {
 	switch v := allocatedSocket.(type) {
+	// case *GuestAllocatedVsockSocket:
+	// 	return v.referenceId
+	// case *GuestAllocatedUnixSocket:
+	// 	return v.referenceId
 	case VsockAllocatedSocket:
 		return fmt.Sprintf("socket:vsock:%d", v.Port())
 	case UnixAllocatedSocket:
 		return fmt.Sprintf("socket:unix:%s", v.Path())
+	default:
+		panic(fmt.Sprintf("unknown allocated socket type: %T", allocatedSocket))
 	}
-	return ""
 }
 
 func NewUnixSocketReferenceId(path string) string {

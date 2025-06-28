@@ -2,11 +2,13 @@ package server
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"gitlab.com/tozd/go/errors"
 
 	"github.com/walteh/runm/core/runc/runtime"
+	"github.com/walteh/runm/core/runc/socket"
 
 	runmv1 "github.com/walteh/runm/proto/v1"
 )
@@ -67,6 +69,7 @@ func (s *Server) AllocateIO(ctx context.Context, req *runmv1.AllocateIORequest) 
 	s.state.StoreOpenIO(ioref, pio)
 	res := &runmv1.AllocateIOResponse{}
 	res.SetIoReferenceId(ioref)
+
 	return res, nil
 }
 
@@ -112,6 +115,7 @@ func (s *Server) AllocateSockets(ctx context.Context, req *runmv1.AllocateSocket
 		referenceId := runtime.NewSocketReferenceId(sock)
 		s.state.StoreOpenSocket(referenceId, sock)
 		refs = append(refs, referenceId)
+		slog.InfoContext(ctx, "allocated socketz", "reference_id", referenceId)
 	}
 	res.SetSocketReferenceIds(refs)
 
@@ -132,7 +136,7 @@ func (s *Server) BindConsoleToSocket(ctx context.Context, req *runmv1.BindConsol
 		return nil, errors.Errorf("cannot bind console to socket: socket '%s' not found", req.GetSocketReferenceId())
 	}
 
-	err := runtime.BindConsoleToSocket(ctx, cs, as)
+	err := socket.BindConsoleToSocket(ctx, cs, as)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +175,7 @@ func (s *Server) BindIOToSockets(ctx context.Context, req *runmv1.BindIOToSocket
 		iosocks[2] = sock
 	}
 
-	err := runtime.BindIOToSockets(ctx, io, iosocks[0], iosocks[1], iosocks[2])
+	err := socket.BindIOToSockets(ctx, io, iosocks[0], iosocks[1], iosocks[2])
 	if err != nil {
 		return nil, err
 	}

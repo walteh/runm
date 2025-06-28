@@ -15,6 +15,7 @@ import (
 
 	"github.com/walteh/runm/core/runc/conversion"
 	"github.com/walteh/runm/core/runc/runtime"
+	"github.com/walteh/runm/core/runc/socket"
 
 	runmv1 "github.com/walteh/runm/proto/v1"
 )
@@ -44,7 +45,7 @@ func (c *GRPCClientRuntime) NewTempConsoleSocket(ctx context.Context) (runtime.C
 		return nil, errors.Errorf("receiving socket reference id: %w", err)
 	}
 
-	hsock, err := runtime.NewHostAllocatedSocketFromId(ctx, refId.GetSocketReferenceId(), c.vsockProxier)
+	hsock, err := socket.NewHostAllocatedSocketFromId(ctx, refId.GetSocketReferenceId(), c.vsockProxier)
 	if err != nil {
 		return nil, errors.Errorf("allocating host allocated socket: %w", err)
 	}
@@ -102,7 +103,7 @@ func (c *GRPCClientRuntime) NewTempConsoleSocket(ctx context.Context) (runtime.C
 
 	slog.InfoContext(ctx, "binding console to socket - B")
 
-	consock, err := runtime.NewHostConsoleSocket(ctx, hsock, c.vsockProxier)
+	consock, err := socket.NewHostConsoleSocket(ctx, hsock, c.vsockProxier)
 	if err != nil {
 		return nil, err
 	}
@@ -187,8 +188,11 @@ func (c *GRPCClientRuntime) NewPipeIO(ctx context.Context, ioUID, ioGID int, opt
 
 	sock, err := c.socketAllocatorGrpcService.AllocateIO(ctx, ioReq)
 	if err != nil {
+		slog.ErrorContext(ctx, "error allocating IO", "error", err)
 		return nil, errors.Errorf("allocating IO: %w", err)
 	}
+
+	slog.InfoContext(ctx, "all sockets allocated", "list", iov.GetSocketReferenceIds())
 
 	count2 := 0
 
@@ -196,52 +200,63 @@ func (c *GRPCClientRuntime) NewPipeIO(ctx context.Context, ioUID, ioGID int, opt
 	bindReq.SetIoReferenceId(sock.GetIoReferenceId())
 
 	if ropts.OpenStdin {
+		slog.InfoContext(ctx, "allocating stdin socket", "socket_id", iov.GetSocketReferenceIds()[count2])
 		bindReq.SetStdinSocketReferenceId(iov.GetSocketReferenceIds()[count2])
 		count2++
 	}
 	if ropts.OpenStdout {
+		slog.InfoContext(ctx, "allocating stdout socket", "socket_id", iov.GetSocketReferenceIds()[count2])
 		bindReq.SetStdoutSocketReferenceId(iov.GetSocketReferenceIds()[count2])
 		count2++
 	}
 	if ropts.OpenStderr {
+		slog.InfoContext(ctx, "allocating stderr socket", "socket_id", iov.GetSocketReferenceIds()[count2])
 		bindReq.SetStderrSocketReferenceId(iov.GetSocketReferenceIds()[count2])
+
 	}
 
+	slog.InfoContext(ctx, "binding IO to sockets", "io_id", sock.GetIoReferenceId(), "stdin_id", bindReq.GetStdinSocketReferenceId(), "stdout_id", bindReq.GetStdoutSocketReferenceId(), "stderr_id", bindReq.GetStderrSocketReferenceId())
+
+	slog.InfoContext(ctx, "binding IO to sockets - A")
 	_, err = c.socketAllocatorGrpcService.BindIOToSockets(ctx, bindReq)
 	if err != nil {
+		slog.ErrorContext(ctx, "error binding IO to sockets", "error", err)
 		return nil, errors.Errorf("binding IO to sockets: %w", err)
 	}
 
 	var stdinRef, stdoutRef, stderrRef string
 
 	if ropts.OpenStdin {
+		slog.InfoContext(ctx, "allocating stdin socket", "socket_id", bindReq.GetStdinSocketReferenceId())
 		stdinRef = bindReq.GetStdinSocketReferenceId()
 	}
 	if ropts.OpenStdout {
+		slog.InfoContext(ctx, "allocating stdout socket", "socket_id", bindReq.GetStdoutSocketReferenceId())
 		stdoutRef = bindReq.GetStdoutSocketReferenceId()
 	}
 	if ropts.OpenStderr {
+		slog.InfoContext(ctx, "allocating stderr socket", "socket_id", bindReq.GetStderrSocketReferenceId())
 		stderrRef = bindReq.GetStderrSocketReferenceId()
 	}
 
 	var stdinAllocated, stdoutAllocated, stderrAllocated runtime.AllocatedSocket
 
 	if stdinRef != "" {
-		stdinAllocated, err = runtime.NewHostAllocatedSocketFromId(ctx, stdinRef, c.vsockProxier)
+		stdinAllocated, err = socket.NewHostAllocatedSocketFromId(ctx, stdinRef, c.vsockProxier)
 		if err != nil {
 			return nil, errors.Errorf("allocating stdin socket: %w", err)
 		}
 	}
 
 	if stdoutRef != "" {
-		stdoutAllocated, err = runtime.NewHostAllocatedSocketFromId(ctx, stdoutRef, c.vsockProxier)
+		stdoutAllocated, err = socket.NewHostAllocatedSocketFromId(ctx, stdoutRef, c.vsockProxier)
 		if err != nil {
 			return nil, errors.Errorf("allocating stdout socket: %w", err)
 		}
 	}
 
 	if stderrRef != "" {
-		stderrAllocated, err = runtime.NewHostAllocatedSocketFromId(ctx, stderrRef, c.vsockProxier)
+		stderrAllocated, err = socket.NewHostAllocatedSocketFromId(ctx, stderrRef, c.vsockProxier)
 		if err != nil {
 			return nil, errors.Errorf("allocating stderr socket: %w", err)
 		}

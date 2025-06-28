@@ -1,4 +1,4 @@
-package runtime
+package socket
 
 import (
 	"context"
@@ -6,20 +6,18 @@ import (
 	"net"
 	"os"
 
-	"golang.org/x/sys/unix"
-
 	"github.com/containerd/console"
-	"gitlab.com/tozd/go/errors"
-
 	gorunc "github.com/containerd/go-runc"
-
 	"github.com/walteh/runm/core/runc/file"
+	"github.com/walteh/runm/core/runc/runtime"
+	"gitlab.com/tozd/go/errors"
+	"golang.org/x/sys/unix"
 )
 
-var _ ConsoleSocket = &HostConsoleSocket{}
+var _ runtime.ConsoleSocket = &HostConsoleSocket{}
 
 type HostConsoleSocket struct {
-	socket AllocatedSocket
+	socket runtime.AllocatedSocket
 	path   string
 	conn   *net.UnixConn
 	// unusedfd uintptr
@@ -46,7 +44,7 @@ func (h *HostConsoleSocket) ReceiveMaster() (console.Console, error) {
 	return console.ConsoleFromFile(f)
 }
 
-func NewHostUnixConsoleSocket(ctx context.Context, socket UnixAllocatedSocket) (ConsoleSocket, error) {
+func NewHostUnixConsoleSocket(ctx context.Context, socket runtime.UnixAllocatedSocket) (runtime.ConsoleSocket, error) {
 	tmp, err := gorunc.NewTempConsoleSocket()
 	if err != nil {
 		return nil, err
@@ -63,7 +61,7 @@ func NewHostUnixConsoleSocket(ctx context.Context, socket UnixAllocatedSocket) (
 	// return &HostConsoleSocket{socket: socket, path: tmp.Path(), conn: tmp.Conn().(*net.UnixConn)}, nil
 }
 
-func NewHostVsockFdConsoleSocket(ctx context.Context, socket VsockAllocatedSocket, proxier VsockProxier) (*HostConsoleSocket, error) {
+func NewHostVsockFdConsoleSocket(ctx context.Context, socket runtime.VsockAllocatedSocket, proxier runtime.VsockProxier) (*HostConsoleSocket, error) {
 	conn, path, err := proxier.ProxyVsock(ctx, socket.Port())
 	if err != nil {
 		return nil, err
@@ -71,11 +69,11 @@ func NewHostVsockFdConsoleSocket(ctx context.Context, socket VsockAllocatedSocke
 	return &HostConsoleSocket{socket: socket, path: path, conn: conn}, nil
 }
 
-func NewHostConsoleSocket(ctx context.Context, socket AllocatedSocket, proxier VsockProxier) (ConsoleSocket, error) {
+func NewHostConsoleSocket(ctx context.Context, socket runtime.AllocatedSocket, proxier runtime.VsockProxier) (runtime.ConsoleSocket, error) {
 	switch v := socket.(type) {
-	case UnixAllocatedSocket:
+	case runtime.UnixAllocatedSocket:
 		return NewHostUnixConsoleSocket(ctx, v)
-	case VsockAllocatedSocket:
+	case runtime.VsockAllocatedSocket:
 		return NewHostVsockFdConsoleSocket(ctx, v, proxier)
 	default:
 		return nil, errors.Errorf("invalid socket type: %T", socket)
