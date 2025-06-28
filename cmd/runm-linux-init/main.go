@@ -48,7 +48,7 @@ var (
 )
 
 const (
-	serviceName = "runm-linux-init"
+	serviceName = "runm-init"
 )
 
 func init() {
@@ -185,7 +185,7 @@ func runGrpcVsockServer(ctx context.Context) error {
 	runcRoot := "/run/containerd/runc"
 
 	realRuntime := goruncruntime.WrapdGoRuncRuntime(&gorunc.Runc{
-		Command:       "/mbin/runc",
+		Command:       "/mbin/runc-test",
 		Log:           filepath.Join(constants.Ec1AbsPath, runtime.LogFileBase),
 		LogFormat:     gorunc.JSON,
 		PdeathSignal:  unix.SIGKILL,

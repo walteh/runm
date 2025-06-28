@@ -120,7 +120,7 @@ func (p *Init) Create(ctx context.Context, r *process.CreateConfig) error {
 		pidFile = newPidFile(p.Bundle)
 	)
 
-	ctx = slogctx.Append(ctx, "process.init.create", "id", p.id)
+	ctx = slogctx.Append(ctx, "operation", "process.init.create")
 	if r.Terminal {
 		if socket, err = p.runtime.NewTempConsoleSocket(ctx); err != nil {
 			return errors.Errorf("failed to create OCI runtime console socket: %w", err)

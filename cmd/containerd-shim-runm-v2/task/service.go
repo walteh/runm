@@ -338,6 +338,7 @@ func (s *service) Start(ctx context.Context, r *taskv3.StartRequest) (*taskv3.St
 			s.lifecycleMu.Unlock()
 		}
 		handleStarted(container, p)
+		slog.ErrorContext(ctx, "failed to start process", "error", err)
 		return nil, errgrpc.ToGRPC(err)
 	}
 

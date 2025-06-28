@@ -257,6 +257,42 @@ RUN cp runc /bin/runc
 
 
 ########################################################
+# runc-test builder
+########################################################
+
+FROM debian-golang-ref AS runc-test-static-builder
+
+ARG RUNC_GIT_REF
+
+RUN apt-get update \
+	&& apt-get install -y \
+		build-essential \
+		autoconf \
+		libtool \
+		git \
+		bison \
+		flex \
+		wget \
+		libseccomp-dev \
+		libseccomp2 \
+	&& rm -rf /var/lib/apt/lists/*
+
+COPY --from=forks / /app/
+COPY --from=runm . /app/runm
+
+WORKDIR /app/runm/test/integration/cmd/runc-test
+
+# RUN git clone --depth 1 --branch ${RUNC_GIT_REF} https://github.com/opencontainers/runc.git /src
+# WORKDIR /src
+RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/go/pkg/mod <<EOF
+make static
+EOF
+
+RUN strip runc
+RUN cp runc /bin/runc-test
+
+
+########################################################
 # runm-linux-go-base builder
 ########################################################
 
@@ -347,6 +383,7 @@ COPY --from=runc-static-builder /bin/runc /runc
 COPY --from=crun-static-builder-alpine /bin/crun /crun
 COPY --from=runm-linux-init-builder /out/runm-linux-init /runm-linux-init
 COPY --from=runm-linux-host-fork-exec-proxy-builder /out/runm-linux-host-fork-exec-proxy /runm-linux-host-fork-exec-proxy
+COPY --from=runc-test-static-builder /bin/runc-test /runc-test
 
 ########################################################
 # initramfs cpio builder

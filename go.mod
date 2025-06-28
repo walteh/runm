@@ -17,6 +17,7 @@ replace (
 	github.com/containers/gvisor-tap-vsock => ../gvisor-tap-vsock
 	// github.com/moby/buildkit => ../buildkit
 	gitlab.com/tozd/go/errors => ../go-errors
+	github.com/opencontainers/runc => ../runc
 )
 
 replace gvisor.dev/gvisor => gvisor.dev/gvisor v0.0.0-20250611222258-0fe9a4bf489c
@@ -56,7 +57,10 @@ require (
 	github.com/moby/sys/userns v0.1.0
 	github.com/muesli/termenv v0.16.0
 	github.com/nxadm/tail v1.4.11
+	github.com/opencontainers/cgroups v0.0.1
+	github.com/opencontainers/runc v1.2.6
 	github.com/opencontainers/runtime-spec v1.2.1
+	github.com/opencontainers/selinux v1.12.0
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/pkg/term v1.1.0
 	github.com/rs/xid v1.6.0
@@ -66,6 +70,7 @@ require (
 	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.10.0
 	github.com/superblocksteam/run v0.0.7
+	github.com/urfave/cli v1.22.16
 	github.com/urfave/cli/v2 v2.27.7
 	github.com/veqryn/slog-context v0.8.0
 	github.com/walteh/run v0.0.0-20250510150917-6f8074766f03
@@ -104,6 +109,7 @@ require (
 	github.com/charmbracelet/x/cellbuf v0.0.13-0.20250311204145-2c3ea96c31dd // indirect
 	github.com/charmbracelet/x/term v0.2.1 // indirect
 	github.com/checkpoint-restore/checkpointctl v1.3.0 // indirect
+	github.com/checkpoint-restore/go-criu/v6 v6.3.0 // indirect
 	github.com/checkpoint-restore/go-criu/v7 v7.2.0 // indirect
 	github.com/compose-spec/compose-go/v2 v2.6.4 // indirect
 	github.com/containerd/accelerated-container-image v1.3.0 // indirect
@@ -184,6 +190,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
+	github.com/mrunalp/fileutils v0.5.1 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/multiformats/go-base32 v0.1.0 // indirect
 	github.com/multiformats/go-base36 v0.2.0 // indirect
@@ -196,7 +203,6 @@ require (
 	github.com/nwaples/rardecode/v2 v2.1.0 // indirect
 	github.com/oklog/run v1.0.0 // indirect
 	github.com/opencontainers/runtime-tools v0.9.1-0.20250303011046-260e151b8552 // indirect
-	github.com/opencontainers/selinux v1.12.0 // indirect
 	github.com/petermattis/goid v0.0.0-20250319124200-ccd6737f222a // indirect
 	github.com/philhofer/fwd v1.1.3-0.20240916144458-20a13a1f6b7c // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
@@ -213,6 +219,7 @@ require (
 	github.com/samber/lo v1.51.0 // indirect
 	github.com/samber/slog-common v0.19.0 // indirect
 	github.com/sasha-s/go-deadlock v0.3.5 // indirect
+	github.com/seccomp/libseccomp-golang v0.10.0 // indirect
 	github.com/smallstep/pkcs7 v0.1.1 // indirect
 	github.com/sorairolake/lzip-go v0.3.5 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
@@ -268,8 +275,8 @@ require (
 	github.com/cilium/ebpf v0.18.0 // indirect
 	github.com/containerd/continuity v0.4.5 // indirect
 	github.com/containerd/otelttrpc v0.1.0
-	github.com/coreos/go-systemd/v22 v22.5.1-0.20231103132048-7d375ecc2b09 // indirect
-	github.com/docker/go-units v0.5.0 // indirect
+	github.com/coreos/go-systemd/v22 v22.5.1-0.20231103132048-7d375ecc2b09
+	github.com/docker/go-units v0.5.0
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
