@@ -277,15 +277,17 @@ RUN apt-get update \
 		libseccomp2 \
 	&& rm -rf /var/lib/apt/lists/*
 
-COPY --from=forks / /app/
-COPY --from=runm . /app/runm
+ARG WORKDIR_REMAP="/app"
 
-WORKDIR /app/runm/test/integration/cmd/runc-test
+COPY --from=forks / ${WORKDIR_REMAP}
+COPY --from=runm . ${WORKDIR_REMAP}/runm/
+
+WORKDIR ${WORKDIR_REMAP}/runm/test/integration/cmd/runc-test
 
 # RUN git clone --depth 1 --branch ${RUNC_GIT_REF} https://github.com/opencontainers/runc.git /src
 # WORKDIR /src
 RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/go/pkg/mod <<EOF
-make static
+make static TRIMPATH=
 EOF
 
 RUN strip runc

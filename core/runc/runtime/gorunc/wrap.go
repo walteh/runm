@@ -78,6 +78,8 @@ func (r *GoRuncRuntime) Create(ctx context.Context, id, bundle string, options *
 	// 	}
 	// }()
 
+	options.NoNewKeyring = true
+
 	return WrapWithRuntimeError(ctx, r, func() error {
 		return r.internal.Create(ctx, id, bundle, options)
 	})

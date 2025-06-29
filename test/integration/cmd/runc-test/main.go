@@ -5,11 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	//nolint:revive // Enable cgroup manager to manage devices
 	_ "github.com/opencontainers/cgroups/devices"
@@ -172,6 +174,25 @@ func main() {
 
 		return nil
 	}
+
+	// log once a minute to the console to indicate that the command is running
+	ticker := time.NewTicker(1 * time.Second)
+	ticks := 0
+	defer ticker.Stop()
+
+	go func() {
+		for tick := range ticker.C {
+
+			ticks++
+			if ticks < 10 || ticks%60 == 0 {
+				slog.Info("still running in runc-test, waiting to be killed", "tick", tick)
+			}
+		}
+	}()
+
+	defer func() {
+		slog.Debug("DEBUG: RUNC IS DONE")
+	}()
 
 	// If the command returns an error, cli takes upon itself to print
 	// the error on cli.ErrWriter and exit.

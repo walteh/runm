@@ -262,6 +262,7 @@ tasks:
             docker buildx build \
                 --platform=linux/{{.ARCH}} \
                 --target export \
+                --build-arg WORKDIR_REMAP=$(dirname $(pwd)) \
                 --output type=local,dest={{.TMP_DIR}} \
                 --build-context=runm=. \
                 --build-context=go-path=$(go env GOPATH) \

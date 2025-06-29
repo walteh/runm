@@ -99,6 +99,12 @@ func WithDebugPatternColoring(enabled bool) TermLoggerOption {
 	}
 }
 
+func WithMultilineBoxes(enabled bool) TermLoggerOption {
+	return func(l *TermLogger) {
+		l.enableMultilineBoxes = enabled
+	}
+}
+
 func newColoredString(s string, color string) lipgloss.Style {
 	return lipgloss.NewStyle().SetString(s).Foreground(lipgloss.Color(color)).Bold(true)
 }
@@ -140,6 +146,7 @@ type TermLogger struct {
 	showOSIcon                 bool                      // Whether to show OS icon
 	enableNameColors           bool                      // Whether to enable name colors
 	enableDebugPatternColoring bool                      // Whether to enable debug pattern coloring
+	enableMultilineBoxes       bool                      // Whether to render multiline messages in boxes
 	patternColorCache          map[string]lipgloss.Color // Cache for deterministic colors
 }
 
@@ -194,6 +201,7 @@ func NewTermLogger(writer io.Writer, sopts *slog.HandlerOptions, opts ...TermLog
 		nameColor:                  "",
 		showOSIcon:                 false,
 		enableDebugPatternColoring: false,
+		enableMultilineBoxes:       true, // Enable by default
 		patternColorCache:          make(map[string]lipgloss.Color),
 	}
 	for _, opt := range opts {
@@ -327,6 +335,29 @@ const (
 	maxNameLength = 15
 )
 
+// MessageToBox renders a multiline message in a box similar to error display
+func MessageToBox(message string, styles *Styles, render renderFunc) string {
+	// Format the message nicely in a box
+	content := message
+
+	// If the message is already styled, don't apply additional styling
+	if !strings.Contains(message, "\x1b[") {
+		// Apply moderate styling to the content for better readability
+		content = render(lipgloss.NewStyle().Foreground(MessageColor), message)
+	}
+
+	// Render the content in a container with rounded borders
+	boxStyle := styles.Error.Container.Copy().
+		BorderForeground(TreeBorderColor)
+
+	return render(boxStyle, content)
+}
+
+// HasNewlines checks if a string contains newlines
+func HasNewlines(s string) bool {
+	return strings.Contains(s, "\n")
+}
+
 func (l *TermLogger) Handle(ctx context.Context, r slog.Record) error {
 	// Build a pretty, human-friendly log line.
 
@@ -397,7 +428,14 @@ func (l *TermLogger) Handle(ctx context.Context, r slog.Record) error {
 
 	// 4. Message with special formatting for debug level if enabled
 	var msg string
-	if r.Level == slog.LevelDebug && l.enableDebugPatternColoring {
+	// Check if message has newlines and should be rendered in a box
+	if HasNewlines(r.Message) && l.enableMultilineBoxes {
+		// For multiline messages, add a placeholder to the main log line
+		msg = l.render(levelStyle.UnsetString().UnsetMaxWidth().UnsetBold(), "[multiline message below]")
+		// Add the boxed content to the appendage
+		appendageBuilder.WriteString(MessageToBox(r.Message, l.styles, l.renderFunc))
+		appendageBuilder.WriteString("\n")
+	} else if r.Level == slog.LevelDebug && l.enableDebugPatternColoring {
 		msg, _ = l.colorizeDebugPattern(r.Message, -1, false)
 	} else {
 		msg = l.render(levelStyle.UnsetString().UnsetMaxWidth().UnsetBold(), r.Message)

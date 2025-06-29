@@ -203,6 +203,7 @@ func WithDevTermHanlder(writer io.Writer) OptLoggerOptsSetter {
 				slogdevterm.WithEnableLoggerNameColor(true),
 				slogdevterm.WithOSIcon(true),
 				slogdevterm.WithDebugPatternColoring(true),
+				slogdevterm.WithMultilineBoxes(true),
 			))
 		})
 	}
