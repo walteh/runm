@@ -21,6 +21,7 @@ import (
 	gorunc "github.com/containerd/go-runc"
 
 	"github.com/walteh/runm/core/runc/runtime"
+	"github.com/walteh/runm/pkg/logging"
 )
 
 var _ runtime.Runtime = (*GoRuncRuntime)(nil)
@@ -115,6 +116,12 @@ func getRawRuncError(ctx context.Context, r *GoRuncRuntime, err error) error {
 }
 
 func WrapWithRuntimeError(ctx context.Context, r *GoRuncRuntime, f func() error) error {
+	callerFuncName := logging.GetCurrentCallerURIOffset(1)
+	spl := strings.Split(filepath.Base(callerFuncName.Function), ".")
+	funcName := spl[len(spl)-1]
+
+	slog.Debug(fmt.Sprintf("GORUNC:START[%s]", funcName))
+	defer slog.Debug(fmt.Sprintf("GORUNC:END[%s]", funcName))
 	err := f()
 	if err == nil {
 		return nil
@@ -124,6 +131,9 @@ func WrapWithRuntimeError(ctx context.Context, r *GoRuncRuntime, f func() error)
 
 func WrapWithRuntimeErrorResult[T any](ctx context.Context, r *GoRuncRuntime, f func() (T, error)) (T, error) {
 	var zero T
+	callerFuncName := logging.GetCurrentCallerURIOffset(1)
+	slog.Debug(fmt.Sprintf("GORUNC:START[%s]", filepath.Base(callerFuncName.Function)))
+	defer slog.Debug(fmt.Sprintf("GORUNC:END[%s]", filepath.Base(callerFuncName.Function)))
 	result, err := f()
 	if err == nil {
 		return result, nil

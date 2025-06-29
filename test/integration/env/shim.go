@@ -46,7 +46,7 @@ var mode = guessShimMode()
 
 func setupOtel(ctx context.Context) (*slog.Logger, func() error, error) {
 
-	shimName := fmt.Sprintf("shim[%s]", mode[0:4])
+	shimName := fmt.Sprintf("shim[%s]", mode)
 
 	logProxySock, err := net.Dial("unix", ShimLogProxySockPath())
 	if err != nil {

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"os"
@@ -149,7 +150,39 @@ func proxyHooks(ctx context.Context) error {
 	return nil
 }
 
+func listenForLogProxy(ctx context.Context) (func() error, error) {
+	conn, err := net.Listen("unix", "/tmp/runm-log-proxy.sock")
+	if err != nil {
+		return nil, errors.Errorf("problem listening vsock for log proxy: %w", err)
+	}
+
+	go func() {
+		for {
+			conn, err := conn.Accept()
+			if err != nil {
+				slog.ErrorContext(ctx, "problem accepting log proxy connection", "error", err)
+				continue
+			}
+
+			go func() {
+				io.Copy(os.Stdout, conn)
+			}()
+		}
+	}()
+
+	return func() error {
+		return conn.Close()
+	}, nil
+}
+
 func runGrpcVsockServer(ctx context.Context) error {
+
+	closeLogProxy, err := listenForLogProxy(ctx)
+	if err != nil {
+		return errors.Errorf("problem listening for log proxy: %w", err)
+	}
+
+	defer closeLogProxy()
 
 	ticker := time.NewTicker(1 * time.Second)
 	ticks := 0
@@ -183,6 +216,11 @@ func runGrpcVsockServer(ctx context.Context) error {
 
 	namespace := "default"
 	runcRoot := "/run/containerd/runc"
+
+	// exec /mbin/runc-test --version
+	if err := ExecCmdForwardingStdio(ctx, "/mbin/runc-test", "--version"); err != nil {
+		return errors.Errorf("problem executing runc-test --version: %w", err)
+	}
 
 	realRuntime := goruncruntime.WrapdGoRuncRuntime(&gorunc.Runc{
 		Command:       "/mbin/runc-test",

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
@@ -218,6 +219,7 @@ type runner struct {
 }
 
 func (r *runner) run(config *specs.Process) (int, error) {
+	defer slog.Debug("DEBUG: run done")
 	var err error
 	defer func() {
 		if err != nil {
@@ -279,12 +281,15 @@ func (r *runner) run(config *specs.Process) (int, error) {
 		panic("Unknown action")
 	}
 	if err != nil {
+		slog.Debug("DEBUG: container.Start/Restore/Run failed", "error", err)
 		return -1, err
 	}
+	slog.Debug("DEBUG: tty.waitConsole()")
 	if err = tty.waitConsole(); err != nil {
 		r.terminate(process)
 		return -1, err
 	}
+	slog.Debug("DEBUG: tty.ClosePostStart()")
 	tty.ClosePostStart()
 	if r.pidFile != "" {
 		if err = createPidFile(r.pidFile, process); err != nil {
@@ -292,14 +297,19 @@ func (r *runner) run(config *specs.Process) (int, error) {
 			return -1, err
 		}
 	}
+	slog.Debug("DEBUG: handlerCh wait by blocking for signal")
 	handler := <-handlerCh
+	slog.Debug("DEBUG: handler.forward()")
 	status, err := handler.forward(process, tty, detach)
 	if err != nil {
 		r.terminate(process)
 	}
+	slog.Debug("DEBUG: tty.waitConsole() done")
 	if detach {
+		slog.Debug("DEBUG: detach, returning 0")
 		return 0, nil
 	}
+	slog.Debug("DEBUG: container.Start/Restore/Run done")
 	if err == nil {
 		r.destroy()
 	}
@@ -359,6 +369,8 @@ const (
 )
 
 func startContainer(context *cli.Context, action CtAct, criuOpts *libcontainer.CriuOpts) (int, error) {
+	slog.Debug("DEBUG: startContainer")
+	defer slog.Debug("DEBUG: startContainer done")
 	if err := revisePidFile(context); err != nil {
 		return -1, err
 	}

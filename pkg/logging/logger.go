@@ -46,7 +46,7 @@ type LoggerOpts struct {
 
 func NewDefaultDevLogger(name string, writer io.Writer, opts ...OptLoggerOptsSetter) *slog.Logger {
 
-	opts = append(opts,
+	defaults := []OptLoggerOptsSetter{
 		WithDevTermHanlder(writer),
 		WithProcessName(name),
 		WithGlobalRedactor(),
@@ -59,13 +59,13 @@ func NewDefaultDevLogger(name string, writer io.Writer, opts ...OptLoggerOptsSet
 			Level:     slog.LevelDebug,
 			AddSource: true,
 		}),
-	)
+	}
+	opts = append(defaults, opts...)
 	return NewLogger(opts...)
 }
 
 func NewDefaultDevLoggerWithOtel(ctx context.Context, name string, rawLogWriter io.Writer, instances *OTelInstances, opts ...OptLoggerOptsSetter) *slog.Logger {
-
-	opts = append(opts,
+	defaults := []OptLoggerOptsSetter{
 		WithDevTermHanlder(rawLogWriter),
 		WithProcessName(name),
 		WithGlobalRedactor(),
@@ -80,12 +80,13 @@ func NewDefaultDevLoggerWithOtel(ctx context.Context, name string, rawLogWriter 
 			Level:     slog.LevelDebug,
 			AddSource: true,
 		}),
-	)
+	}
+	opts = append(defaults, opts...)
 	return NewLogger(opts...)
 }
 
 func NewDefaultJSONLogger(name string, writer io.Writer, opts ...OptLoggerOptsSetter) *slog.Logger {
-	opts = append(opts,
+	defaults := []OptLoggerOptsSetter{
 		WithProcessName(name),
 		WithGlobalRedactor(),
 		WithErrorStackTracer(),
@@ -98,7 +99,8 @@ func NewDefaultJSONLogger(name string, writer io.Writer, opts ...OptLoggerOptsSe
 			Level:     slog.LevelDebug,
 			AddSource: true,
 		}),
-	)
+	}
+	opts = append(defaults, opts...)
 	return NewLogger(opts...)
 }
 
@@ -190,15 +192,10 @@ func WithValue(v slog.Attr) OptLoggerOptsSetter {
 func WithDevTermHanlder(writer io.Writer) OptLoggerOptsSetter {
 	return func(o *LoggerOpts) {
 		o.delayedHandlerCreatorOpts = append(o.delayedHandlerCreatorOpts, func(o *LoggerOpts) {
-			if os.Getenv("TERM") == "linux" {
-				// override linux term colors
-				// obv this is a hack but okay for the specific situation we need it for (all raw logs viewed in iTerm2)
-				os.Setenv("TERM", "xterm-256color")
-				os.Setenv("COLORTERM", "truecolor")
-			}
+
 			o.handlers = append(o.handlers, slogdevterm.NewTermLogger(writer, o.handlerOptions,
 				slogdevterm.WithLoggerName(o.processName),
-				slogdevterm.WithProfile(termenv.ANSI256),
+				slogdevterm.WithColorProfile(termenv.TrueColor),
 				slogdevterm.WithRenderOption(termenv.WithTTY(true)),
 				slogdevterm.WithEnableLoggerNameColor(true),
 				slogdevterm.WithOSIcon(true),

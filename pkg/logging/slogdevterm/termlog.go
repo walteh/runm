@@ -57,12 +57,6 @@ func WithLoggerName(name string) TermLoggerOption {
 	}
 }
 
-func WithProfile(profile termenv.Profile) TermLoggerOption {
-	return func(l *TermLogger) {
-		l.renderOpts = append(l.renderOpts, termenv.WithProfile(profile))
-	}
-}
-
 func WithRenderOption(opt termenv.OutputOption) TermLoggerOption {
 	return func(l *TermLogger) {
 		l.renderOpts = append(l.renderOpts, opt)
@@ -132,6 +126,12 @@ func GetOSIcon() lipgloss.Style {
 	return icon
 }
 
+func WithColorProfile(profile termenv.Profile) TermLoggerOption {
+	return func(l *TermLogger) {
+		l.colorProfile = profile
+	}
+}
+
 type HyperlinkFunc func(link, renderedText string) string
 
 type TermLogger struct {
@@ -141,6 +141,7 @@ type TermLogger struct {
 	renderOpts                 []termenv.OutputOption
 	renderer                   *lipgloss.Renderer
 	name                       string
+	colorProfile               termenv.Profile
 	hyperlinkFunc              HyperlinkFunc
 	nameColor                  lipgloss.Color            // Map to cache colors for names
 	showOSIcon                 bool                      // Whether to show OS icon
@@ -190,7 +191,7 @@ func generateDeterministicNeonColor(s string) lipgloss.Color {
 }
 
 func NewTermLogger(writer io.Writer, sopts *slog.HandlerOptions, opts ...TermLoggerOption) *TermLogger {
-	l := &TermLogger{
+	l := TermLogger{
 		writer:                     writer,
 		slogOptions:                sopts,
 		styles:                     DefaultStyles(),
@@ -198,6 +199,7 @@ func NewTermLogger(writer io.Writer, sopts *slog.HandlerOptions, opts ...TermLog
 		name:                       "",
 		hyperlinkFunc:              stackerr.Hyperlink,
 		enableNameColors:           false,
+		colorProfile:               termenv.ANSI256,
 		nameColor:                  "",
 		showOSIcon:                 false,
 		enableDebugPatternColoring: false,
@@ -205,16 +207,19 @@ func NewTermLogger(writer io.Writer, sopts *slog.HandlerOptions, opts ...TermLog
 		patternColorCache:          make(map[string]lipgloss.Color),
 	}
 	for _, opt := range opts {
-		opt(l)
+		opt(&l)
 	}
 
 	if l.nameColor == "" && l.enableNameColors {
 		l.nameColor = generateDeterministicNeonColor(l.name)
 	}
 
-	l.renderer = lipgloss.NewRenderer(l.writer, l.renderOpts...)
+	l.renderOpts = append(l.renderOpts, termenv.WithProfile(l.colorProfile))
 
-	return l
+	l.renderer = lipgloss.NewRenderer(l.writer, l.renderOpts...)
+	l.renderer.SetColorProfile(l.colorProfile)
+
+	return &l
 }
 
 // Enabled implements slog.Handler.

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -146,6 +147,8 @@ func main() {
 		updateCommand,
 		featuresCommand,
 	}
+
+	var logProxyConn net.Conn
 	app.Before = func(context *cli.Context) error {
 		if !context.IsSet("root") && xdgDirUsed {
 			// According to the XDG specification, we need to set anything in
@@ -167,13 +170,33 @@ func main() {
 		opts := []logging.OptLoggerOptsSetter{}
 
 		if file := context.GlobalString("log"); file != "" {
-			opts = append(opts, logging.WithFileHandler(file))
+			// opts = append(opts, logging.WithFileHandler(file))
+			opts = append(opts, logging.WithInterceptLogrus(false))
 		}
 
-		_ = logging.NewDefaultDevLogger(fmt.Sprintf("runc[%s]", context.Args().First()), os.Stdout, opts...)
+		opts = append(opts, logging.WithValues([]slog.Attr{
+			slog.String("run_id", fmt.Sprintf("%d", runId)),
+			slog.String("ppid", fmt.Sprintf("%d", os.Getppid())),
+			slog.String("pid", fmt.Sprintf("%d", os.Getpid())),
+		}))
 
-		return nil
+		conn, err := net.Dial("unix", "/tmp/runm-log-proxy.sock")
+		if err != nil {
+			fmt.Printf("problem dialing log proxy: %v\n", err)
+		} else {
+			// defer conn.Close()
+			logProxyConn = conn
+			_ = logging.NewDefaultDevLogger(fmt.Sprintf("runc[%s]", context.Args().First()), conn, opts...)
+		}
+
+		return configLogrus(context)
 	}
+
+	defer func() {
+		if logProxyConn != nil {
+			logProxyConn.Close()
+		}
+	}()
 
 	// log once a minute to the console to indicate that the command is running
 	ticker := time.NewTicker(1 * time.Second)

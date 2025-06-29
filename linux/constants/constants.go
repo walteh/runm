@@ -25,5 +25,6 @@ const (
 	VsockStdoutPort               = 2021
 	VsockStderrPort               = 2022
 	VsockOtelPort                 = 3098
+	VsockLogProxyPort             = 3099
 	RunmHostServerVsockPort       = 2023
 )

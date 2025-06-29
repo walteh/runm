@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/urfave/cli"
@@ -60,8 +61,14 @@ command(s) that get executed on start, edit the args parameter of the spec. See
 		if err := checkArgs(context, 1, exactArgs); err != nil {
 			return err
 		}
+		slog.Debug("DEBUG: create")
+		defer slog.Debug("DEBUG: create done")
 		status, err := startContainer(context, CT_ACT_CREATE, nil)
 		if err == nil {
+			slog.Debug("DEBUG: create done, exiting with status", "status", status)
+			if status == 0 {
+				return nil
+			}
 			// exit with the container's exit status so any external supervisor
 			// is notified of the exit with the correct exit status.
 			os.Exit(status)
