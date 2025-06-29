@@ -197,7 +197,7 @@ func runGrpcVsockServer(ctx context.Context) error {
 	realSocketAllocator := socket.NewGuestVsockSocketAllocator(3, 2300)
 
 	serveropts := []grpc.ServerOption{
-		grpc.ChainUnaryInterceptor(grpcerr.UnaryServerInterceptor()),
+		grpc.ChainUnaryInterceptor(grpcerr.UnaryServerInterceptor),
 	}
 
 	if enableOtel {

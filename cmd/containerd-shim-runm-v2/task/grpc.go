@@ -27,7 +27,7 @@ func (s *service) serveGrpc(ctx context.Context, cid string) (func() error, func
 
 	grpcServer := grpc.NewServer(
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
-		grpc.ChainUnaryInterceptor(grpcerr.UnaryServerInterceptor()),
+		grpc.ChainUnaryInterceptor(grpcerr.UnaryServerInterceptor),
 		grpc.ChainStreamInterceptor(grpcerr.StreamServerInterceptor()),
 	)
 

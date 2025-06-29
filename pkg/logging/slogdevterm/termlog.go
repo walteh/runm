@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"reflect"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -20,6 +21,9 @@ import (
 )
 
 var _ slog.Handler = (*TermLogger)(nil)
+
+// Pattern for special debug log formatting: WORD:WORD[content]
+var debugPatternRegex = regexp.MustCompile(`^([^:]+):([^\[]+)\[(.*)\]$`)
 
 type TermLoggerOption = func(*TermLogger)
 
@@ -71,6 +75,12 @@ func WithEnableLoggerNameColor(enabled bool) TermLoggerOption {
 	}
 }
 
+func WithDebugPatternColoring(enabled bool) TermLoggerOption {
+	return func(l *TermLogger) {
+		l.enableDebugPatternColoring = enabled
+	}
+}
+
 func newColoredString(s string, color string) lipgloss.Style {
 	return lipgloss.NewStyle().SetString(s).Foreground(lipgloss.Color(color)).Bold(true)
 }
@@ -101,16 +111,18 @@ func GetOSIcon() lipgloss.Style {
 type HyperlinkFunc func(link, renderedText string) string
 
 type TermLogger struct {
-	slogOptions      *slog.HandlerOptions
-	styles           *Styles
-	writer           io.Writer
-	renderOpts       []termenv.OutputOption
-	renderer         *lipgloss.Renderer
-	name             string
-	hyperlinkFunc    HyperlinkFunc
-	nameColor        lipgloss.Color // Map to cache colors for names
-	showOSIcon       bool           // Whether to show OS icon
-	enableNameColors bool           // Whether to enable name colors
+	slogOptions                *slog.HandlerOptions
+	styles                     *Styles
+	writer                     io.Writer
+	renderOpts                 []termenv.OutputOption
+	renderer                   *lipgloss.Renderer
+	name                       string
+	hyperlinkFunc              HyperlinkFunc
+	nameColor                  lipgloss.Color            // Map to cache colors for names
+	showOSIcon                 bool                      // Whether to show OS icon
+	enableNameColors           bool                      // Whether to enable name colors
+	enableDebugPatternColoring bool                      // Whether to enable debug pattern coloring
+	patternColorCache          map[string]lipgloss.Color // Cache for deterministic colors
 }
 
 // Generate a deterministic neon color from a string
@@ -154,15 +166,17 @@ func generateDeterministicNeonColor(s string) lipgloss.Color {
 
 func NewTermLogger(writer io.Writer, sopts *slog.HandlerOptions, opts ...TermLoggerOption) *TermLogger {
 	l := &TermLogger{
-		writer:           writer,
-		slogOptions:      sopts,
-		styles:           DefaultStyles(),
-		renderOpts:       []termenv.OutputOption{},
-		name:             "",
-		hyperlinkFunc:    stackerr.Hyperlink,
-		enableNameColors: false,
-		nameColor:        "",
-		showOSIcon:       false,
+		writer:                     writer,
+		slogOptions:                sopts,
+		styles:                     DefaultStyles(),
+		renderOpts:                 []termenv.OutputOption{},
+		name:                       "",
+		hyperlinkFunc:              stackerr.Hyperlink,
+		enableNameColors:           false,
+		nameColor:                  "",
+		showOSIcon:                 false,
+		enableDebugPatternColoring: false,
+		patternColorCache:          make(map[string]lipgloss.Color),
 	}
 	for _, opt := range opts {
 		opt(l)
@@ -188,6 +202,51 @@ func (l *TermLogger) render(s lipgloss.Style, strs ...string) string {
 
 func (l *TermLogger) renderFunc(s lipgloss.Style, strs string) string {
 	return s.Renderer(l.renderer).Render(strs)
+}
+
+// getOrCreateColor gets a color from cache or creates a new one
+func (l *TermLogger) getOrCreateColor(key string) lipgloss.Color {
+	color, exists := l.patternColorCache[key]
+	if !exists {
+		color = generateDeterministicNeonColor(key)
+		l.patternColorCache[key] = color
+	}
+	return color
+}
+
+// colorizeDebugPattern applies special coloring to debug messages matching pattern
+func (l *TermLogger) colorizeDebugPattern(message string) string {
+	if !l.enableDebugPatternColoring {
+		return message
+	}
+
+	matches := debugPatternRegex.FindStringSubmatch(message)
+	if matches == nil || len(matches) != 4 {
+		return message
+	}
+
+	// Extract components preserving exact spaces
+	firstPart := matches[1]  // Part before the colon (preserve all spaces)
+	secondPart := matches[2] // Part between colon and bracket (preserve all spaces)
+	content := matches[3]    // Content inside brackets (preserve all spaces)
+
+	// For color generation, use trimmed versions to ensure consistent colors
+	// while still preserving display spaces
+	firstPartTrimmed := strings.TrimSpace(firstPart)
+	secondPartTrimmed := strings.TrimSpace(secondPart)
+
+	// Get deterministic colors for each component using trimmed versions for consistency
+	firstPartColor := l.getOrCreateColor(firstPartTrimmed)
+	secondPartColor := l.getOrCreateColor(secondPartTrimmed)
+	contentColor := l.getOrCreateColor(strings.TrimSpace(content))
+
+	// Create styled components with original spacing preserved
+	styledFirstPart := l.render(lipgloss.NewStyle().Foreground(firstPartColor).Bold(true), firstPart)
+	styledSecondPart := l.render(lipgloss.NewStyle().Foreground(secondPartColor).Bold(true), secondPart)
+	styledContent := l.render(lipgloss.NewStyle().Foreground(contentColor), content)
+
+	// Reconstruct the message with styles, exactly preserving original format and spacing
+	return fmt.Sprintf("%s:%s[%s]", styledFirstPart, styledSecondPart, styledContent)
 }
 
 const (
@@ -246,12 +305,34 @@ func (l *TermLogger) Handle(ctx context.Context, r slog.Record) error {
 
 	// 3. Source (if requested).
 	if l.slogOptions != nil && l.slogOptions.AddSource {
-		b.WriteString(RenderEnhancedSource(stackerr.NewEnhancedSource(r.PC), l.styles, l.renderFunc, l.hyperlinkFunc))
+		source := stackerr.NewEnhancedSource(r.PC)
+		// r.AddAttrs(slog.Attr{
+		// 	Key:   "source.raw_func",
+		// 	Value: slog.StringValue(source.RawFunc),
+		// }, slog.Attr{
+		// 	Key:   "source.raw_file_path",
+		// 	Value: slog.StringValue(source.RawFilePath),
+		// }, slog.Attr{
+		// 	Key:   "source.raw_file_line",
+		// 	Value: slog.IntValue(source.RawFileLine),
+		// }, slog.Attr{
+		// 	Key:   "source.enhanced_func",
+		// 	Value: slog.StringValue(source.EnhancedFunc),
+		// }, slog.Attr{
+		// 	Key:   "source.enhanced_pkg",
+		// 	Value: slog.StringValue(source.EnhancedPkg),
+		// })
+		b.WriteString(RenderEnhancedSource(source, l.styles, l.renderFunc, l.hyperlinkFunc))
 		b.WriteByte(' ')
 	}
 
-	// 4. Message.
-	msg := l.render(levelStyle.UnsetString().UnsetMaxWidth().UnsetBold(), r.Message)
+	// 4. Message with special formatting for debug level if enabled
+	var msg string
+	if r.Level == slog.LevelDebug && l.enableDebugPatternColoring {
+		msg = l.colorizeDebugPattern(r.Message)
+	} else {
+		msg = l.render(levelStyle.UnsetString().UnsetMaxWidth().UnsetBold(), r.Message)
+	}
 	b.WriteString(msg)
 
 	// 5. Attributes (key=value ...).

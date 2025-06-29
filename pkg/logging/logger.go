@@ -191,7 +191,10 @@ func WithDevTermHanlder(writer io.Writer) OptLoggerOptsSetter {
 	return func(o *LoggerOpts) {
 		o.delayedHandlerCreatorOpts = append(o.delayedHandlerCreatorOpts, func(o *LoggerOpts) {
 			if os.Getenv("TERM") == "linux" {
-				os.Setenv("TERM", "xterm-256color") // override linux term to 256 color
+				// override linux term colors
+				// obv this is a hack but okay for the specific situation we need it for (all raw logs viewed in iTerm2)
+				os.Setenv("TERM", "xterm-256color")
+				os.Setenv("COLORTERM", "truecolor")
 			}
 			o.handlers = append(o.handlers, slogdevterm.NewTermLogger(writer, o.handlerOptions,
 				slogdevterm.WithLoggerName(o.processName),
@@ -199,6 +202,7 @@ func WithDevTermHanlder(writer io.Writer) OptLoggerOptsSetter {
 				slogdevterm.WithRenderOption(termenv.WithTTY(true)),
 				slogdevterm.WithEnableLoggerNameColor(true),
 				slogdevterm.WithOSIcon(true),
+				slogdevterm.WithDebugPatternColoring(true),
 			))
 		})
 	}

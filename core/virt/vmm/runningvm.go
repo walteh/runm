@@ -79,7 +79,7 @@ func (r *RunningVM[VM]) GuestService(ctx context.Context) (*grpcruntime.GRPCClie
 					slog.InfoContext(ctx, "dialing vsock", "port", constants.RunmGuestServerVsockPort, "ignored_addr", addr)
 					return conn, nil
 				}),
-				grpc.WithUnaryInterceptor(grpcerr.UnaryClientInterceptor()),
+				grpc.WithUnaryInterceptor(grpcerr.UnaryClientInterceptor),
 				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024 * 1024 * 10)),
 			}
 			if logging.GetGlobalOtelInstances() != nil {
@@ -392,7 +392,7 @@ func (rvm *RunningVM[VM]) SetupHostService(ctx context.Context) error {
 
 	grpcServer := grpc.NewServer(
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
-		grpc.ChainUnaryInterceptor(grpcerr.UnaryServerInterceptor()),
+		grpc.ChainUnaryInterceptor(grpcerr.UnaryServerInterceptor),
 		grpc.ChainStreamInterceptor(grpcerr.StreamServerInterceptor()),
 	)
 
