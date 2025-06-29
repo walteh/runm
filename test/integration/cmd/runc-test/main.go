@@ -95,8 +95,6 @@ func main() {
 		xdgDirUsed = true
 	}
 
-	_ = logging.NewDefaultDevLogger("runc", os.Stdout)
-
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
 			Name:  "debug",
@@ -164,7 +162,15 @@ func main() {
 			return err
 		}
 
-		return configLogrus(context)
+		opts := []logging.OptLoggerOptsSetter{}
+
+		if file := context.GlobalString("log"); file != "" {
+			opts = append(opts, logging.WithFileHandler(file))
+		}
+
+		_ = logging.NewDefaultDevLogger("runc", os.Stdout, opts...)
+
+		return nil
 	}
 
 	// If the command returns an error, cli takes upon itself to print

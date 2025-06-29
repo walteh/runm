@@ -7,6 +7,15 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// Package slogdevterm provides a terminal-based logger for slog that supports colors, styles, and OS icons.
+//
+// Features:
+// - Colored output based on log levels
+// - Custom styles for different log components
+// - Stack trace rendering for errors
+// - OS icons to identify the platform
+// - Colorized logger names for better visual differentiation
+
 // Styles defines the styles for the text logger.
 type Styles struct {
 	// Timestamp is the style for timestamps.
@@ -186,7 +195,26 @@ func DefaultStyles() *Styles {
 				BorderStyle(lipgloss.RoundedBorder()),
 		},
 		Error: ErrorStyles{
-			Main:     lipgloss.NewStyle().Foreground(LevelErrorColor).Bold(true),
+			Main: lipgloss.NewStyle().Foreground(LevelErrorColor).Bold(true).Transform(func(s string) string {
+				var b strings.Builder
+
+				// indent the wrapped lines by a tab
+				indent := "\n\t"
+				wrapAt := 150
+
+				// wrap at 150 characters
+				for len(s) > wrapAt {
+					b.WriteString(s[:wrapAt])
+					b.WriteString(indent)
+					s = s[wrapAt:]
+					wrapAt = 145
+				}
+
+				// write whatever is left
+				b.WriteString(s)
+
+				return b.String()
+			}),
 			Arrow:    lipgloss.NewStyle().Foreground(ErrorTraceArrowColor).Bold(true),
 			Function: lipgloss.NewStyle().Foreground(ErrorFunctionColor).Bold(true),
 			Package:  lipgloss.NewStyle().Foreground(ErrorPackageColor).Bold(true),
@@ -196,6 +224,7 @@ func DefaultStyles() *Styles {
 			Container: lipgloss.NewStyle().
 				Padding(1, 2).
 				Margin(1, 0).
+				MaxWidth(160).
 				BorderForeground(LevelErrorColor).
 				BorderStyle(lipgloss.RoundedBorder()),
 		},

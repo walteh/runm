@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"reflect"
+	"runtime"
 	"strings"
 	"time"
 
@@ -52,17 +53,64 @@ func WithHyperlinkFunc(fn func(link, renderedText string) string) TermLoggerOpti
 	}
 }
 
+func WithOSIcon(enabled bool) TermLoggerOption {
+	return func(l *TermLogger) {
+		l.showOSIcon = enabled
+	}
+}
+
+func WithLoggerNameColor(color lipgloss.Color) TermLoggerOption {
+	return func(l *TermLogger) {
+		l.nameColor = color
+	}
+}
+
+func WithEnableLoggerNameColor(enabled bool) TermLoggerOption {
+	return func(l *TermLogger) {
+		l.enableNameColors = enabled
+	}
+}
+
+func newColoredString(s string, color string) lipgloss.Style {
+	return lipgloss.NewStyle().SetString(s).Foreground(lipgloss.Color(color)).Bold(true)
+}
+
+// simple linux =  \U000F033D"
+// OSIconMap maps OS identifiers to unicode icons \udb80\udf3d
+var OSIconMap = map[string]lipgloss.Style{
+	"darwin":  newColoredString("\uf302", "#FFD700"), // light green Apple logo for macOS
+	"linux":   newColoredString("\ue712", "#FF9E80"), // orange Penguin for Linux
+	"windows": newColoredString("\ue70f", "#40DFFF"), // blue Window for Windows
+	"freebsd": newColoredString("\uf30c", "white"),   // green BSD Daemon for FreeBSD
+
+	"openbsd": newColoredString("\uf328", "white"),  // purple Pufferfish for OpenBSD
+	"android": newColoredString("\ue70e", "white"),  // Robot for Android
+	"ios":     newColoredString("\uf0037", "white"), // Mobile phone for iOS
+	"js":      newColoredString("\uf2ef", "white"),  // Web for JavaScript runtime
+}
+
+// GetOSIcon returns the appropriate icon for the current OS
+func GetOSIcon() lipgloss.Style {
+	icon, exists := OSIconMap[runtime.GOOS]
+	if !exists {
+		return newColoredString("\uf059", "white") // question mark for unknown OS
+	}
+	return icon
+}
+
 type HyperlinkFunc func(link, renderedText string) string
 
 type TermLogger struct {
-	slogOptions   *slog.HandlerOptions
-	styles        *Styles
-	writer        io.Writer
-	renderOpts    []termenv.OutputOption
-	renderer      *lipgloss.Renderer
-	name          string
-	hyperlinkFunc HyperlinkFunc
-	nameColors    map[string]lipgloss.Color // Map to cache colors for names
+	slogOptions      *slog.HandlerOptions
+	styles           *Styles
+	writer           io.Writer
+	renderOpts       []termenv.OutputOption
+	renderer         *lipgloss.Renderer
+	name             string
+	hyperlinkFunc    HyperlinkFunc
+	nameColor        lipgloss.Color // Map to cache colors for names
+	showOSIcon       bool           // Whether to show OS icon
+	enableNameColors bool           // Whether to enable name colors
 }
 
 // Generate a deterministic neon color from a string
@@ -74,23 +122,7 @@ func generateDeterministicNeonColor(s string) lipgloss.Color {
 
 	// Enhanced color palette - larger variety of vibrant colors
 	neonColors := []string{
-		// Primary Neons
-		"#FF00FF", // Magenta
-		"#00FFFF", // Cyan
-		"#FF0000", // Red
-		"#00FF00", // Green
-		"#0000FF", // Blue
-		"#FFFF00", // Yellow
 
-		// Secondary Neons
-		"#FF4500", // Orange Red
-		"#9D00FF", // Purple
-		"#FF0080", // Hot Pink
-		"#00FF80", // Spring Green
-		"#00B0FF", // Bright Blue
-		"#80FF00", // Lime Green
-
-		// Tertiary Neons
 		"#FF79E1", // Neon Pink
 		"#7FFFD4", // Aquamarine
 		"#FFD700", // Gold
@@ -104,20 +136,14 @@ func generateDeterministicNeonColor(s string) lipgloss.Color {
 		"#FF9E80", // Coral
 		"#F740FF", // Fuchsia
 		"#40DFFF", // Electric Blue
-		"#8B78E6", // Medium Purple
+		"#9D00FF", // Medium Purple
 		"#00BFFF", // Deep Sky Blue
 		"#CCFF00", // Electric Lime
 		"#FF6037", // Outrageous Orange
 		"#00CCCC", // Caribbean Green
 		"#B3FF00", // Spring Bud
-		"#FF4ADE", // Purple Pizzazz
+		"#AE00FB", // Purple Pizzazz
 
-		// Rich Jewel Tones
-		"#3300FF", // Ultramarine
-		"#00FF9C", // Caribbean Green
-		"#FF3800", // Coquelicot
-		"#56FF0D", // Screamin' Green
-		"#AE00FB", // Electric Violet
 	}
 
 	// Use the hash to select a color
@@ -128,16 +154,22 @@ func generateDeterministicNeonColor(s string) lipgloss.Color {
 
 func NewTermLogger(writer io.Writer, sopts *slog.HandlerOptions, opts ...TermLoggerOption) *TermLogger {
 	l := &TermLogger{
-		writer:        writer,
-		slogOptions:   sopts,
-		styles:        DefaultStyles(),
-		renderOpts:    []termenv.OutputOption{},
-		name:          "",
-		hyperlinkFunc: stackerr.Hyperlink,
-		nameColors:    make(map[string]lipgloss.Color),
+		writer:           writer,
+		slogOptions:      sopts,
+		styles:           DefaultStyles(),
+		renderOpts:       []termenv.OutputOption{},
+		name:             "",
+		hyperlinkFunc:    stackerr.Hyperlink,
+		enableNameColors: false,
+		nameColor:        "",
+		showOSIcon:       false,
 	}
 	for _, opt := range opts {
 		opt(l)
+	}
+
+	if l.nameColor == "" && l.enableNameColors {
+		l.nameColor = generateDeterministicNeonColor(l.name)
 	}
 
 	l.renderer = lipgloss.NewRenderer(l.writer, l.renderOpts...)
@@ -169,8 +201,6 @@ func (l *TermLogger) Handle(ctx context.Context, r slog.Record) error {
 	var b strings.Builder
 	var appendageBuilder strings.Builder
 
-	enableNameColors := false
-
 	// 0. Name.
 	if l.name != "" {
 		name := l.name
@@ -180,21 +210,20 @@ func (l *TermLogger) Handle(ctx context.Context, r slog.Record) error {
 
 		prefixStyle := l.styles.Prefix
 
-		if enableNameColors {
-
+		if l.enableNameColors {
 			// Get or generate a color for this name
-			nameColor, exists := l.nameColors[name]
-			if !exists {
-				// Generate a deterministic color based on the name
-				nameColor = generateDeterministicNeonColor(name)
-				l.nameColors[name] = nameColor
-			}
-
-			prefixStyle = prefixStyle.Foreground(nameColor).Bold(true).Faint(true)
+			prefixStyle = prefixStyle.Foreground(l.nameColor).Bold(true).Faint(false)
 		}
 
 		// Create a style with the deterministic color
 		b.WriteString(l.render(prefixStyle, strings.ToUpper(name)))
+
+		// Add OS icon if enabled
+		if l.showOSIcon {
+			b.WriteString(" ")
+			b.WriteString(l.render(GetOSIcon(), ""))
+		}
+
 		b.WriteByte(' ')
 	}
 
@@ -256,20 +285,6 @@ func (l *TermLogger) Handle(ctx context.Context, r slog.Record) error {
 					val := fmt.Sprintf("type: %T - %v", a.Value.Any(), a.Value.Any())
 					valColored = l.render(valStyle, val)
 				}
-				// } else if jsonData, isJSON := isJSONString(a.Value.Any()); isJSON {
-				// 	// Check for JSON strings or bytes that should be pretty-printed
-				// 	appendageBuilder.WriteString(JSONToTreeWithTitle([]byte(jsonData), a.Key, l.styles, l.renderFunc))
-				// 	appendageBuilder.WriteString("\n")
-				// 	valColored = l.render(l.styles.ValueAppendage, "󰘦 "+a.Key)
-				// } else if isStructLike(a.Value.Any()) {
-				// 	// Handle structs, maps, slices, and other complex types
-				// 	// Option 1: Tree-style display (original)
-				// 	appendageBuilder.WriteString(StructToTreeWithTitle(a.Value.Any(), a.Key, l.styles, l.renderFunc))
-
-				// 	// Option 2: GoBoxDump display
-				// 	// appendageBuilder.WriteString(GoBoxDump(a.Value.Any(), a.Key, l.styles, l.renderFunc))
-				// 	appendageBuilder.WriteString("\n")
-				// 	valColored = l.render(l.styles.ValueAppendage, "󰙅 "+a.Key)
 			} else {
 				// Value styling (supports per-key overrides).
 				valStyle, ok := l.styles.Values[a.Key]
