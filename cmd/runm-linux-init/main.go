@@ -48,7 +48,7 @@ var (
 )
 
 const (
-	serviceName = "runm-init"
+	serviceName = "runm[init]"
 )
 
 func init() {

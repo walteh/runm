@@ -168,7 +168,7 @@ func main() {
 			opts = append(opts, logging.WithFileHandler(file))
 		}
 
-		_ = logging.NewDefaultDevLogger("runc", os.Stdout, opts...)
+		_ = logging.NewDefaultDevLogger(fmt.Sprintf("runc[%s]", context.Args().First()), os.Stdout, opts...)
 
 		return nil
 	}

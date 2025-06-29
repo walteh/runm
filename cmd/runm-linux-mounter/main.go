@@ -48,7 +48,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	logger := logging.NewDefaultDevLogger("runm-linux-mounter", os.Stdout)
+	logger := logging.NewDefaultDevLogger("runm[mounter]", os.Stdout)
 
 	ctx = slogctx.NewCtx(ctx, logger)
 

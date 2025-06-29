@@ -29,6 +29,7 @@ tool (
 	github.com/kazhuravlev/options-gen/cmd/options-gen
 	github.com/n-r-w/protodep
 	github.com/oligot/go-mod-upgrade
+	github.com/solatis/mcp-gopls/cmd/mcp-gopls
 	github.com/vektra/mockery/v3
 	github.com/walteh/protoc-gen/protoc-gen-go-opaque
 	github.com/walteh/protoc-gen/protoc-gen-go-slog
@@ -412,7 +413,7 @@ require (
 	github.com/mailru/easyjson v0.9.0 // indirect
 	github.com/maratori/testableexamples v1.0.0 // indirect
 	github.com/maratori/testpackage v1.1.1 // indirect
-	github.com/mark3labs/mcp-go v0.30.1 // indirect
+	github.com/mark3labs/mcp-go v0.32.0 // indirect
 	github.com/matoous/godox v1.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -524,6 +525,7 @@ require (
 	github.com/sivchari/tenv v1.12.1 // indirect
 	github.com/skeema/knownhosts v1.3.1 // indirect
 	github.com/slack-go/slack v0.17.0 // indirect
+	github.com/solatis/mcp-gopls v0.0.0-20250624100817-39e8cfa9a6ed // indirect
 	github.com/sonatard/noctx v0.1.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/sourcegraph/go-diff v0.7.0 // indirect

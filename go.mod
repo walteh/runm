@@ -15,9 +15,9 @@ replace (
 	github.com/containerd/nerdctl/v2 => ../nerdctl
 	github.com/containerd/ttrpc => ../ttrpc
 	github.com/containers/gvisor-tap-vsock => ../gvisor-tap-vsock
+	github.com/opencontainers/runc => ../runc
 	// github.com/moby/buildkit => ../buildkit
 	gitlab.com/tozd/go/errors => ../go-errors
-	github.com/opencontainers/runc => ../runc
 )
 
 replace gvisor.dev/gvisor => gvisor.dev/gvisor v0.0.0-20250611222258-0fe9a4bf489c
@@ -57,7 +57,7 @@ require (
 	github.com/moby/sys/userns v0.1.0
 	github.com/muesli/termenv v0.16.0
 	github.com/nxadm/tail v1.4.11
-	github.com/opencontainers/cgroups v0.0.1
+	github.com/opencontainers/cgroups v0.0.2
 	github.com/opencontainers/runc v1.2.6
 	github.com/opencontainers/runtime-spec v1.2.1
 	github.com/opencontainers/selinux v1.12.0
@@ -109,7 +109,6 @@ require (
 	github.com/charmbracelet/x/cellbuf v0.0.13-0.20250311204145-2c3ea96c31dd // indirect
 	github.com/charmbracelet/x/term v0.2.1 // indirect
 	github.com/checkpoint-restore/checkpointctl v1.3.0 // indirect
-	github.com/checkpoint-restore/go-criu/v6 v6.3.0 // indirect
 	github.com/checkpoint-restore/go-criu/v7 v7.2.0 // indirect
 	github.com/compose-spec/compose-go/v2 v2.6.4 // indirect
 	github.com/containerd/accelerated-container-image v1.3.0 // indirect
@@ -181,6 +180,7 @@ require (
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/locker v1.0.1 // indirect
 	github.com/moby/spdystream v0.5.0 // indirect
+	github.com/moby/sys/capability v0.4.0 // indirect
 	github.com/moby/sys/mount v0.3.4 // indirect
 	github.com/moby/sys/sequential v0.6.0 // indirect
 	github.com/moby/sys/signal v0.7.1 // indirect
@@ -219,7 +219,7 @@ require (
 	github.com/samber/lo v1.51.0 // indirect
 	github.com/samber/slog-common v0.19.0 // indirect
 	github.com/sasha-s/go-deadlock v0.3.5 // indirect
-	github.com/seccomp/libseccomp-golang v0.10.0 // indirect
+	github.com/seccomp/libseccomp-golang v0.11.0 // indirect
 	github.com/smallstep/pkcs7 v0.1.1 // indirect
 	github.com/sorairolake/lzip-go v0.3.5 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect

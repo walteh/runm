@@ -9,8 +9,8 @@ import (
 	"log/slog"
 	"os"
 	"reflect"
-	"regexp"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -23,7 +23,25 @@ import (
 var _ slog.Handler = (*TermLogger)(nil)
 
 // Pattern for special debug log formatting: WORD:WORD[content]
-var debugPatternRegex = regexp.MustCompile(`^([^:]+):([^\[]+)\[(.*)\]$`)
+func ParseSegments(s string) ([]string, bool) {
+	// Find the first "[" and the last "]"
+	open := strings.IndexByte(s, '[')
+	close := strings.LastIndexByte(s, ']')
+	if open < 0 || close < 0 || close <= open {
+		return nil, false
+	}
+
+	// Extract prefix and suffix
+	prefix := s[:open]
+	suffix := s[open+1 : close]
+
+	// Split the prefix on ":" (this will yield all m1…mN)
+	parts := strings.Split(prefix, ":")
+
+	// Append the bracketed part as the final element
+	parts = append(parts, suffix)
+	return parts, true
+}
 
 type TermLoggerOption = func(*TermLogger)
 
@@ -215,43 +233,98 @@ func (l *TermLogger) getOrCreateColor(key string) lipgloss.Color {
 }
 
 // colorizeDebugPattern applies special coloring to debug messages matching pattern
-func (l *TermLogger) colorizeDebugPattern(message string) string {
+func (l *TermLogger) colorizeDebugPattern(message string, maxWidth int, force bool) (outstr string, ok bool) {
+
+	fallback := func() (string, bool) {
+
+		if maxWidth <= 0 {
+			return message, false
+		}
+		if maxWidth > len(message) {
+			return message + strings.Repeat(" ", maxWidth-len(message)), false
+		}
+		return message[:maxWidth], false
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("Recovered in f [message: %s] [maxWidth: %d] [force: %t] [r: %v]\n", message, maxWidth, force, r)
+			debug.PrintStack()
+			outstr, ok = fallback()
+		}
+	}()
+
 	if !l.enableDebugPatternColoring {
-		return message
+		return fallback()
 	}
 
-	matches := debugPatternRegex.FindStringSubmatch(message)
-	if matches == nil || len(matches) != 4 {
-		return message
+	parts, ok := ParseSegments(message)
+	if !ok {
+		if force {
+			fbs, _ := fallback()
+			return l.render(lipgloss.NewStyle().MaxWidth(maxWidth).Foreground(l.getOrCreateColor(fbs)).Bold(true), fbs), true
+		}
+		return fallback()
 	}
 
-	// Extract components preserving exact spaces
-	firstPart := matches[1]  // Part before the colon (preserve all spaces)
-	secondPart := matches[2] // Part between colon and bracket (preserve all spaces)
-	content := matches[3]    // Content inside brackets (preserve all spaces)
+	if len(parts) == 1 {
 
-	// For color generation, use trimmed versions to ensure consistent colors
-	// while still preserving display spaces
-	firstPartTrimmed := strings.TrimSpace(firstPart)
-	secondPartTrimmed := strings.TrimSpace(secondPart)
+		return fallback()
+	}
 
-	// Get deterministic colors for each component using trimmed versions for consistency
-	firstPartColor := l.getOrCreateColor(firstPartTrimmed)
-	secondPartColor := l.getOrCreateColor(secondPartTrimmed)
-	contentColor := l.getOrCreateColor(strings.TrimSpace(content))
+	overflow := (-1 * maxWidth) - len(parts) - 1
+	if maxWidth > 0 {
+		for _, part := range parts {
+			overflow += len(part)
+		}
+	}
 
-	// Create styled components with original spacing preserved
-	styledFirstPart := l.render(lipgloss.NewStyle().Foreground(firstPartColor).Bold(true), firstPart)
-	styledSecondPart := l.render(lipgloss.NewStyle().Foreground(secondPartColor).Bold(true), secondPart)
-	styledContent := l.render(lipgloss.NewStyle().Foreground(contentColor), content)
+	// cut parts off starting with the first on, convertint it to one character
+	for i := 0; overflow >= 0 && i < len(parts); i++ {
+		saved := len(parts[i]) - 1
+		parts[i] = parts[i][:1]
+		overflow -= saved
+		if overflow <= 0 {
+			break
+		}
+	}
 
-	// Reconstruct the message with styles, exactly preserving original format and spacing
-	return fmt.Sprintf("%s:%s[%s]", styledFirstPart, styledSecondPart, styledContent)
+	if overflow > 0 {
+		// give up and just return the first maxWidth characters
+		return fallback()
+	}
+
+	out := strings.Builder{}
+
+	charsout := 0
+	for i, part := range parts {
+		if i == len(parts)-1 {
+			out.WriteString("[")
+			charsout += 1
+		}
+
+		out.WriteString(l.render(lipgloss.NewStyle().Foreground(l.getOrCreateColor(part)).Bold(true), part))
+		charsout += len(part)
+
+		if i == len(parts)-1 {
+			charsout += 1
+			out.WriteString("]")
+		} else if i < len(parts)-2 {
+			out.WriteByte(':')
+			charsout += 1
+		}
+	}
+
+	if charsout < maxWidth {
+		out.WriteString(strings.Repeat(" ", maxWidth-charsout))
+	}
+
+	return out.String(), true
 }
 
 const (
 	timeFormat    = "15:04:05.0000 MST"
-	maxNameLength = 10
+	maxNameLength = 15
 )
 
 func (l *TermLogger) Handle(ctx context.Context, r slog.Record) error {
@@ -262,20 +335,16 @@ func (l *TermLogger) Handle(ctx context.Context, r slog.Record) error {
 
 	// 0. Name.
 	if l.name != "" {
-		name := l.name
-		if len(name) > maxNameLength {
-			name = name[:maxNameLength]
-		}
+		// name := l.name
+		// if len(name) > maxNameLength {
+		// 	name = name[:maxNameLength]
+		// }
 
-		prefixStyle := l.styles.Prefix
+		name := strings.ToUpper(l.name)
 
-		if l.enableNameColors {
-			// Get or generate a color for this name
-			prefixStyle = prefixStyle.Foreground(l.nameColor).Bold(true).Faint(false)
-		}
+		coloredName, _ := l.colorizeDebugPattern(name, maxNameLength, true)
 
-		// Create a style with the deterministic color
-		b.WriteString(l.render(prefixStyle, strings.ToUpper(name)))
+		b.WriteString(coloredName)
 
 		// Add OS icon if enabled
 		if l.showOSIcon {
@@ -329,7 +398,7 @@ func (l *TermLogger) Handle(ctx context.Context, r slog.Record) error {
 	// 4. Message with special formatting for debug level if enabled
 	var msg string
 	if r.Level == slog.LevelDebug && l.enableDebugPatternColoring {
-		msg = l.colorizeDebugPattern(r.Message)
+		msg, _ = l.colorizeDebugPattern(r.Message, -1, false)
 	} else {
 		msg = l.render(levelStyle.UnsetString().UnsetMaxWidth().UnsetBold(), r.Message)
 	}
