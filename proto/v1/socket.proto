@@ -72,9 +72,11 @@ message AllocateSocketStreamResponse {
 }
 
 message AllocateIORequest {
-	bool open_stdin  = 1;
-	bool open_stdout = 2;
-	bool open_stderr = 3;
+	bool  open_stdin  = 1;
+	bool  open_stdout = 2;
+	bool  open_stderr = 3;
+	int32 io_uid      = 4;
+	int32 io_gid      = 5;
 }
 
 message AllocateIOResponse {

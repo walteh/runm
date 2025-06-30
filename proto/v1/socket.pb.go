@@ -534,6 +534,8 @@ type AllocateIORequest struct {
 	xxx_hidden_OpenStdin  bool                   `protobuf:"varint,1,opt,name=open_stdin,json=openStdin"`
 	xxx_hidden_OpenStdout bool                   `protobuf:"varint,2,opt,name=open_stdout,json=openStdout"`
 	xxx_hidden_OpenStderr bool                   `protobuf:"varint,3,opt,name=open_stderr,json=openStderr"`
+	xxx_hidden_IoUid      int32                  `protobuf:"varint,4,opt,name=io_uid,json=ioUid"`
+	xxx_hidden_IoGid      int32                  `protobuf:"varint,5,opt,name=io_gid,json=ioGid"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -584,6 +586,20 @@ func (x *AllocateIORequest) GetOpenStderr() bool {
 	return false
 }
 
+func (x *AllocateIORequest) GetIoUid() int32 {
+	if x != nil {
+		return x.xxx_hidden_IoUid
+	}
+	return 0
+}
+
+func (x *AllocateIORequest) GetIoGid() int32 {
+	if x != nil {
+		return x.xxx_hidden_IoGid
+	}
+	return 0
+}
+
 func (x *AllocateIORequest) SetOpenStdin(v bool) {
 	x.xxx_hidden_OpenStdin = v
 }
@@ -596,12 +612,22 @@ func (x *AllocateIORequest) SetOpenStderr(v bool) {
 	x.xxx_hidden_OpenStderr = v
 }
 
+func (x *AllocateIORequest) SetIoUid(v int32) {
+	x.xxx_hidden_IoUid = v
+}
+
+func (x *AllocateIORequest) SetIoGid(v int32) {
+	x.xxx_hidden_IoGid = v
+}
+
 type AllocateIORequest_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
 	OpenStdin  bool
 	OpenStdout bool
 	OpenStderr bool
+	IoUid      int32
+	IoGid      int32
 }
 
 func (b0 AllocateIORequest_builder) Build() *AllocateIORequest {
@@ -611,6 +637,8 @@ func (b0 AllocateIORequest_builder) Build() *AllocateIORequest {
 	x.xxx_hidden_OpenStdin = b.OpenStdin
 	x.xxx_hidden_OpenStdout = b.OpenStdout
 	x.xxx_hidden_OpenStderr = b.OpenStderr
+	x.xxx_hidden_IoUid = b.IoUid
+	x.xxx_hidden_IoGid = b.IoGid
 	return m0
 }
 
@@ -1760,14 +1788,16 @@ const file_v1_socket_proto_rawDesc = "" +
 	"\x1bAllocateSocketStreamRequest\"T\n" +
 	"\x1cAllocateSocketStreamResponse\x124\n" +
 	"\vsocket_type\x18\x01 \x01(\v2\x13.runm.v1.SocketTypeR\n" +
-	"socketType\"t\n" +
+	"socketType\"\xa2\x01\n" +
 	"\x11AllocateIORequest\x12\x1d\n" +
 	"\n" +
 	"open_stdin\x18\x01 \x01(\bR\topenStdin\x12\x1f\n" +
 	"\vopen_stdout\x18\x02 \x01(\bR\n" +
 	"openStdout\x12\x1f\n" +
 	"\vopen_stderr\x18\x03 \x01(\bR\n" +
-	"openStderr\"<\n" +
+	"openStderr\x12\x15\n" +
+	"\x06io_uid\x18\x04 \x01(\x05R\x05ioUid\x12\x15\n" +
+	"\x06io_gid\x18\x05 \x01(\x05R\x05ioGid\"<\n" +
 	"\x12AllocateIOResponse\x12&\n" +
 	"\x0fio_reference_id\x18\x01 \x01(\tR\rioReferenceId\"\x18\n" +
 	"\x16AllocateConsoleRequest\"K\n" +

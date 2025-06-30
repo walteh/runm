@@ -190,6 +190,7 @@ type AllocatedSocketReference interface {
 
 type FileConn interface {
 	syscall.Conn
+	net.Conn
 	Read(p []byte) (n int, err error)
 	Write(p []byte) (n int, err error)
 	Close() error

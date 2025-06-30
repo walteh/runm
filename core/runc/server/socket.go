@@ -105,7 +105,7 @@ func (s *Server) AllocateConsole(ctx context.Context, req *runmv1.AllocateConsol
 
 func (s *Server) AllocateIO(ctx context.Context, req *runmv1.AllocateIORequest) (*runmv1.AllocateIOResponse, error) {
 	ioref := runtime.NewIoReferenceId()
-	pio, err := s.runtime.NewPipeIO(ctx, 0, 0)
+	pio, err := s.runtime.NewPipeIO(ctx, int(req.GetIoUid()), int(req.GetIoGid()))
 	if err != nil {
 		return nil, errors.Errorf("failed to allocate io: %w", err)
 	}

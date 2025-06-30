@@ -106,7 +106,7 @@ func newColoredString(s string, color string) lipgloss.Style {
 // simple linux =  \U000F033D"
 // OSIconMap maps OS identifiers to unicode icons \udb80\udf3d
 var OSIconMap = map[string]lipgloss.Style{
-	"darwin":  newColoredString("\uf302", "#FFD700"), // light green Apple logo for macOS
+	"darwin":  newColoredString("\uf302", "#00FA9A"), // light green Apple logo for macOS
 	"linux":   newColoredString("\ue712", "#FF9E80"), // orange Penguin for Linux
 	"windows": newColoredString("\ue70f", "#40DFFF"), // blue Window for Windows
 	"freebsd": newColoredString("\uf30c", "white"),   // green BSD Daemon for FreeBSD
@@ -158,34 +158,55 @@ func generateDeterministicNeonColor(s string) lipgloss.Color {
 	h.Write([]byte(s))
 	hash := h.Sum32()
 
-	// Enhanced color palette - larger variety of vibrant colors
+	// hash := sha256.Sum256([]byte(s))
+
 	neonColors := []string{
-
-		"#FF79E1", // Neon Pink
-		"#7FFFD4", // Aquamarine
+		// Reds & Oranges
+		"#FF0000", // Red
+		"#FF4500", // OrangeRed
+		"#FF6347", // Tomato
+		"#FF7F50", // Coral
 		"#FFD700", // Gold
-		"#1E90FF", // Dodger Blue
-		"#00FA9A", // Medium Spring Green
-		"#FA8072", // Salmon
-		"#E6FF00", // Acid Green
-		"#FF73B3", // Tickle Me Pink
 
-		// Vibrant Pastels
-		"#FF9E80", // Coral
-		"#F740FF", // Fuchsia
-		"#40DFFF", // Electric Blue
-		"#9D00FF", // Medium Purple
-		"#00BFFF", // Deep Sky Blue
-		"#CCFF00", // Electric Lime
-		"#FF6037", // Outrageous Orange
-		"#00CCCC", // Caribbean Green
-		"#B3FF00", // Spring Bud
-		"#AE00FB", // Purple Pizzazz
+		// Pinks & Purples
+		"#FF1493", // DeepPink
+		"#FF69B4", // HotPink
+		"#BA55D3", // MediumOrchid
+		"#9370DB", // MediumPurple
+		"#DA70D6", // Orchid
 
+		// Yellows & Greens
+		"#ADFF2F", // GreenYellow
+		"#7FFF00", // Chartreuse
+		"#00FF00", // Lime
+		"#32CD32", // LimeGreen
+		"#00FA9A", // MediumSpringGreen
+
+		// Cyans & Blues
+		"#00FFFF", // Aqua
+		"#00CED1", // DarkTurquoise
+		"#1E90FF", // DodgerBlue
+		"#4169E1", // RoyalBlue
+		"#6495ED", // CornflowerBlue
+
+		// Teals & Aquas
+		"#20B2AA", // LightSeaGreen
+		"#40E0D0", // Turquoise
+		"#48D1CC", // MediumTurquoise
+		"#5F9EA0", // CadetBlue
+		"#00BFFF", // DeepSkyBlue
+
+		// Browns & Accents
+		"#D2691E", // Chocolate
+		"#FF8C00", // DarkOrange
+		"#DAA520", // GoldenRod
+		"#DC143C", // Crimson
+		// "#8B008B", // DarkMagenta
 	}
 
 	// Use the hash to select a color
-	index := hash % uint32(len(neonColors))
+	// index := big.NewInt(0).Mod(big.NewInt(0).SetBytes(hash[:]), big.NewInt(int64(len(neonColors)))).Int64()
+	index := int(hash) % len(neonColors)
 
 	return lipgloss.Color(neonColors[index])
 }
@@ -316,7 +337,9 @@ func (l *TermLogger) colorizeDebugPattern(message string, maxWidth int, force bo
 			charsout += 1
 		}
 
-		out.WriteString(l.render(lipgloss.NewStyle().Foreground(l.getOrCreateColor(part)).Bold(true), part))
+		color := l.getOrCreateColor(part)
+
+		out.WriteString(l.render(lipgloss.NewStyle().Foreground(color).Bold(true), part))
 		charsout += len(part)
 
 		if i == len(parts)-1 {

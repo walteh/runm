@@ -100,10 +100,12 @@ func (x *AllocateIORequest) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
 	}
-	attrs := make([]slog.Attr, 0, 3)
+	attrs := make([]slog.Attr, 0, 5)
 	attrs = append(attrs, slog.Bool("open_stdin", x.GetOpenStdin()))
 	attrs = append(attrs, slog.Bool("open_stdout", x.GetOpenStdout()))
 	attrs = append(attrs, slog.Bool("open_stderr", x.GetOpenStderr()))
+	attrs = append(attrs, slog.Int64("io_uid", int64(x.GetIoUid())))
+	attrs = append(attrs, slog.Int64("io_gid", int64(x.GetIoGid())))
 	return slog.GroupValue(attrs...)
 }
 

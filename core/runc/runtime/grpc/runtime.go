@@ -189,6 +189,8 @@ func (c *GRPCClientRuntime) NewPipeIO(ctx context.Context, ioUID, ioGID int, opt
 	ioReq.SetOpenStdin(ropts.OpenStdin)
 	ioReq.SetOpenStdout(ropts.OpenStdout)
 	ioReq.SetOpenStderr(ropts.OpenStderr)
+	ioReq.SetIoUid(int32(ioUID))
+	ioReq.SetIoGid(int32(ioGID))
 
 	sock, err := c.socketAllocatorGrpcService.AllocateIO(ctx, ioReq)
 	if err != nil {
