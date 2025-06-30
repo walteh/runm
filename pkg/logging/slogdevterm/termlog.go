@@ -99,6 +99,13 @@ func WithMultilineBoxes(enabled bool) TermLoggerOption {
 	}
 }
 
+func WithDelimiter(rune rune) TermLoggerOption {
+	return func(l *TermLogger) {
+		l.delimiter = rune
+		l.enableDelimiter = true
+	}
+}
+
 func newColoredString(s string, color string) lipgloss.Style {
 	return lipgloss.NewStyle().SetString(s).Foreground(lipgloss.Color(color)).Bold(true)
 }
@@ -138,6 +145,8 @@ type TermLogger struct {
 	slogOptions                *slog.HandlerOptions
 	styles                     *Styles
 	writer                     io.Writer
+	delimiter                  rune
+	enableDelimiter            bool
 	renderOpts                 []termenv.OutputOption
 	renderer                   *lipgloss.Renderer
 	name                       string
@@ -220,6 +229,8 @@ func NewTermLogger(writer io.Writer, sopts *slog.HandlerOptions, opts ...TermLog
 		name:                       "",
 		hyperlinkFunc:              stackerr.Hyperlink,
 		enableNameColors:           false,
+		enableDelimiter:            false,
+		delimiter:                  '\n',
 		colorProfile:               termenv.ANSI256,
 		nameColor:                  "",
 		showOSIcon:                 false,
@@ -539,9 +550,24 @@ func (l *TermLogger) Handle(ctx context.Context, r slog.Record) error {
 	}
 
 	_, err := fmt.Fprint(w, b.String())
+	if err != nil {
+		return err
+	}
+
 	if appendageBuilder.Len() > 0 {
 		_, err = fmt.Fprint(w, appendageBuilder.String())
+		if err != nil {
+			return err
+		}
 	}
+
+	if l.enableDelimiter {
+		_, err = w.Write([]byte{byte(l.delimiter)})
+		if err != nil {
+			return err
+		}
+	}
+
 	return err
 }
 

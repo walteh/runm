@@ -11,6 +11,7 @@ import (
 	"github.com/walteh/runm/core/runc/oom"
 	"github.com/walteh/runm/core/runc/runtime"
 	"github.com/walteh/runm/core/virt/vmm"
+	"github.com/walteh/runm/pkg/logging"
 	"github.com/walteh/runm/pkg/units"
 )
 
@@ -56,6 +57,8 @@ func NewRunmVMRuntime[VM vmm.VirtualMachine](
 		Platform:       units.PlatformLinuxARM64,
 		Bundle:         opts.Bundle,
 		HostOtlpPort:   opts.HostOtlpPort,
+		RawWriter:      logging.GetDefaultRawWriter(),
+		DelimWriter:    logging.GetDefaultDelimWriter(),
 	}
 
 	vm, err := vmm.NewOCIVirtualMachine(ctx, hpv, cfg)
@@ -63,7 +66,7 @@ func NewRunmVMRuntime[VM vmm.VirtualMachine](
 		return nil, err
 	}
 
-	slog.InfoContext(ctx, "created oci vm, starting it", "id", vm.VM().ID())
+	slog.InfoContext(ctx, "created oci vm, starting it", "id", vm.VM().ID(), "rawWriter==nil", cfg.RawWriter == nil, "delimWriter==nil", cfg.DelimWriter == nil)
 
 	if err := vm.Start(ctx); err != nil {
 		return nil, err

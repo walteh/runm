@@ -50,6 +50,19 @@ func WithInterceptLogrus(opt bool) OptLoggerOptsSetter {
 	return func(o *LoggerOpts) { o.interceptLogrus = opt }
 }
 
+func WithRawWriter(opt io.Writer) OptLoggerOptsSetter {
+	return func(o *LoggerOpts) { o.rawWriter = opt }
+}
+
+// delimitedLogWriter io.Writer
+func WithEnableDelimiter(opt bool) OptLoggerOptsSetter {
+	return func(o *LoggerOpts) { o.enableDelimiter = opt }
+}
+
+func WithDelimiter(opt rune) OptLoggerOptsSetter {
+	return func(o *LoggerOpts) { o.delimiter = opt }
+}
+
 func WithInterceptHclog(opt bool) OptLoggerOptsSetter {
 	return func(o *LoggerOpts) { o.interceptHclog = opt }
 }

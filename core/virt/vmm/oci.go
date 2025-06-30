@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -42,6 +43,8 @@ type OCIVMConfig struct {
 	VCPUs          uint64
 	Platform       units.Platform
 	HostOtlpPort   uint32
+	RawWriter      io.Writer
+	DelimWriter    io.Writer
 }
 
 func appendContext(ctx context.Context, id string) context.Context {
@@ -228,9 +231,11 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 		runtime:      nil,
 		workingDir:   workingDir,
 		netdev:       netdev,
+		rawWriter:    ctrconfig.RawWriter,
+		delimWriter:  ctrconfig.DelimWriter,
 	}
 
-	slog.InfoContext(ctx, "created oci vm", "id", ctrconfig.ID)
+	slog.InfoContext(ctx, "created oci vm", "id", ctrconfig.ID, "rawWriter==nil", ctrconfig.RawWriter == nil, "delimWriter==nil", ctrconfig.DelimWriter == nil)
 
 	return runner, nil
 }

@@ -22,6 +22,7 @@ import (
 	slogctx "github.com/veqryn/slog-context"
 
 	"github.com/walteh/runm/cmd/containerd-shim-runm-v2/manager"
+	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/logging"
 	"github.com/walteh/runm/pkg/logging/sloglogrus"
 
@@ -44,34 +45,57 @@ func (d *simpleOtelDialer) DialContext(ctx context.Context, _, _ string) (net.Co
 
 var mode = guessShimMode()
 
-func setupOtel(ctx context.Context) (*slog.Logger, func() error, error) {
+func setupOtelForShim(ctx context.Context) (*slog.Logger, func() error, error) {
 
 	shimName := fmt.Sprintf("shim[%s]", mode)
 
-	logProxySock, err := net.Dial("unix", ShimLogProxySockPath())
+	opts := []logging.OptLoggerOptsSetter{
+		logging.WithDelimiter(constants.VsockDelimitedLogProxyDelimiter),
+		logging.WithEnableDelimiter(true),
+	}
+
+	rawWriterSock, err := net.Dial("unix", ShimRawWriterSockPath())
 	if err != nil {
-		slog.Error("Failed to dial log proxy socket", "error", err, "path", ShimLogProxySockPath())
+		slog.Error("Failed to dial log proxy socket", "error", err, "path", ShimRawWriterSockPath())
 		return nil, nil, err
 	}
+
+	opts = append(opts, logging.WithRawWriter(rawWriterSock))
+
+	logProxySockDelim, err := net.Dial("unix", ShimDelimitedWriterSockPath())
+	if err != nil {
+		slog.Error("Failed to dial log proxy socket", "error", err, "path", ShimDelimitedWriterSockPath())
+		return nil, nil, err
+	}
+
+	// opts = append(opts, logging.WithDelimitedLogWriter(logProxySockDelim))
+
 	// attempt to listen on the port 5909
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", MagicHostOtlpGRPCPort()))
 	if err == nil {
 		listener.Close()
-		l := logging.NewDefaultDevLogger(shimName, logProxySock)
+		l := logging.NewDefaultDevLogger(shimName, logProxySockDelim, opts...)
 		l.Debug("logger created without otel, the host otel grpc port is free", "port", MagicHostOtlpGRPCPort())
 		return l, func() error {
-			logProxySock.Close()
+			rawWriterSock.Close()
+			logProxySockDelim.Close()
 			return nil
 		}, nil
 	}
 
-	otelInstances, err := logging.NewGRPCOtelInstances(ctx, &simpleOtelDialer{port: MagicHostOtlpGRPCPort(), network: "tcp"}, shimName)
+	otlpConn, err := net.Dial("tcp", fmt.Sprintf("localhost:%d", MagicHostOtlpGRPCPort()))
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return logging.NewDefaultDevLoggerWithOtel(ctx, shimName, logProxySock, otelInstances), func() error {
-		logProxySock.Close()
+	otelInstances, err := logging.NewGRPCOtelInstances(ctx, otlpConn, shimName)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return logging.NewDefaultDevLoggerWithOtel(ctx, shimName, logProxySockDelim, otelInstances, opts...), func() error {
+		rawWriterSock.Close()
+		logProxySockDelim.Close()
 		return otelInstances.Shutdown(ctx)
 	}, nil
 }
@@ -91,7 +115,7 @@ func ShimMain() {
 
 	// slog.Info("dialed otel proxy socket", "conn", otelProxySock)
 
-	logger, sd, err := setupOtel(ctx)
+	logger, sd, err := setupOtelForShim(ctx)
 	if err != nil {
 		slog.Error("Failed to setup otel", "error", err)
 		os.Exit(1)

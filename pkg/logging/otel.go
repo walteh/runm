@@ -94,7 +94,7 @@ func (i *OTelInstances) Shutdown(ctx context.Context) error {
 
 // setupOTelSDK bootstraps the OpenTelemetry pipeline.
 // If it does not return an error, make sure to call shutdown for proper cleanup.
-func NewGRPCOtelInstances(ctx context.Context, grpcDialer proxy.ContextDialer, serviceName string) (*OTelInstances, error) {
+func NewGRPCOtelInstances(ctx context.Context, conn net.Conn, serviceName string) (*OTelInstances, error) {
 
 	var err error
 	instances := &OTelInstances{}
@@ -105,7 +105,7 @@ func NewGRPCOtelInstances(ctx context.Context, grpcDialer proxy.ContextDialer, s
 		}
 	}()
 
-	instances.Conn, err = initConn(ctx, grpcDialer)
+	instances.Conn, err = initConnFromConn(ctx, conn)
 	if err != nil {
 		return nil, errors.Errorf("initializing gRPC connection: %w", err)
 	}
@@ -184,13 +184,31 @@ func newPropagator() propagation.TextMapPropagator {
 
 // Initialize a gRPC connection to be used by both the tracer and meter
 // providers.
-func initConn(ctx context.Context, dialer proxy.ContextDialer) (*grpc.ClientConn, error) {
+func initConnFromDialer(ctx context.Context, dialer proxy.ContextDialer) (*grpc.ClientConn, error) {
 
 	conn, err := grpc.NewClient(
 		"passthrough://",
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
 			return dialer.DialContext(ctx, "tcp", addr)
+		}),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gRPC connection to collector: %w", err)
+	}
+
+	return conn, err
+}
+
+// Initialize a gRPC connection to be used by both the tracer and meter
+// providers.
+func initConnFromConn(ctx context.Context, nconn net.Conn) (*grpc.ClientConn, error) {
+
+	conn, err := grpc.NewClient(
+		"passthrough://",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+			return nconn, nil
 		}),
 	)
 	if err != nil {

@@ -365,7 +365,7 @@ FROM scratch AS initramfs-files
 COPY --from=runm-linux-mounter-builder /out/runm-linux-mounter /runm-linux-mounter
 
 # busybox initalized filesystem
-COPY --from=busybox-static-builder /rootfs/ /
+COPY --from=busybox-static-builder /rootfs/bin/busybox /bin/busybox
 
 # our raw files
 COPY udhcpc.default /rootfs/etc/udhcpc/default.script
@@ -397,7 +397,7 @@ WORKDIR /work
 
 COPY --from=initramfs-files / /rootfs
 
-RUN chroot /rootfs ln -s /runm-linux-mounter /init
+RUN chroot /rootfs /bin/busybox ln -s /runm-linux-mounter /init
 
 RUN mkdir -p /dist \
 	&& (cd /rootfs && find . -print0 | cpio --null -ov --format=newc > /dist/initramfs.cpio) \

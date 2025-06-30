@@ -36,10 +36,14 @@ type LoggerOpts struct {
 	handlers          []slog.Handler
 	makeDefaultLogger bool
 	interceptLogrus   bool
-	interceptHclog    bool
-	values            []slog.Attr
-	globalLogWriter   io.Writer
-	otlpInstances     *OTelInstances
+	rawWriter         io.Writer
+	// delimitedLogWriter io.Writer
+	enableDelimiter bool
+	delimiter       rune
+	interceptHclog  bool
+	values          []slog.Attr
+	globalLogWriter io.Writer
+	otlpInstances   *OTelInstances
 
 	delayedHandlerCreatorOpts []OptLoggerOptsSetter `opts:"-"`
 }
@@ -62,6 +66,11 @@ func NewDefaultDevLogger(name string, writer io.Writer, opts ...OptLoggerOptsSet
 	}
 	opts = append(defaults, opts...)
 	return NewLogger(opts...)
+}
+
+func NewDefaultDevLoggerWithDelimiter(name string, writer io.Writer, delimiter rune, opts ...OptLoggerOptsSetter) *slog.Logger {
+	opts = append(opts, WithDelimiter(delimiter), WithEnableDelimiter(true))
+	return NewDefaultDevLogger(name, writer, opts...)
 }
 
 func NewDefaultDevLoggerWithOtel(ctx context.Context, name string, rawLogWriter io.Writer, instances *OTelInstances, opts ...OptLoggerOptsSetter) *slog.Logger {
@@ -141,13 +150,35 @@ func NewLogger(opts ...OptLoggerOptsSetter) *slog.Logger {
 		copts.fallbackWriter = os.Stderr
 	}
 
+	if copts.rawWriter == nil {
+		copts.rawWriter = copts.fallbackWriter
+	}
+
+	if copts.enableDelimiter {
+		if copts.delimiter == 0 {
+			copts.delimiter = '\n'
+		}
+	}
+
 	for _, opt := range copts.delayedHandlerCreatorOpts {
 		opt(&copts)
 	}
 
+	// copts.rawWriter = &PrefixedWriter{
+	// 	getPrefix: func(str string) string {
+	// 		if strings.HasPrefix(str, "[name=") {
+	// 			return str
+	// 		}
+	// 		return fmt.Sprintf("[name=%s][pid=%04d][time=%s]: %s", copts.processName, os.Getpid(), time.Now().Format("04:05.0000"), str)
+	// 	},
+	// 	w: copts.rawWriter,
+	// }
+
 	if len(copts.handlers) == 0 {
 		_, _ = fmt.Fprintln(copts.fallbackWriter, "WARNING: no handlers provided, using fallback handler (defaults to stderr)")
-		copts.handlers = []slog.Handler{slog.NewTextHandler(copts.fallbackWriter, copts.handlerOptions)}
+		copts.handlers = []slog.Handler{
+			slog.NewTextHandler(copts.fallbackWriter, copts.handlerOptions),
+		}
 	}
 
 	fan := newMultiHandler(copts.handlers...)
@@ -161,8 +192,13 @@ func NewLogger(opts ...OptLoggerOptsSetter) *slog.Logger {
 	}
 
 	if copts.globalLogWriter != nil {
-		SetDefaultLogWriter(copts.globalLogWriter)
+		SetDefaultDelimWriter(copts.globalLogWriter)
+		SetDefaultRawWriter(copts.rawWriter)
 	}
+
+	// if copts.delimitedLogWriter != nil {
+	// 	SetDefaultDelimitedLogWriter(copts.delimiter, copts.delimitedLogWriter)
+	// }
 
 	if copts.makeDefaultLogger {
 		slog.SetDefault(l)
@@ -193,7 +229,7 @@ func WithDevTermHanlder(writer io.Writer) OptLoggerOptsSetter {
 	return func(o *LoggerOpts) {
 		o.delayedHandlerCreatorOpts = append(o.delayedHandlerCreatorOpts, func(o *LoggerOpts) {
 
-			o.handlers = append(o.handlers, slogdevterm.NewTermLogger(writer, o.handlerOptions,
+			devtermOpts := []slogdevterm.TermLoggerOption{
 				slogdevterm.WithLoggerName(o.processName),
 				slogdevterm.WithColorProfile(termenv.TrueColor),
 				slogdevterm.WithRenderOption(termenv.WithTTY(true)),
@@ -201,7 +237,13 @@ func WithDevTermHanlder(writer io.Writer) OptLoggerOptsSetter {
 				slogdevterm.WithOSIcon(true),
 				slogdevterm.WithDebugPatternColoring(true),
 				slogdevterm.WithMultilineBoxes(true),
-			))
+			}
+
+			if o.enableDelimiter {
+				devtermOpts = append(devtermOpts, slogdevterm.WithDelimiter(o.delimiter))
+			}
+
+			o.handlers = append(o.handlers, slogdevterm.NewTermLogger(writer, o.handlerOptions, devtermOpts...))
 		})
 	}
 }

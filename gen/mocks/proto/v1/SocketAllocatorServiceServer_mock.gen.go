@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/walteh/runm/proto/v1"
-	"google.golang.org/grpc"
 )
 
 // Ensure that MockSocketAllocatorServiceServer does implement runmv1.SocketAllocatorServiceServer.
@@ -27,12 +26,6 @@ var _ runmv1.SocketAllocatorServiceServer = &MockSocketAllocatorServiceServer{}
 //			},
 //			AllocateIOFunc: func(context1 context.Context, allocateIORequest *runmv1.AllocateIORequest) (*runmv1.AllocateIOResponse, error) {
 //				panic("mock out the AllocateIO method")
-//			},
-//			AllocateSocketStreamFunc: func(allocateSocketStreamRequest *runmv1.AllocateSocketStreamRequest, serverStreamingServer grpc.ServerStreamingServer[runmv1.AllocateSocketStreamResponse]) error {
-//				panic("mock out the AllocateSocketStream method")
-//			},
-//			AllocateSocketsFunc: func(context1 context.Context, allocateSocketsRequest *runmv1.AllocateSocketsRequest) (*runmv1.AllocateSocketsResponse, error) {
-//				panic("mock out the AllocateSockets method")
 //			},
 //			BindConsoleToSocketFunc: func(context1 context.Context, bindConsoleToSocketRequest *runmv1.BindConsoleToSocketRequest) (*runmv1.BindConsoleToSocketResponse, error) {
 //				panic("mock out the BindConsoleToSocket method")
@@ -67,12 +60,6 @@ type MockSocketAllocatorServiceServer struct {
 
 	// AllocateIOFunc mocks the AllocateIO method.
 	AllocateIOFunc func(context1 context.Context, allocateIORequest *runmv1.AllocateIORequest) (*runmv1.AllocateIOResponse, error)
-
-	// AllocateSocketStreamFunc mocks the AllocateSocketStream method.
-	AllocateSocketStreamFunc func(allocateSocketStreamRequest *runmv1.AllocateSocketStreamRequest, serverStreamingServer grpc.ServerStreamingServer[runmv1.AllocateSocketStreamResponse]) error
-
-	// AllocateSocketsFunc mocks the AllocateSockets method.
-	AllocateSocketsFunc func(context1 context.Context, allocateSocketsRequest *runmv1.AllocateSocketsRequest) (*runmv1.AllocateSocketsResponse, error)
 
 	// BindConsoleToSocketFunc mocks the BindConsoleToSocket method.
 	BindConsoleToSocketFunc func(context1 context.Context, bindConsoleToSocketRequest *runmv1.BindConsoleToSocketRequest) (*runmv1.BindConsoleToSocketResponse, error)
@@ -110,20 +97,6 @@ type MockSocketAllocatorServiceServer struct {
 			Context1 context.Context
 			// AllocateIORequest is the allocateIORequest argument value.
 			AllocateIORequest *runmv1.AllocateIORequest
-		}
-		// AllocateSocketStream holds details about calls to the AllocateSocketStream method.
-		AllocateSocketStream []struct {
-			// AllocateSocketStreamRequest is the allocateSocketStreamRequest argument value.
-			AllocateSocketStreamRequest *runmv1.AllocateSocketStreamRequest
-			// ServerStreamingServer is the serverStreamingServer argument value.
-			ServerStreamingServer grpc.ServerStreamingServer[runmv1.AllocateSocketStreamResponse]
-		}
-		// AllocateSockets holds details about calls to the AllocateSockets method.
-		AllocateSockets []struct {
-			// Context1 is the context1 argument value.
-			Context1 context.Context
-			// AllocateSocketsRequest is the allocateSocketsRequest argument value.
-			AllocateSocketsRequest *runmv1.AllocateSocketsRequest
 		}
 		// BindConsoleToSocket holds details about calls to the BindConsoleToSocket method.
 		BindConsoleToSocket []struct {
@@ -175,17 +148,15 @@ type MockSocketAllocatorServiceServer struct {
 			DialOpenListenerRequest *runmv1.DialOpenListenerRequest
 		}
 	}
-	lockAllocateConsole      sync.RWMutex
-	lockAllocateIO           sync.RWMutex
-	lockAllocateSocketStream sync.RWMutex
-	lockAllocateSockets      sync.RWMutex
-	lockBindConsoleToSocket  sync.RWMutex
-	lockBindIOToSockets      sync.RWMutex
-	lockCloseConsole         sync.RWMutex
-	lockCloseIO              sync.RWMutex
-	lockCloseSocket          sync.RWMutex
-	lockCloseSockets         sync.RWMutex
-	lockDialOpenListener     sync.RWMutex
+	lockAllocateConsole     sync.RWMutex
+	lockAllocateIO          sync.RWMutex
+	lockBindConsoleToSocket sync.RWMutex
+	lockBindIOToSockets     sync.RWMutex
+	lockCloseConsole        sync.RWMutex
+	lockCloseIO             sync.RWMutex
+	lockCloseSocket         sync.RWMutex
+	lockCloseSockets        sync.RWMutex
+	lockDialOpenListener    sync.RWMutex
 }
 
 // AllocateConsole calls AllocateConsoleFunc.
@@ -257,78 +228,6 @@ func (mock *MockSocketAllocatorServiceServer) AllocateIOCalls() []struct {
 	mock.lockAllocateIO.RLock()
 	calls = mock.calls.AllocateIO
 	mock.lockAllocateIO.RUnlock()
-	return calls
-}
-
-// AllocateSocketStream calls AllocateSocketStreamFunc.
-func (mock *MockSocketAllocatorServiceServer) AllocateSocketStream(allocateSocketStreamRequest *runmv1.AllocateSocketStreamRequest, serverStreamingServer grpc.ServerStreamingServer[runmv1.AllocateSocketStreamResponse]) error {
-	if mock.AllocateSocketStreamFunc == nil {
-		panic("MockSocketAllocatorServiceServer.AllocateSocketStreamFunc: method is nil but SocketAllocatorServiceServer.AllocateSocketStream was just called")
-	}
-	callInfo := struct {
-		AllocateSocketStreamRequest *runmv1.AllocateSocketStreamRequest
-		ServerStreamingServer       grpc.ServerStreamingServer[runmv1.AllocateSocketStreamResponse]
-	}{
-		AllocateSocketStreamRequest: allocateSocketStreamRequest,
-		ServerStreamingServer:       serverStreamingServer,
-	}
-	mock.lockAllocateSocketStream.Lock()
-	mock.calls.AllocateSocketStream = append(mock.calls.AllocateSocketStream, callInfo)
-	mock.lockAllocateSocketStream.Unlock()
-	return mock.AllocateSocketStreamFunc(allocateSocketStreamRequest, serverStreamingServer)
-}
-
-// AllocateSocketStreamCalls gets all the calls that were made to AllocateSocketStream.
-// Check the length with:
-//
-//	len(mockedSocketAllocatorServiceServer.AllocateSocketStreamCalls())
-func (mock *MockSocketAllocatorServiceServer) AllocateSocketStreamCalls() []struct {
-	AllocateSocketStreamRequest *runmv1.AllocateSocketStreamRequest
-	ServerStreamingServer       grpc.ServerStreamingServer[runmv1.AllocateSocketStreamResponse]
-} {
-	var calls []struct {
-		AllocateSocketStreamRequest *runmv1.AllocateSocketStreamRequest
-		ServerStreamingServer       grpc.ServerStreamingServer[runmv1.AllocateSocketStreamResponse]
-	}
-	mock.lockAllocateSocketStream.RLock()
-	calls = mock.calls.AllocateSocketStream
-	mock.lockAllocateSocketStream.RUnlock()
-	return calls
-}
-
-// AllocateSockets calls AllocateSocketsFunc.
-func (mock *MockSocketAllocatorServiceServer) AllocateSockets(context1 context.Context, allocateSocketsRequest *runmv1.AllocateSocketsRequest) (*runmv1.AllocateSocketsResponse, error) {
-	if mock.AllocateSocketsFunc == nil {
-		panic("MockSocketAllocatorServiceServer.AllocateSocketsFunc: method is nil but SocketAllocatorServiceServer.AllocateSockets was just called")
-	}
-	callInfo := struct {
-		Context1               context.Context
-		AllocateSocketsRequest *runmv1.AllocateSocketsRequest
-	}{
-		Context1:               context1,
-		AllocateSocketsRequest: allocateSocketsRequest,
-	}
-	mock.lockAllocateSockets.Lock()
-	mock.calls.AllocateSockets = append(mock.calls.AllocateSockets, callInfo)
-	mock.lockAllocateSockets.Unlock()
-	return mock.AllocateSocketsFunc(context1, allocateSocketsRequest)
-}
-
-// AllocateSocketsCalls gets all the calls that were made to AllocateSockets.
-// Check the length with:
-//
-//	len(mockedSocketAllocatorServiceServer.AllocateSocketsCalls())
-func (mock *MockSocketAllocatorServiceServer) AllocateSocketsCalls() []struct {
-	Context1               context.Context
-	AllocateSocketsRequest *runmv1.AllocateSocketsRequest
-} {
-	var calls []struct {
-		Context1               context.Context
-		AllocateSocketsRequest *runmv1.AllocateSocketsRequest
-	}
-	mock.lockAllocateSockets.RLock()
-	calls = mock.calls.AllocateSockets
-	mock.lockAllocateSockets.RUnlock()
 	return calls
 }
 

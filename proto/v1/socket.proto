@@ -9,11 +9,9 @@ option features.(pb.go).api_level = API_OPAQUE;
 option features.field_presence = IMPLICIT;  // makes everything by default required, for optional set to EXPLICIT
 
 service SocketAllocatorService {
-	rpc AllocateSockets(AllocateSocketsRequest) returns (AllocateSocketsResponse) {}
+	// rpc AllocateSockets(AllocateSocketsRequest) returns (AllocateSocketsResponse) {}
 
-
-	rpc AllocateSocketStream(AllocateSocketStreamRequest) returns (stream AllocateSocketStreamResponse) {}
-
+	// rpc AllocateSocketStream(AllocateSocketStreamRequest) returns (stream AllocateSocketStreamResponse) {}
 
 	rpc DialOpenListener(DialOpenListenerRequest) returns (DialOpenListenerResponse) {}
 

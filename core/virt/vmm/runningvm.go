@@ -49,6 +49,9 @@ type RunningVM[VM VirtualMachine] struct {
 	// stderr       io.Writer
 	// connStatus      <-chan VSockManagerState
 	start time.Time
+
+	rawWriter   io.Writer
+	delimWriter io.Writer
 }
 
 func (r *RunningVM[VM]) GuestService(ctx context.Context) (*grpcruntime.GRPCClientRuntime, error) {
@@ -276,6 +279,51 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 	}
 
 	errgrp.Go(func() error {
+		var writer io.Writer
+		if rvm.rawWriter == nil {
+			slog.WarnContext(ctx, "raw writer is nil, using default raw writer")
+			writer = logging.GetDefaultRawWriter()
+		} else {
+			writer = rvm.rawWriter
+		}
+		slog.InfoContext(ctx, "running vsock raw writer proxy server", "port", constants.VsockRawWriterProxyPort)
+		err = rvm.RunVsockProxyServer(ctx, uint32(constants.VsockRawWriterProxyPort), writer)
+		if err != nil {
+			slog.ErrorContext(ctx, "error running vsock raw writer proxy server", "error", err)
+			return errors.Errorf("running vsock raw writer proxy server: %w", err)
+		}
+		return nil
+	})
+
+	errgrp.Go(func() error {
+		var writer io.Writer
+		if rvm.delimWriter == nil {
+			slog.WarnContext(ctx, "delim writer is nil, using default delim writer")
+			writer = logging.GetDefaultDelimWriter()
+		} else {
+			writer = rvm.delimWriter
+		}
+		slog.InfoContext(ctx, "running vsock delimited writer proxy server", "port", constants.VsockDelimitedWriterProxyPort)
+		err = rvm.RunVsockProxyServer(ctx, uint32(constants.VsockDelimitedWriterProxyPort), writer)
+		if err != nil {
+			slog.ErrorContext(ctx, "error running vsock delimited writer proxy server", "error", err)
+			return errors.Errorf("running vsock delimited writer proxy server: %w", err)
+		}
+		return nil
+	})
+
+	if rvm.hostOtlpPort != 0 {
+		errgrp.Go(func() error {
+			err = rvm.SetupOtelForwarder(ctx)
+			if err != nil {
+				slog.ErrorContext(ctx, "error setting up otel forwarder", "error", err)
+				return errors.Errorf("setting up otel forwarder: %w", err)
+			}
+			return nil
+		})
+	}
+
+	errgrp.Go(func() error {
 		err = rvm.VM().ServeBackgroundTasks(ctx)
 		if err != nil {
 			slog.ErrorContext(ctx, "error serving background tasks", "error", err)
@@ -292,27 +340,6 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 		}
 		return nil
 	})
-
-	if rvm.hostOtlpPort != 0 {
-		errgrp.Go(func() error {
-			err = rvm.SetupOtelForwarder(ctx)
-			if err != nil {
-				slog.ErrorContext(ctx, "error setting up otel forwarder", "error", err)
-				return errors.Errorf("setting up otel forwarder: %w", err)
-			}
-			return nil
-		})
-	}
-
-	// errgrp.Go(func() error {
-	// 	err = rvm.ForwardStdio(ctx, rvm.stdin, rvm.stdout, rvm.stderr)
-	// 	if err != nil {
-	// 		slog.ErrorContext(ctx, "error forwarding stdio", "error", err)
-	// 		return errors.Errorf("forwarding stdio: %w", err)
-	// 	}
-	// 	slog.WarnContext(ctx, "forwarding stdio done")
-	// 	return nil
-	// })
 
 	err = TailConsoleLog(ctx, rvm.workingDir)
 	if err != nil {
@@ -518,7 +545,11 @@ func TryAppendingConsoleLog(ctx context.Context, workingDir string) error {
 		return errors.Errorf("opening console log file: %w", err)
 	}
 
-	writer := logging.GetDefaultLogWriter()
+	writer := logging.GetDefaultRawWriter()
+	if writer == nil {
+		slog.WarnContext(ctx, "default raw writer is not set, skipping appending console log")
+		return nil
+	}
 
 	buf := bytes.NewBuffer(nil)
 	buf.Write([]byte("\n\n--------------------------------\n\n"))
@@ -543,7 +574,12 @@ func TailConsoleLog(ctx context.Context, workingDir string) error {
 		return errors.Errorf("reading console log file: %w", err)
 	}
 
-	writer := logging.GetDefaultLogWriter()
+	writer := logging.GetDefaultRawWriter()
+
+	if writer == nil {
+		slog.WarnContext(ctx, "default raw writer is not set, skipping tailing console log")
+		return nil
+	}
 
 	for _, line := range strings.Split(string(dat), "\n") {
 		fmt.Fprintf(writer, "%s\n", line)
@@ -562,3 +598,83 @@ func TailConsoleLog(ctx context.Context, workingDir string) error {
 
 	return nil
 }
+
+func (rvm *RunningVM[VM]) RunVsockProxyServer(ctx context.Context, port uint32, writer io.Writer) error {
+	vsockListener, err := rvm.vm.VSockListen(ctx, port)
+	if err != nil {
+		slog.ErrorContext(ctx, "vsock listen failed", "err", err)
+		return errors.Errorf("listening on vsock: %w", err)
+	}
+	defer vsockListener.Close()
+
+	if writer == nil {
+		slog.ErrorContext(ctx, "writer is nil", "port", port)
+		return errors.Errorf("writer is nil: %w", err)
+	}
+
+	for {
+		conn, err := vsockListener.Accept()
+		if err != nil {
+			slog.ErrorContext(ctx, "vsock accept failed", "err", err)
+			continue
+		}
+
+		slog.InfoContext(ctx, "vsock accepted for proxy server", "port", port)
+
+		go func() {
+			defer conn.Close()
+			tb, err := io.Copy(writer, conn)
+			if err != nil {
+				slog.ErrorContext(ctx, "error copying to writer", "err", err, "port", port)
+			} else {
+				slog.InfoContext(ctx, "copied to writer - closing connection", "port", port, "bytes", tb)
+			}
+		}()
+	}
+}
+
+// func (rvm *RunningVM[VM]) RunVsockJSONLogProxyServer(ctx context.Context) error {
+// 	vsockListener, err := rvm.vm.VSockListen(ctx, uint32(constants.VsockJSONLogProxyPort))
+// 	if err != nil {
+// 		slog.ErrorContext(ctx, "vsock listen failed", "err", err)
+// 		return errors.Errorf("listening on vsock: %w", err)
+// 	}
+// 	defer vsockListener.Close()
+
+// 	writer := logging.GetDefaultLogWriter()
+
+// 	for {
+// 		conn, err := vsockListener.Accept()
+// 		if err != nil {
+// 			slog.ErrorContext(ctx, "vsock accept failed", "err", err)
+// 			continue
+// 		}
+
+// 		go func(c net.Conn) {
+// 			defer c.Close()
+
+// 			// Option A: JSON Decoder for NDJSON
+// 			dec := json.NewDecoder(c)
+// 			for dec.More() {
+// 				var entry map[string]interface{}
+// 				if err := dec.Decode(&entry); err != nil {
+// 					if err == io.EOF {
+// 						break
+// 					}
+// 					slog.Error("json decode error", "err", err)
+// 					break
+// 				}
+// 				fmt.Fprintf(writer, "%v\n", entry)
+// 			}
+
+// 			// Option B: Scanner for line-delimited JSON
+// 			// scanner := bufio.NewScanner(c)
+// 			// for scanner.Scan() {
+// 			//     fmt.Fprintf(writer, "%s\n", scanner.Text())
+// 			// }
+// 			// if err := scanner.Err(); err != nil {
+// 			//     slog.Error("scanner error", "err", err)
+// 			// }
+// 		}(conn)
+// 	}
+// }

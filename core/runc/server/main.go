@@ -14,12 +14,12 @@ import (
 )
 
 type Server struct {
-	runtime         runtime.Runtime
-	runtimeExtras   runtime.RuntimeExtras
-	socketAllocator runtime.SocketAllocator
-	eventHandler    runtime.EventHandler
-	cgroupAdapter   runtime.CgroupAdapter
-	bundleSource    string
+	runtime       runtime.Runtime
+	runtimeExtras runtime.RuntimeExtras
+	// socketAllocator runtime.SocketAllocator
+	eventHandler  runtime.EventHandler
+	cgroupAdapter runtime.CgroupAdapter
+	bundleSource  string
 
 	state *state.State
 }
@@ -39,7 +39,7 @@ func WithBundleSource(bundleSource string) ServerOpt {
 func NewServer(
 	r runtime.Runtime,
 	runtimeExtras runtime.RuntimeExtras,
-	socketAllocator runtime.SocketAllocator,
+	// socketAllocator runtime.SocketAllocator,
 	eventHandler runtime.EventHandler,
 	cgroupAdapter runtime.CgroupAdapter,
 	opts ...ServerOpt) *Server {
@@ -50,13 +50,13 @@ func NewServer(
 	}
 
 	s := &Server{
-		runtime:         r,
-		runtimeExtras:   runtimeExtras,
-		socketAllocator: socketAllocator,
-		eventHandler:    eventHandler,
-		cgroupAdapter:   cgroupAdapter,
-		bundleSource:    optz.BundleSource,
-		state:           state.NewState(),
+		runtime:       r,
+		runtimeExtras: runtimeExtras,
+		// socketAllocator: socketAllocator,
+		eventHandler:  eventHandler,
+		cgroupAdapter: cgroupAdapter,
+		bundleSource:  optz.BundleSource,
+		state:         state.NewState(),
 	}
 
 	return s

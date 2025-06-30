@@ -2,9 +2,7 @@ package server
 
 import (
 	"context"
-	"log/slog"
 	"net"
-	"time"
 
 	"gitlab.com/tozd/go/errors"
 
@@ -51,45 +49,45 @@ func (s *Server) DialOpenListener(ctx context.Context, req *runmv1.DialOpenListe
 	return &runmv1.DialOpenListenerResponse{}, nil
 }
 
-func (s *Server) AllocateSocketStream(req *runmv1.AllocateSocketStreamRequest, stream runmv1.SocketAllocatorService_AllocateSocketStreamServer) error {
-	as, err := s.socketAllocator.AllocateSocket(stream.Context())
-	if err != nil {
-		return err
-	}
+// func (s *Server) AllocateSocketStream(req *runmv1.AllocateSocketStreamRequest, stream runmv1.SocketAllocatorService_AllocateSocketStreamServer) error {
+// 	as, err := s.socketAllocator.AllocateSocket(stream.Context())
+// 	if err != nil {
+// 		return err
+// 	}
 
-	st, err := storeSocket(s.state, as)
-	if err != nil {
-		return err
-	}
+// 	st, err := storeSocket(s.state, as)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	res := &runmv1.AllocateSocketStreamResponse{}
-	res.SetSocketType(st)
-	if err := stream.Send(res); err != nil {
-		return err
-	}
+// 	res := &runmv1.AllocateSocketStreamResponse{}
+// 	res.SetSocketType(st)
+// 	if err := stream.Send(res); err != nil {
+// 		return err
+// 	}
 
-	ready := make(chan error)
-	go func() {
-		ready <- as.Ready()
-	}()
+// 	ready := make(chan error)
+// 	go func() {
+// 		ready <- as.Ready()
+// 	}()
 
-	select {
-	case <-stream.Context().Done():
-		return errors.Errorf("context done before socket was ready: %w", stream.Context().Err())
-	case <-time.After(10 * time.Second):
-		return errors.Errorf("timeout waiting for socket to be ready")
-	case err := <-ready:
-		if err != nil {
-			return errors.Errorf("socket not ready: %w", err)
-		}
-		st, err := storeSocket(s.state, as)
-		if err != nil {
-			return err
-		}
-		res.SetSocketType(st)
-		return nil
-	}
-}
+// 	select {
+// 	case <-stream.Context().Done():
+// 		return errors.Errorf("context done before socket was ready: %w", stream.Context().Err())
+// 	case <-time.After(10 * time.Second):
+// 		return errors.Errorf("timeout waiting for socket to be ready")
+// 	case err := <-ready:
+// 		if err != nil {
+// 			return errors.Errorf("socket not ready: %w", err)
+// 		}
+// 		st, err := storeSocket(s.state, as)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		res.SetSocketType(st)
+// 		return nil
+// 	}
+// }
 
 func (s *Server) AllocateConsole(ctx context.Context, req *runmv1.AllocateConsoleRequest) (*runmv1.AllocateConsoleResponse, error) {
 	referenceId := runtime.NewConsoleReferenceId()
@@ -116,60 +114,60 @@ func (s *Server) AllocateIO(ctx context.Context, req *runmv1.AllocateIORequest) 
 	return res, nil
 }
 
-// AllocateSocket implements runmv1.SocketAllocatorServiceServer.
-func (s *Server) AllocateSocket(ctx context.Context, req *runmv1.AllocateSocketRequest) (*runmv1.AllocateSocketResponse, error) {
-	as, err := s.socketAllocator.AllocateSocket(ctx)
-	if err != nil {
-		return nil, errors.Errorf("failed to allocate socket: %w", err)
-	}
+// // AllocateSocket implements runmv1.SocketAllocatorServiceServer.
+// func (s *Server) AllocateSocket(ctx context.Context, req *runmv1.AllocateSocketRequest) (*runmv1.AllocateSocketResponse, error) {
+// 	as, err := s.socketAllocator.AllocateSocket(ctx)
+// 	if err != nil {
+// 		return nil, errors.Errorf("failed to allocate socket: %w", err)
+// 	}
 
-	st, err := storeSocket(s.state, as)
-	if err != nil {
-		return nil, err
-	}
+// 	st, err := storeSocket(s.state, as)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	res := &runmv1.AllocateSocketResponse{}
-	res.SetSocketType(st)
-	return res, nil
-}
+// 	res := &runmv1.AllocateSocketResponse{}
+// 	res.SetSocketType(st)
+// 	return res, nil
+// }
 
-// AllocateSockets implements runmv1.SocketAllocatorServiceServer.
-func (s *Server) AllocateSockets(ctx context.Context, req *runmv1.AllocateSocketsRequest) (*runmv1.AllocateSocketsResponse, error) {
-	socksToClean := make([]runtime.AllocatedSocket, 0, req.GetCount())
-	defer func() {
-		if len(socksToClean) == 0 {
-			return
-		}
-		for _, sock := range socksToClean {
-			sock.Close()
-			deleteSocket(s.state, sock)
-		}
-	}()
+// // AllocateSockets implements runmv1.SocketAllocatorServiceServer.
+// func (s *Server) AllocateSockets(ctx context.Context, req *runmv1.AllocateSocketsRequest) (*runmv1.AllocateSocketsResponse, error) {
+// 	socksToClean := make([]runtime.AllocatedSocket, 0, req.GetCount())
+// 	defer func() {
+// 		if len(socksToClean) == 0 {
+// 			return
+// 		}
+// 		for _, sock := range socksToClean {
+// 			sock.Close()
+// 			deleteSocket(s.state, sock)
+// 		}
+// 	}()
 
-	for i := 0; i < int(req.GetCount()); i++ {
-		as, err := s.socketAllocator.AllocateSocket(ctx)
-		if err != nil {
-			return nil, errors.Errorf("failed to allocate socket: %w", err)
-		}
-		socksToClean = append(socksToClean, as)
-	}
+// 	for i := 0; i < int(req.GetCount()); i++ {
+// 		as, err := s.socketAllocator.AllocateSocket(ctx)
+// 		if err != nil {
+// 			return nil, errors.Errorf("failed to allocate socket: %w", err)
+// 		}
+// 		socksToClean = append(socksToClean, as)
+// 	}
 
-	res := &runmv1.AllocateSocketsResponse{}
-	refs := make([]*runmv1.SocketType, 0, req.GetCount())
-	for _, sock := range socksToClean {
-		st, err := storeSocket(s.state, sock)
-		if err != nil {
-			return nil, err
-		}
-		refs = append(refs, st)
-		slog.InfoContext(ctx, "allocated socketz", "reference_id", st)
-	}
-	res.SetSocketTypes(refs)
+// 	res := &runmv1.AllocateSocketsResponse{}
+// 	refs := make([]*runmv1.SocketType, 0, req.GetCount())
+// 	for _, sock := range socksToClean {
+// 		st, err := storeSocket(s.state, sock)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		refs = append(refs, st)
+// 		slog.InfoContext(ctx, "allocated socketz", "reference_id", st)
+// 	}
+// 	res.SetSocketTypes(refs)
 
-	socksToClean = nil
+// 	socksToClean = nil
 
-	return res, nil
-}
+// 	return res, nil
+// }
 
 // BindConsoleToSocket implements runmv1.SocketAllocatorServiceServer.
 func (s *Server) BindConsoleToSocket(ctx context.Context, req *runmv1.BindConsoleToSocketRequest) (*runmv1.BindConsoleToSocketResponse, error) {

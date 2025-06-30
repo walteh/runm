@@ -15,9 +15,11 @@ import (
 	"time"
 
 	//nolint:revive // Enable cgroup manager to manage devices
+	"github.com/mdlayher/vsock"
 	_ "github.com/opencontainers/cgroups/devices"
 	"github.com/opencontainers/runc/libcontainer/seccomp"
 	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/logging"
 
 	"github.com/sirupsen/logrus"
@@ -148,7 +150,7 @@ func main() {
 		featuresCommand,
 	}
 
-	var logProxyConn net.Conn
+	var logProxyConn, rawProxyConn net.Conn
 	app.Before = func(context *cli.Context) error {
 		if !context.IsSet("root") && xdgDirUsed {
 			// According to the XDG specification, we need to set anything in
@@ -167,12 +169,13 @@ func main() {
 			return err
 		}
 
-		opts := []logging.OptLoggerOptsSetter{}
-
-		if file := context.GlobalString("log"); file != "" {
-			// opts = append(opts, logging.WithFileHandler(file))
-			opts = append(opts, logging.WithInterceptLogrus(false))
+		opts := []logging.OptLoggerOptsSetter{
+			logging.WithDelimiter(constants.VsockDelimitedLogProxyDelimiter),
+			logging.WithEnableDelimiter(true),
+			logging.WithInterceptLogrus(false),
 		}
+
+		loggerName := fmt.Sprintf("runc[%s]", context.Args().First())
 
 		opts = append(opts, logging.WithValues([]slog.Attr{
 			slog.String("run_id", fmt.Sprintf("%d", runId)),
@@ -180,13 +183,21 @@ func main() {
 			slog.String("pid", fmt.Sprintf("%d", os.Getpid())),
 		}))
 
-		conn, err := net.Dial("unix", "/tmp/runm-log-proxy.sock")
+		rawConn, err := vsock.Dial(2, uint32(constants.VsockRawWriterProxyPort), nil)
+		if err != nil {
+			fmt.Printf("problem dialing raw log proxy: %v\n", err)
+		} else {
+			rawProxyConn = rawConn
+			opts = append(opts, logging.WithRawWriter(rawConn))
+		}
+
+		delimConn, err := vsock.Dial(2, uint32(constants.VsockDelimitedWriterProxyPort), nil)
 		if err != nil {
 			fmt.Printf("problem dialing log proxy: %v\n", err)
 		} else {
 			// defer conn.Close()
-			logProxyConn = conn
-			_ = logging.NewDefaultDevLogger(fmt.Sprintf("runc[%s]", context.Args().First()), conn, opts...)
+			logProxyConn = delimConn
+			_ = logging.NewDefaultDevLogger(loggerName, delimConn, opts...)
 		}
 
 		return configLogrus(context)
@@ -195,6 +206,9 @@ func main() {
 	defer func() {
 		if logProxyConn != nil {
 			logProxyConn.Close()
+		}
+		if rawProxyConn != nil {
+			rawProxyConn.Close()
 		}
 	}()
 

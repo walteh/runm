@@ -1836,10 +1836,8 @@ const file_v1_socket_proto_rawDesc = "" +
 	"\x0fCloseIOResponse\"G\n" +
 	"\x13CloseConsoleRequest\x120\n" +
 	"\x14console_reference_id\x18\x01 \x01(\tR\x12consoleReferenceId\"\x16\n" +
-	"\x14CloseConsoleResponse2\xbb\a\n" +
-	"\x16SocketAllocatorService\x12V\n" +
-	"\x0fAllocateSockets\x12\x1f.runm.v1.AllocateSocketsRequest\x1a .runm.v1.AllocateSocketsResponse\"\x00\x12g\n" +
-	"\x14AllocateSocketStream\x12$.runm.v1.AllocateSocketStreamRequest\x1a%.runm.v1.AllocateSocketStreamResponse\"\x000\x01\x12Y\n" +
+	"\x14CloseConsoleResponse2\xfa\x05\n" +
+	"\x16SocketAllocatorService\x12Y\n" +
 	"\x10DialOpenListener\x12 .runm.v1.DialOpenListenerRequest\x1a!.runm.v1.DialOpenListenerResponse\"\x00\x12G\n" +
 	"\n" +
 	"AllocateIO\x12\x1a.runm.v1.AllocateIORequest\x1a\x1b.runm.v1.AllocateIOResponse\"\x00\x12V\n" +
@@ -1895,30 +1893,26 @@ var file_v1_socket_proto_depIdxs = []int32{
 	2,  // 9: runm.v1.BindConsoleToSocketRequest.socket_type:type_name -> runm.v1.SocketType
 	2,  // 10: runm.v1.AllocateSocketResponse.socket_type:type_name -> runm.v1.SocketType
 	2,  // 11: runm.v1.CloseSocketRequest.socket_type:type_name -> runm.v1.SocketType
-	13, // 12: runm.v1.SocketAllocatorService.AllocateSockets:input_type -> runm.v1.AllocateSocketsRequest
-	5,  // 13: runm.v1.SocketAllocatorService.AllocateSocketStream:input_type -> runm.v1.AllocateSocketStreamRequest
-	3,  // 14: runm.v1.SocketAllocatorService.DialOpenListener:input_type -> runm.v1.DialOpenListenerRequest
-	7,  // 15: runm.v1.SocketAllocatorService.AllocateIO:input_type -> runm.v1.AllocateIORequest
-	9,  // 16: runm.v1.SocketAllocatorService.AllocateConsole:input_type -> runm.v1.AllocateConsoleRequest
-	17, // 17: runm.v1.SocketAllocatorService.BindConsoleToSocket:input_type -> runm.v1.BindConsoleToSocketRequest
-	15, // 18: runm.v1.SocketAllocatorService.BindIOToSockets:input_type -> runm.v1.BindIOToSocketsRequest
-	21, // 19: runm.v1.SocketAllocatorService.CloseSocket:input_type -> runm.v1.CloseSocketRequest
-	11, // 20: runm.v1.SocketAllocatorService.CloseSockets:input_type -> runm.v1.CloseSocketsRequest
-	23, // 21: runm.v1.SocketAllocatorService.CloseIO:input_type -> runm.v1.CloseIORequest
-	25, // 22: runm.v1.SocketAllocatorService.CloseConsole:input_type -> runm.v1.CloseConsoleRequest
-	14, // 23: runm.v1.SocketAllocatorService.AllocateSockets:output_type -> runm.v1.AllocateSocketsResponse
-	6,  // 24: runm.v1.SocketAllocatorService.AllocateSocketStream:output_type -> runm.v1.AllocateSocketStreamResponse
-	4,  // 25: runm.v1.SocketAllocatorService.DialOpenListener:output_type -> runm.v1.DialOpenListenerResponse
-	8,  // 26: runm.v1.SocketAllocatorService.AllocateIO:output_type -> runm.v1.AllocateIOResponse
-	10, // 27: runm.v1.SocketAllocatorService.AllocateConsole:output_type -> runm.v1.AllocateConsoleResponse
-	18, // 28: runm.v1.SocketAllocatorService.BindConsoleToSocket:output_type -> runm.v1.BindConsoleToSocketResponse
-	16, // 29: runm.v1.SocketAllocatorService.BindIOToSockets:output_type -> runm.v1.BindIOToSocketsResponse
-	22, // 30: runm.v1.SocketAllocatorService.CloseSocket:output_type -> runm.v1.CloseSocketResponse
-	12, // 31: runm.v1.SocketAllocatorService.CloseSockets:output_type -> runm.v1.CloseSocketsResponse
-	24, // 32: runm.v1.SocketAllocatorService.CloseIO:output_type -> runm.v1.CloseIOResponse
-	26, // 33: runm.v1.SocketAllocatorService.CloseConsole:output_type -> runm.v1.CloseConsoleResponse
-	23, // [23:34] is the sub-list for method output_type
-	12, // [12:23] is the sub-list for method input_type
+	3,  // 12: runm.v1.SocketAllocatorService.DialOpenListener:input_type -> runm.v1.DialOpenListenerRequest
+	7,  // 13: runm.v1.SocketAllocatorService.AllocateIO:input_type -> runm.v1.AllocateIORequest
+	9,  // 14: runm.v1.SocketAllocatorService.AllocateConsole:input_type -> runm.v1.AllocateConsoleRequest
+	17, // 15: runm.v1.SocketAllocatorService.BindConsoleToSocket:input_type -> runm.v1.BindConsoleToSocketRequest
+	15, // 16: runm.v1.SocketAllocatorService.BindIOToSockets:input_type -> runm.v1.BindIOToSocketsRequest
+	21, // 17: runm.v1.SocketAllocatorService.CloseSocket:input_type -> runm.v1.CloseSocketRequest
+	11, // 18: runm.v1.SocketAllocatorService.CloseSockets:input_type -> runm.v1.CloseSocketsRequest
+	23, // 19: runm.v1.SocketAllocatorService.CloseIO:input_type -> runm.v1.CloseIORequest
+	25, // 20: runm.v1.SocketAllocatorService.CloseConsole:input_type -> runm.v1.CloseConsoleRequest
+	4,  // 21: runm.v1.SocketAllocatorService.DialOpenListener:output_type -> runm.v1.DialOpenListenerResponse
+	8,  // 22: runm.v1.SocketAllocatorService.AllocateIO:output_type -> runm.v1.AllocateIOResponse
+	10, // 23: runm.v1.SocketAllocatorService.AllocateConsole:output_type -> runm.v1.AllocateConsoleResponse
+	18, // 24: runm.v1.SocketAllocatorService.BindConsoleToSocket:output_type -> runm.v1.BindConsoleToSocketResponse
+	16, // 25: runm.v1.SocketAllocatorService.BindIOToSockets:output_type -> runm.v1.BindIOToSocketsResponse
+	22, // 26: runm.v1.SocketAllocatorService.CloseSocket:output_type -> runm.v1.CloseSocketResponse
+	12, // 27: runm.v1.SocketAllocatorService.CloseSockets:output_type -> runm.v1.CloseSocketsResponse
+	24, // 28: runm.v1.SocketAllocatorService.CloseIO:output_type -> runm.v1.CloseIOResponse
+	26, // 29: runm.v1.SocketAllocatorService.CloseConsole:output_type -> runm.v1.CloseConsoleResponse
+	21, // [21:30] is the sub-list for method output_type
+	12, // [12:21] is the sub-list for method input_type
 	12, // [12:12] is the sub-list for extension type_name
 	12, // [12:12] is the sub-list for extension extendee
 	0,  // [0:12] is the sub-list for field type_name

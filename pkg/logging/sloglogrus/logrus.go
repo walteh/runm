@@ -47,6 +47,10 @@ func (h *SlogBridgeHook) Levels() []logrus.Level {
 }
 
 func (h *SlogBridgeHook) Fire(entry *logrus.Entry) error {
+	// logrus.SetOutput(io.Discard)
+	// logrus.SetFormatter(&logrus.TextFormatter{
+	// 	DisableColors: true,
+	// })
 	// Map logrus levels to slog levels
 	var level slog.Level
 	switch entry.Level {

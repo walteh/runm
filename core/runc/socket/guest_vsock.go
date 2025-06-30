@@ -14,7 +14,7 @@ var _ runtime.SocketAllocator = (*GuestVsockSocketAllocator)(nil)
 
 var guestVsockSocketCounter = atomic.Uint32{}
 
-func NewGuestVsockSocketAllocator(cid uint32, basePort uint32) *GuestVsockSocketAllocator {
+func NewGuestVsockSocketAllocatorPrettySureUnused(cid uint32, basePort uint32) *GuestVsockSocketAllocator {
 	return &GuestVsockSocketAllocator{cid: cid, basePort: basePort}
 }
 
@@ -24,12 +24,14 @@ type GuestVsockSocketAllocator struct {
 }
 
 func (g *GuestVsockSocketAllocator) AllocateSocket(ctx context.Context) (runtime.AllocatedSocket, error) {
-	port := uint32(g.basePort) + uint32(guestVsockSocketCounter.Add(1))
-	sock, err := NewGuestAllocatedVsockSocket(ctx, g.cid, port)
-	if err != nil {
-		return nil, errors.Errorf("failed to allocate vsock socket: %w", err)
-	}
-	return sock, nil
+	// pretty sure this is unused, we only use the vsock allocator for the grpc server
+	return nil, errors.Errorf("pretty sure this vsock allocator is not used")
+	// port := uint32(g.basePort) + uint32(guestVsockSocketCounter.Add(1))
+	// sock, err := NewGuestAllocatedVsockSocket(ctx, g.cid, port)
+	// if err != nil {
+	// 	return nil, errors.Errorf("failed to allocate vsock socket: %w", err)
+	// }
+	// return sock, nil
 }
 
 func (g *GuestAllocatedVsockSocket) DialContext(ctx context.Context, network, address string) (net.Conn, error) {

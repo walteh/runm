@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -15,6 +16,7 @@ import (
 	"syscall"
 
 	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/mdlayher/vsock"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"gitlab.com/tozd/go/errors"
 
@@ -32,6 +34,75 @@ var (
 	containerIdFlag string
 	runmModeFlag    string
 	bundleSource    string
+	enableOtel      bool
+)
+
+type runmLinuxMounter struct {
+	rawWriter  io.WriteCloser
+	logWriter  io.WriteCloser
+	otelWriter io.WriteCloser
+
+	logger *slog.Logger
+}
+
+// DO NOT USE SLOG IN THIS FUNCTION - LOG TO STDOUT
+func (r *runmLinuxMounter) setupLogger(ctx context.Context) (context.Context, error) {
+	var err error
+
+	fmt.Printf("connecting to vsock for raw writer\n")
+
+	rawWriterConn, err := vsock.Dial(2, uint32(constants.VsockRawWriterProxyPort), nil)
+	if err != nil {
+		return nil, errors.Errorf("problem dialing vsock for raw writer: %w", err)
+	}
+
+	fmt.Printf("connecting to vsock for delimited writer\n")
+
+	delimitedLogProxyConn, err := vsock.Dial(2, uint32(constants.VsockDelimitedWriterProxyPort), nil)
+	if err != nil {
+		return nil, errors.Errorf("problem dialing vsock for log proxy: %w", err)
+	}
+
+	opts := []logging.OptLoggerOptsSetter{
+		logging.WithDelimiter(constants.VsockDelimitedLogProxyDelimiter),
+		logging.WithEnableDelimiter(true),
+		logging.WithRawWriter(rawWriterConn),
+	}
+
+	var logger *slog.Logger
+	if enableOtel {
+		otelConn, err := vsock.Dial(2, uint32(constants.VsockOtelPort), nil)
+		if err != nil {
+			return nil, errors.Errorf("problem dialing vsock for otel: %w", err)
+		}
+
+		otelInstancez, err := logging.NewGRPCOtelInstances(ctx, otelConn, serviceName)
+		if err != nil {
+			return nil, errors.Errorf("failed to setup OTel SDK: %w", err)
+		}
+
+		logger = logging.NewDefaultDevLoggerWithOtel(ctx, serviceName, delimitedLogProxyConn, otelInstancez, opts...)
+
+		r.otelWriter = otelConn
+
+	} else {
+		fmt.Printf("DEBUG: pid: %d - setting up logger without otel\n", os.Getpid())
+		logger = logging.NewDefaultDevLogger(serviceName, delimitedLogProxyConn, opts...)
+	}
+
+	go func() {
+		fmt.Fprintf(rawWriterConn, "test test 123 from raw writer\n")
+	}()
+
+	r.rawWriter = rawWriterConn
+	r.logWriter = delimitedLogProxyConn
+	r.logger = logger
+
+	return slogctx.NewCtx(ctx, logger), nil
+}
+
+const (
+	serviceName = "runm[mounter]"
 )
 
 func init() {
@@ -43,18 +114,18 @@ func init() {
 
 func main() {
 
-	pid := os.Getpid()
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	logger := logging.NewDefaultDevLogger("runm[mounter]", os.Stdout)
+	runmLinuxMounter := &runmLinuxMounter{}
 
-	ctx = slogctx.NewCtx(ctx, logger)
+	ctx, err := runmLinuxMounter.setupLogger(ctx)
+	if err != nil {
+		fmt.Printf("failed to setup logger: %v\n", err)
+		os.Exit(1)
+	}
 
-	ctx = slogctx.Append(ctx, slog.Int("pid", pid))
-
-	err := recoveryMain(ctx)
+	err = recoveryMain(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "error in main", "error", err)
 		os.Exit(1)

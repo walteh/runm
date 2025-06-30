@@ -8,8 +8,6 @@ import (
 )
 
 type TTRPCSocketAllocatorServiceService interface {
-	AllocateSockets(context.Context, *AllocateSocketsRequest) (*AllocateSocketsResponse, error)
-	AllocateSocketStream(context.Context, *AllocateSocketStreamRequest, TTRPCSocketAllocatorService_AllocateSocketStreamServer) error
 	DialOpenListener(context.Context, *DialOpenListenerRequest) (*DialOpenListenerResponse, error)
 	AllocateIO(context.Context, *AllocateIORequest) (*AllocateIOResponse, error)
 	AllocateConsole(context.Context, *AllocateConsoleRequest) (*AllocateConsoleResponse, error)
@@ -21,29 +19,9 @@ type TTRPCSocketAllocatorServiceService interface {
 	CloseConsole(context.Context, *CloseConsoleRequest) (*CloseConsoleResponse, error)
 }
 
-type TTRPCSocketAllocatorService_AllocateSocketStreamServer interface {
-	Send(*AllocateSocketStreamResponse) error
-	ttrpc.StreamServer
-}
-
-type ttrpcsocketallocatorserviceAllocateSocketStreamServer struct {
-	ttrpc.StreamServer
-}
-
-func (x *ttrpcsocketallocatorserviceAllocateSocketStreamServer) Send(m *AllocateSocketStreamResponse) error {
-	return x.StreamServer.SendMsg(m)
-}
-
 func RegisterTTRPCSocketAllocatorServiceService(srv *ttrpc.Server, svc TTRPCSocketAllocatorServiceService) {
 	srv.RegisterService("runm.v1.SocketAllocatorService", &ttrpc.ServiceDesc{
 		Methods: map[string]ttrpc.Method{
-			"AllocateSockets": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
-				var req AllocateSocketsRequest
-				if err := unmarshal(&req); err != nil {
-					return nil, err
-				}
-				return svc.AllocateSockets(ctx, &req)
-			},
 			"DialOpenListener": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
 				var req DialOpenListenerRequest
 				if err := unmarshal(&req); err != nil {
@@ -108,81 +86,17 @@ func RegisterTTRPCSocketAllocatorServiceService(srv *ttrpc.Server, svc TTRPCSock
 				return svc.CloseConsole(ctx, &req)
 			},
 		},
-		Streams: map[string]ttrpc.Stream{
-			"AllocateSocketStream": {
-				Handler: func(ctx context.Context, stream ttrpc.StreamServer) (interface{}, error) {
-					m := new(AllocateSocketStreamRequest)
-					if err := stream.RecvMsg(m); err != nil {
-						return nil, err
-					}
-					return nil, svc.AllocateSocketStream(ctx, m, &ttrpcsocketallocatorserviceAllocateSocketStreamServer{stream})
-				},
-				StreamingClient: false,
-				StreamingServer: true,
-			},
-		},
 	})
-}
-
-type TTRPCSocketAllocatorServiceClient interface {
-	AllocateSockets(context.Context, *AllocateSocketsRequest) (*AllocateSocketsResponse, error)
-	AllocateSocketStream(context.Context, *AllocateSocketStreamRequest) (TTRPCSocketAllocatorService_AllocateSocketStreamClient, error)
-	DialOpenListener(context.Context, *DialOpenListenerRequest) (*DialOpenListenerResponse, error)
-	AllocateIO(context.Context, *AllocateIORequest) (*AllocateIOResponse, error)
-	AllocateConsole(context.Context, *AllocateConsoleRequest) (*AllocateConsoleResponse, error)
-	BindConsoleToSocket(context.Context, *BindConsoleToSocketRequest) (*BindConsoleToSocketResponse, error)
-	BindIOToSockets(context.Context, *BindIOToSocketsRequest) (*BindIOToSocketsResponse, error)
-	CloseSocket(context.Context, *CloseSocketRequest) (*CloseSocketResponse, error)
-	CloseSockets(context.Context, *CloseSocketsRequest) (*CloseSocketsResponse, error)
-	CloseIO(context.Context, *CloseIORequest) (*CloseIOResponse, error)
-	CloseConsole(context.Context, *CloseConsoleRequest) (*CloseConsoleResponse, error)
 }
 
 type ttrpcsocketallocatorserviceClient struct {
 	client *ttrpc.Client
 }
 
-func NewTTRPCSocketAllocatorServiceClient(client *ttrpc.Client) TTRPCSocketAllocatorServiceClient {
+func NewTTRPCSocketAllocatorServiceClient(client *ttrpc.Client) TTRPCSocketAllocatorServiceService {
 	return &ttrpcsocketallocatorserviceClient{
 		client: client,
 	}
-}
-
-func (c *ttrpcsocketallocatorserviceClient) AllocateSockets(ctx context.Context, req *AllocateSocketsRequest) (*AllocateSocketsResponse, error) {
-	var resp AllocateSocketsResponse
-	if err := c.client.Call(ctx, "runm.v1.SocketAllocatorService", "AllocateSockets", req, &resp); err != nil {
-		return nil, err
-	}
-	return &resp, nil
-}
-
-func (c *ttrpcsocketallocatorserviceClient) AllocateSocketStream(ctx context.Context, req *AllocateSocketStreamRequest) (TTRPCSocketAllocatorService_AllocateSocketStreamClient, error) {
-	stream, err := c.client.NewStream(ctx, &ttrpc.StreamDesc{
-		StreamingClient: false,
-		StreamingServer: true,
-	}, "runm.v1.SocketAllocatorService", "AllocateSocketStream", req)
-	if err != nil {
-		return nil, err
-	}
-	x := &ttrpcsocketallocatorserviceAllocateSocketStreamClient{stream}
-	return x, nil
-}
-
-type TTRPCSocketAllocatorService_AllocateSocketStreamClient interface {
-	Recv() (*AllocateSocketStreamResponse, error)
-	ttrpc.ClientStream
-}
-
-type ttrpcsocketallocatorserviceAllocateSocketStreamClient struct {
-	ttrpc.ClientStream
-}
-
-func (x *ttrpcsocketallocatorserviceAllocateSocketStreamClient) Recv() (*AllocateSocketStreamResponse, error) {
-	m := new(AllocateSocketStreamResponse)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
 }
 
 func (c *ttrpcsocketallocatorserviceClient) DialOpenListener(ctx context.Context, req *DialOpenListenerRequest) (*DialOpenListenerResponse, error) {

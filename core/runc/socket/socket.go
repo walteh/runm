@@ -100,7 +100,7 @@ func copyLoggingAllBytesSomehow(ctx context.Context, name string, w io.Writer, r
 				slog.ErrorContext(ctx, "error reading byte", "name", name, "error", err)
 				return
 			}
-			slog.InfoContext(ctx, "copied byte", "name", name, "byte", buf[0])
+			slog.InfoContext(ctx, "copied byte", "name", name, "byte", buf[0], "string", string(buf))
 		}
 	}()
 	return io.Copy(w, nr)
