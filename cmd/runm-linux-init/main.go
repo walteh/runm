@@ -65,6 +65,8 @@ type runmLinuxInit struct {
 	logWriter  io.WriteCloser
 	otelWriter io.WriteCloser
 
+	exitChan chan gorunc.Exit
+
 	logger *slog.Logger
 }
 
@@ -169,7 +171,139 @@ func recoveryMain(ctx context.Context, r *runmLinuxInit) (err error) {
 	return <-errChan
 }
 
-func proxyHooks(ctx context.Context) error {
+func (r *runmLinuxInit) configureRuntimeServer(ctx context.Context) (*grpc.Server, *server.Server, error) {
+	namespace := "default"
+	runcRoot := "/run/containerd/runc"
+
+	realRuntime := goruncruntime.WrapdGoRuncRuntime(&gorunc.Runc{
+		Command:       "/mbin/runc-test",
+		Log:           filepath.Join(constants.Ec1AbsPath, runtime.LogFileBase),
+		LogFormat:     gorunc.JSON,
+		PdeathSignal:  unix.SIGKILL,
+		Debug:         true,
+		Root:          filepath.Join(runcRoot, namespace), // 		Root:         filepath.Join(opts.ProcessCreateConfig.Options.Root, opts.Namespace),
+		SystemdCgroup: false,
+	})
+
+	serveropts := []grpc.ServerOption{
+		grpc.ChainUnaryInterceptor(grpcerr.UnaryServerInterceptor),
+	}
+
+	if enableOtel {
+		if logging.GetGlobalOtelInstances() != nil {
+			serveropts = append(serveropts, logging.GetGlobalOtelInstances().GetGrpcServerOpts())
+			defer logging.GetGlobalOtelInstances().Shutdown(ctx)
+		} else {
+			slog.WarnContext(ctx, "no otel instances found, not enabling otel")
+		}
+	}
+
+	grpcVsockServer := grpc.NewServer(serveropts...)
+
+	cgroupAdapter, err := goruncruntime.NewCgroupV2Adapter(ctx, containerId)
+	if err != nil {
+		return nil, nil, errors.Errorf("failed to create cgroup adapter: %w", err)
+	}
+
+	var mockRuntimeExtras = &runtimemock.MockRuntimeExtras{}
+
+	realEventHandler := goruncruntime.NewGoRuncEventHandler()
+
+	serverz := server.NewServer(
+		realRuntime,
+		mockRuntimeExtras,
+		// realSocketAllocator,
+		realEventHandler,
+		cgroupAdapter,
+		server.WithBundleSource(bundleSource),
+		server.WithCustomExitChan(r.exitChan),
+	)
+
+	serverz.RegisterGrpcServer(grpcVsockServer)
+
+	return grpcVsockServer, serverz, nil
+}
+
+func errGroupGoWithLogging(ctx context.Context, name string, egroup *errgroup.Group, f func() error) {
+	egroup.Go(func() (err error) {
+		slog.DebugContext(ctx, "starting goroutine", "name", name)
+		defer func() {
+			if err != nil {
+				slog.DebugContext(ctx, "goroutine finished", "name", name, "error", err)
+			} else {
+				slog.DebugContext(ctx, "goroutine finished", "name", name)
+			}
+		}()
+		err = f()
+		return
+	})
+}
+
+func (r *runmLinuxInit) runGrpcVsockServer(ctx context.Context) error {
+	slog.InfoContext(ctx, "listening on vsock", "port", constants.RunmGuestServerVsockPort)
+	listener, err := vsock.ListenContextID(3, uint32(constants.RunmGuestServerVsockPort), nil)
+	if err != nil {
+		slog.ErrorContext(ctx, "problem listening vsock", "error", err)
+		return errors.Errorf("problem listening vsock: %w", err)
+	}
+
+	grpcVsockServer, _, err := r.configureRuntimeServer(ctx)
+	if err != nil {
+		return errors.Errorf("problem configuring runtime server: %w", err)
+	}
+
+	if err := grpcVsockServer.Serve(listener); err != nil {
+		return errors.Errorf("problem serving grpc vsock server: %w", err)
+	}
+
+	return nil
+}
+
+func (r *runmLinuxInit) run(ctx context.Context) error {
+
+	if containerId == "" {
+		return errors.Errorf("container-id flag is required")
+	}
+
+	errgroupz, ctx := errgroup.WithContext(ctx)
+
+	r.exitChan = make(chan gorunc.Exit, 32*100)
+
+	errGroupGoWithLogging(ctx, "psnotify", errgroupz, func() error {
+		return r.runPsnotify(ctx, r.exitChan)
+	})
+
+	errGroupGoWithLogging(ctx, "delim-writer-unix-proxy", errgroupz, func() error {
+		return r.runVsockUnixProxy(ctx, constants.DelimitedWriterProxyGuestUnixPath, r.logWriter)
+	})
+
+	errGroupGoWithLogging(ctx, "raw-writer-unix-proxy", errgroupz, func() error {
+		return r.runVsockUnixProxy(ctx, constants.RawWriterProxyGuestUnixPath, r.rawWriter)
+	})
+
+	errGroupGoWithLogging(ctx, "ticker", errgroupz, func() error {
+		return r.runTicker(ctx)
+	})
+
+	go func() {
+		err := runProxyHooks(ctx)
+		if err != nil {
+			slog.ErrorContext(ctx, "problem proxying hooks", "error", err)
+		}
+	}()
+
+	if err := mount(ctx); err != nil {
+		return errors.Errorf("problem mounting rootfs: %w", err)
+	}
+
+	errGroupGoWithLogging(ctx, "grpc-vsock-server", errgroupz, func() error {
+		return r.runGrpcVsockServer(ctx)
+	})
+
+	return errgroupz.Wait()
+}
+
+func runProxyHooks(ctx context.Context) error {
 	spec, exists, err := loadSpec(ctx)
 	if err != nil {
 		return errors.Errorf("failed to load spec: %w", err)
@@ -225,34 +359,6 @@ func (r *runmLinuxInit) runVsockUnixProxy(ctx context.Context, path string, writ
 		}()
 	}
 
-	return nil
-}
-
-func (r *runmLinuxInit) runVsockTCPProxy(ctx context.Context, address string, writer io.WriteCloser) error {
-	tcpconn, err := net.Listen("tcp", address)
-	if err != nil {
-		return errors.Errorf("problem listening vsock for log proxy: %w", err)
-	}
-
-	defer tcpconn.Close()
-
-	for {
-		conn, err := tcpconn.Accept()
-		if err != nil {
-			slog.ErrorContext(ctx, "problem accepting log proxy connection", "error", err)
-			return errors.Errorf("problem accepting log proxy connection: %w", err)
-		}
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-
-		go func() {
-			defer conn.Close()
-			io.Copy(writer, conn)
-		}()
-	}
-
-	return nil
 }
 
 func (r *runmLinuxInit) runTicker(ctx context.Context) error {
@@ -271,139 +377,6 @@ func (r *runmLinuxInit) runTicker(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func (r *runmLinuxInit) configureRuntimeServer(ctx context.Context) (*grpc.Server, *server.Server, error) {
-	namespace := "default"
-	runcRoot := "/run/containerd/runc"
-
-	realRuntime := goruncruntime.WrapdGoRuncRuntime(&gorunc.Runc{
-		Command:       "/mbin/runc-test",
-		Log:           filepath.Join(constants.Ec1AbsPath, runtime.LogFileBase),
-		LogFormat:     gorunc.JSON,
-		PdeathSignal:  unix.SIGKILL,
-		Debug:         true,
-		Root:          filepath.Join(runcRoot, namespace), // 		Root:         filepath.Join(opts.ProcessCreateConfig.Options.Root, opts.Namespace),
-		SystemdCgroup: false,
-	})
-
-	serveropts := []grpc.ServerOption{
-		grpc.ChainUnaryInterceptor(grpcerr.UnaryServerInterceptor),
-	}
-
-	if enableOtel {
-		if logging.GetGlobalOtelInstances() != nil {
-			serveropts = append(serveropts, logging.GetGlobalOtelInstances().GetGrpcServerOpts())
-			defer logging.GetGlobalOtelInstances().Shutdown(ctx)
-		} else {
-			slog.WarnContext(ctx, "no otel instances found, not enabling otel")
-		}
-	}
-
-	grpcVsockServer := grpc.NewServer(serveropts...)
-
-	cgroupAdapter, err := goruncruntime.NewCgroupV2Adapter(ctx, containerId)
-	if err != nil {
-		return nil, nil, errors.Errorf("failed to create cgroup adapter: %w", err)
-	}
-
-	var mockRuntimeExtras = &runtimemock.MockRuntimeExtras{}
-
-	realEventHandler := goruncruntime.NewGoRuncEventHandler()
-
-	serverz := server.NewServer(
-		realRuntime,
-		mockRuntimeExtras,
-		// realSocketAllocator,
-		realEventHandler,
-		cgroupAdapter,
-		server.WithBundleSource(bundleSource),
-	)
-
-	serverz.RegisterGrpcServer(grpcVsockServer)
-
-	return grpcVsockServer, serverz, nil
-}
-
-func errGroupGoWithLogging(ctx context.Context, name string, egroup *errgroup.Group, f func() error) {
-	egroup.Go(func() (err error) {
-		slog.DebugContext(ctx, "starting goroutine", "name", name)
-		defer func() {
-			if err != nil {
-				slog.DebugContext(ctx, "goroutine finished", "name", name, "error", err)
-			} else {
-				slog.DebugContext(ctx, "goroutine finished", "name", name)
-			}
-		}()
-		err = f()
-		return
-	})
-}
-
-func (r *runmLinuxInit) runGrpcVsockServer(ctx context.Context) error {
-	slog.InfoContext(ctx, "listening on vsock", "port", constants.RunmGuestServerVsockPort)
-	listener, err := vsock.ListenContextID(3, uint32(constants.RunmGuestServerVsockPort), nil)
-	if err != nil {
-		slog.ErrorContext(ctx, "problem listening vsock", "error", err)
-		return errors.Errorf("problem listening vsock: %w", err)
-	}
-
-	grpcVsockServer, _, err := r.configureRuntimeServer(ctx)
-	if err != nil {
-		return errors.Errorf("problem configuring runtime server: %w", err)
-	}
-
-	if err := grpcVsockServer.Serve(listener); err != nil {
-		return errors.Errorf("problem serving grpc vsock server: %w", err)
-	}
-
-	return nil
-}
-
-func (r *runmLinuxInit) run(ctx context.Context) error {
-
-	if containerId == "" {
-		return errors.Errorf("container-id flag is required")
-	}
-
-	errgroupz, ctx := errgroup.WithContext(ctx)
-
-	// errGroupGoWithLogging(ctx, "delim-writer-tcp-proxy", errgroupz, func() error {
-	// 	return r.runVsockTCPProxy(ctx, constants.DelimitedLogProxyGuestTCPAddress, r.logWriter)
-	// })
-
-	// errGroupGoWithLogging(ctx, "raw-writer-tcp-proxy", errgroupz, func() error {
-	// 	return r.runVsockTCPProxy(ctx, constants.RawLogProxyGuestTCPAddress, r.rawWriter)
-	// })
-
-	errGroupGoWithLogging(ctx, "delim-writer-unix-proxy", errgroupz, func() error {
-		return r.runVsockUnixProxy(ctx, constants.DelimitedWriterProxyGuestUnixPath, r.logWriter)
-	})
-
-	errGroupGoWithLogging(ctx, "raw-writer-unix-proxy", errgroupz, func() error {
-		return r.runVsockUnixProxy(ctx, constants.RawWriterProxyGuestUnixPath, r.rawWriter)
-	})
-
-	errGroupGoWithLogging(ctx, "ticker", errgroupz, func() error {
-		return r.runTicker(ctx)
-	})
-
-	go func() {
-		err := proxyHooks(ctx)
-		if err != nil {
-			slog.ErrorContext(ctx, "problem proxying hooks", "error", err)
-		}
-	}()
-
-	if err := mount(ctx); err != nil {
-		return errors.Errorf("problem mounting rootfs: %w", err)
-	}
-
-	errGroupGoWithLogging(ctx, "grpc-vsock-server", errgroupz, func() error {
-		return r.runGrpcVsockServer(ctx)
-	})
-
-	return errgroupz.Wait()
 }
 
 func loadSpec(ctx context.Context) (spec *oci.Spec, exists bool, err error) {

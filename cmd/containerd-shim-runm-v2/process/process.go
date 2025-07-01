@@ -59,4 +59,6 @@ type Process interface {
 	Runtime() runtime.Runtime
 	// Cgroup returns the cgroup for the process
 	CgroupAdapter() runtime.CgroupAdapter
+	// CloseIO closes the process IO
+	CloseIO()
 }

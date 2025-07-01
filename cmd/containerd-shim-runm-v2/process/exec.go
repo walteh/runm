@@ -64,6 +64,12 @@ type execProcess struct {
 	waitBlock chan struct{}
 }
 
+func (e *execProcess) CloseIO() {
+	if e.io != nil {
+		e.io.Close()
+	}
+}
+
 func (e *execProcess) Runtime() runtime.Runtime {
 	return e.parent.runtime
 }

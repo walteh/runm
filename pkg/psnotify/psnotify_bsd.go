@@ -8,6 +8,9 @@ package psnotify
 
 import (
 	"syscall"
+	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -73,16 +76,19 @@ func (w *Watcher) readEvents() {
 		}
 
 		for _, ev := range events[:n] {
+			now := time.Now()
 			pid := int(ev.Ident)
 
 			switch ev.Fflags {
 			case syscall.NOTE_FORK:
-				w.Fork <- &ProcEventFork{ParentPid: pid}
+				w.Fork <- &ProcEventFork{ParentPid: pid, Timestamp: now}
 			case syscall.NOTE_EXEC:
-				w.Exec <- &ProcEventExec{Pid: pid}
+				w.Exec <- &ProcEventExec{Pid: pid, Timestamp: now}
 			case syscall.NOTE_EXIT:
 				w.RemoveWatch(pid)
-				w.Exit <- &ProcEventExit{Pid: pid}
+
+				rawStatus := unix.WaitStatus(ev.Data)
+				w.Exit <- &ProcEventExit{Pid: pid, ExitCode: int(rawStatus.ExitStatus()), ExitSignal: rawStatus.Signal(), Timestamp: now}
 			}
 		}
 	}

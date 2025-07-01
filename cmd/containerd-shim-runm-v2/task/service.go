@@ -58,24 +58,29 @@ var (
 	empty = &ptypes.Empty{}
 )
 
+type containerReaperExit struct {
+	containerId string
+	exit        gorunc.Exit
+}
+
 // NewTaskService creates a new instance of a task service
 func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.Service, rtc runtime.RuntimeCreator) (taskv3.TTRPCTaskService, error) {
 
 	s := &service{
-		context: ctx,
-		events:  make(chan interface{}, 128),
-		// ec:                   reaper.Default.Subscribe(), // todo: we need to proxy the reaper events from the vm to the host
+		context:              ctx,
+		events:               make(chan interface{}, 128),
+		ec:                   make(chan containerReaperExit, 32),
 		ep:                   nil,
 		shutdown:             sd,
 		containers:           make(map[string]*runm.Container),
-		running:              make(map[int][]containerProcess),
+		running:              make(map[containerPid][]containerProcess),
 		runningExecs:         make(map[*runm.Container]int),
 		execCountSubscribers: make(map[*runm.Container]chan<- int),
 		containerInitExit:    make(map[*runm.Container]gorunc.Exit),
-		exitSubscribers:      make(map[*map[int][]gorunc.Exit]struct{}),
+		exitSubscribers:      make(map[*map[containerPid][]gorunc.Exit]struct{}),
 		creator:              rtc,
 	}
-	// go s.processExits()
+	go s.processExits()
 	// gorunc.Monitor = reaper.Default // todo: we need to proxy the reaper events from the vm to the host
 	if err := s.initPlatform(); err != nil {
 		return nil, fmt.Errorf("failed to initialized platform behavior: %w", err)
@@ -107,6 +112,11 @@ var (
 	_ runmv1.ShimServiceServer = &service{}
 )
 
+type containerPid struct {
+	pid         int
+	containerId string
+}
+
 // service is the shim implementation of a remote shim over GRPC
 type service struct {
 	mu sync.Mutex
@@ -114,15 +124,15 @@ type service struct {
 	context  context.Context
 	events   chan interface{}
 	platform stdio.Platform
-	ec       chan gorunc.Exit
+	ec       chan containerReaperExit
 	ep       *oom.Watcher
 
 	primaryContainerId string
 	containers         map[string]*runm.Container
 
 	lifecycleMu  sync.Mutex
-	running      map[int][]containerProcess // pid -> running process, guarded by lifecycleMu
-	runningExecs map[*runm.Container]int    // container -> num running execs, guarded by lifecycleMu
+	running      map[containerPid][]containerProcess // pid -> running process, guarded by lifecycleMu
+	runningExecs map[*runm.Container]int             // container -> num running execs, guarded by lifecycleMu
 	// container -> subscription to exec exits/changes to s.runningExecs[container],
 	// guarded by lifecycleMu
 	execCountSubscribers map[*runm.Container]chan<- int
@@ -138,7 +148,7 @@ type service struct {
 	// Subscriptions to exits for PIDs. Adding/deleting subscriptions and
 	// dereferencing the subscription pointers must only be done while holding
 	// lifecycleMu.
-	exitSubscribers map[*map[int][]gorunc.Exit]struct{}
+	exitSubscribers map[*map[containerPid][]gorunc.Exit]struct{}
 
 	shutdown  shutdown.Service
 	publisher shim.Publisher
@@ -167,23 +177,26 @@ type containerProcess struct {
 // It must be called before the caller of preStart returns, otherwise severe
 // memory leaks will occur.
 func (s *service) preStart(c *runm.Container) (handleStarted func(*runm.Container, process.Process), cleanup func()) {
-	exits := make(map[int][]gorunc.Exit)
+	exits := make(map[containerPid][]gorunc.Exit)
 	s.exitSubscribers[&exits] = struct{}{}
 
 	if c != nil {
 		// Remove container init process from s.running so it will once again be
 		// treated as an early exit if it exits before handleStarted is called.
-		pid := c.Pid()
+		pidz := containerPid{
+			pid:         c.Pid(),
+			containerId: c.ID,
+		}
 		var newRunning []containerProcess
-		for _, cp := range s.running[pid] {
+		for _, cp := range s.running[pidz] {
 			if cp.Container != c {
 				newRunning = append(newRunning, cp)
 			}
 		}
 		if len(newRunning) > 0 {
-			s.running[pid] = newRunning
+			s.running[pidz] = newRunning
 		} else {
-			delete(s.running, pid)
+			delete(s.running, pidz)
 		}
 	}
 
@@ -195,7 +208,12 @@ func (s *service) preStart(c *runm.Container) (handleStarted func(*runm.Containe
 
 		s.lifecycleMu.Lock()
 
-		ees, exited := exits[pid]
+		pidz := containerPid{
+			pid:         pid,
+			containerId: c.ID,
+		}
+
+		ees, exited := exits[pidz]
 		delete(s.exitSubscribers, &exits)
 		exits = nil
 		if pid == 0 || exited {
@@ -205,7 +223,7 @@ func (s *service) preStart(c *runm.Container) (handleStarted func(*runm.Containe
 			}
 		} else {
 			// Process start was successful, add to `s.running`.
-			s.running[pid] = append(s.running[pid], containerProcess{
+			s.running[pidz] = append(s.running[pidz], containerProcess{
 				Container: c,
 				Process:   p,
 			})
@@ -252,10 +270,22 @@ func (s *service) Create(ctx context.Context, r *taskv3.CreateTaskRequest) (_ *t
 		return nil, grpcerr.ToContainerdTTRPCf(ctx, err, "reading spec")
 	}
 
-	container, err := runm.NewContainer(ctx, s.platform, r, spec, s.publisher, s.creator)
+	reapereventChan := make(chan gorunc.Exit)
+
+	container, err := runm.NewContainer(ctx, s.platform, r, spec, s.publisher, reapereventChan, s.creator)
 	if err != nil {
 		return nil, err
 	}
+
+	go func() {
+		for e := range reapereventChan {
+			slog.InfoContext(ctx, "reaper event", "id", container.ID, "exit", e)
+			s.ec <- containerReaperExit{
+				containerId: container.ID,
+				exit:        e,
+			}
+		}
+	}()
 
 	slog.InfoContext(ctx, "done creating container")
 
@@ -546,6 +576,7 @@ func (s *service) Kill(ctx context.Context, r *taskv3.KillRequest) (*ptypes.Empt
 	if err != nil {
 		return nil, err
 	}
+	// if container.
 	slog.InfoContext(ctx, "KILLING RUNM with opts", "id", container.ID, "signal", r.Signal, "all", r.All)
 	if err := container.Kill(ctx, r); err != nil {
 		return nil, errgrpc.ToGRPC(err)
@@ -721,7 +752,7 @@ func (s *service) Stats(ctx context.Context, r *taskv3.StatsRequest) (*taskv3.St
 }
 
 func (s *service) processExits() {
-	for e := range s.ec {
+	for ce := range s.ec {
 		// While unlikely, it is not impossible for a container process to exit
 		// and have its PID be recycled for a new container process before we
 		// have a chance to process the first exit. As we have no way to tell
@@ -730,31 +761,37 @@ func (s *service) processExits() {
 		// exit correctly in that case.
 
 		s.lifecycleMu.Lock()
+
+		pidz := containerPid{
+			pid:         ce.exit.Pid,
+			containerId: ce.containerId,
+		}
+
 		// Inform any concurrent s.Start() calls so they can handle the exit
 		// if the PID belongs to them.
 		for subscriber := range s.exitSubscribers {
-			(*subscriber)[e.Pid] = append((*subscriber)[e.Pid], e)
+			(*subscriber)[pidz] = append((*subscriber)[pidz], ce.exit)
 		}
 		// Handle the exit for a created/started process. If there's more than
 		// one, assume they've all exited. One of them will be the correct
 		// process.
 		var cps []containerProcess
-		for _, cp := range s.running[e.Pid] {
+		for _, cp := range s.running[pidz] {
 			_, init := cp.Process.(*process.Init)
 			if init {
-				s.containerInitExit[cp.Container] = e
+				s.containerInitExit[cp.Container] = ce.exit
 			}
 			cps = append(cps, cp)
 		}
-		delete(s.running, e.Pid)
+		delete(s.running, pidz)
 		s.lifecycleMu.Unlock()
 
 		for _, cp := range cps {
 			// todo: here we need to mkae sure we are getting to here
 			if ip, ok := cp.Process.(*process.Init); ok {
-				s.handleInitExit(e, cp.Container, ip)
+				s.handleInitExit(ce.exit, cp.Container, ip)
 			} else {
-				s.handleProcessExit(e, cp.Container, cp.Process)
+				s.handleProcessExit(ce.exit, cp.Container, cp.Process)
 			}
 		}
 	}

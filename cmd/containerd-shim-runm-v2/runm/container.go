@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/stdio"
 	"github.com/containerd/errdefs"
+	gorunc "github.com/containerd/go-runc"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -54,6 +55,7 @@ func NewContainer(
 	r *task.CreateTaskRequest,
 	spec *oci.Spec,
 	publisher events.Publisher,
+	reapereventChan chan<- gorunc.Exit,
 	rtc runtime.RuntimeCreator,
 ) (_ *Container, retErr error) {
 
@@ -253,9 +255,30 @@ func NewContainer(
 		// }
 	}
 
+	go func() {
+		exits, err := rt.SubscribeToReaperExits(ctx)
+		if err != nil {
+			slog.ErrorContext(ctx, "failed to subscribe to reaper exits", "id", r.ID, "error", err)
+			return
+		}
+		for e := range exits {
+			slog.InfoContext(ctx, "reaper event", "id", r.ID, "exit", e)
+			reapereventChan <- e
+		}
+	}()
+
 	slog.InfoContext(ctx, "container struct created", "id", r.ID, "pid", pid)
 
 	return container, nil
+}
+
+func (c *Container) ProcessExits(ctx context.Context, rt runtime.Runtime) (<-chan gorunc.Exit, error) {
+	exits, err := rt.SubscribeToReaperExits(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to subscribe to reaper exits", "id", c.ID, "error", err)
+		return nil, err
+	}
+	return exits, nil
 }
 
 // func (s *Container) processExits() {
@@ -512,8 +535,8 @@ func (c *Container) ProcessRemove(id string) {
 
 // Start a container process
 func (c *Container) Start(ctx context.Context, r *task.StartRequest) (process.Process, error) {
-	slog.InfoContext(ctx, "TASK:CONTAINER:START[START]", "id", c.ID, "execID", r.ExecID)
-	defer slog.InfoContext(ctx, "TASK:CONTAINER:END  [START]", "id", c.ID, "execID", r.ExecID)
+	slog.DebugContext(ctx, "SHIM:CONTAINER:START[START]", "id", c.ID, "execID", r.ExecID)
+	defer slog.DebugContext(ctx, "SHIM:CONTAINER:END  [START]", "id", c.ID, "execID", r.ExecID)
 	p, err := c.Process(r.ExecID)
 	if err != nil {
 		return nil, err
@@ -531,8 +554,8 @@ func (c *Container) Start(ctx context.Context, r *task.StartRequest) (process.Pr
 
 // Delete the container or a process by id
 func (c *Container) Delete(ctx context.Context, r *task.DeleteRequest) (process.Process, error) {
-	slog.InfoContext(ctx, "TASK:CONTAINER:START[DELETE]", "id", c.ID, "execID", r.ExecID)
-	defer slog.InfoContext(ctx, "TASK:CONTAINER:END  [DELETE]", "id", c.ID, "execID", r.ExecID)
+	slog.DebugContext(ctx, "SHIM:CONTAINER:START[DELETE]", "id", c.ID, "execID", r.ExecID)
+	defer slog.DebugContext(ctx, "SHIM:CONTAINER:END  [DELETE]", "id", c.ID, "execID", r.ExecID)
 	p, err := c.Process(r.ExecID)
 	if err != nil {
 		return nil, err
@@ -548,8 +571,8 @@ func (c *Container) Delete(ctx context.Context, r *task.DeleteRequest) (process.
 
 // Exec an additional process
 func (c *Container) Exec(ctx context.Context, r *task.ExecProcessRequest) (process.Process, error) {
-	slog.InfoContext(ctx, "TASK:CONTAINER:START[EXEC]", "id", c.ID, "execID", r.ExecID)
-	defer slog.InfoContext(ctx, "TASK:CONTAINER:END  [EXEC]", "id", c.ID, "execID", r.ExecID)
+	slog.DebugContext(ctx, "SHIM:CONTAINER:START[EXEC]", "id", c.ID, "execID", r.ExecID)
+	defer slog.DebugContext(ctx, "SHIM:CONTAINER:END  [EXEC]", "id", c.ID, "execID", r.ExecID)
 	var spec specs.Process
 	if err := json.Unmarshal(r.Spec.Value, &spec); err != nil {
 		return nil, err
@@ -572,22 +595,22 @@ func (c *Container) Exec(ctx context.Context, r *task.ExecProcessRequest) (proce
 
 // Pause the container
 func (c *Container) Pause(ctx context.Context) error {
-	slog.InfoContext(ctx, "TASK:CONTAINER:START[PAUSE]", "id", c.ID)
-	defer slog.InfoContext(ctx, "TASK:CONTAINER:END  [PAUSE]", "id", c.ID)
+	slog.DebugContext(ctx, "SHIM:CONTAINER:START[PAUSE]", "id", c.ID)
+	defer slog.DebugContext(ctx, "SHIM:CONTAINER:END  [PAUSE]", "id", c.ID)
 	return c.process.(*process.Init).Pause(ctx)
 }
 
 // Resume the container
 func (c *Container) Resume(ctx context.Context) error {
-	slog.InfoContext(ctx, "TASK:CONTAINER:START[RESUME]", "id", c.ID)
-	defer slog.InfoContext(ctx, "TASK:CONTAINER:END  [RESUME]", "id", c.ID)
+	slog.DebugContext(ctx, "SHIM:CONTAINER:START[RESUME]", "id", c.ID)
+	defer slog.DebugContext(ctx, "SHIM:CONTAINER:END  [RESUME]", "id", c.ID)
 	return c.process.(*process.Init).Resume(ctx)
 }
 
 // ResizePty of a process
 func (c *Container) ResizePty(ctx context.Context, r *task.ResizePtyRequest) error {
-	slog.InfoContext(ctx, "TASK:CONTAINER:START[RESIZE_PTY]", "id", c.ID, "execID", r.ExecID)
-	defer slog.InfoContext(ctx, "TASK:CONTAINER:END  [RESIZE_PTY]", "id", c.ID, "execID", r.ExecID)
+	slog.DebugContext(ctx, "SHIM:CONTAINER:START[RESIZE_PTY]", "id", c.ID, "execID", r.ExecID)
+	defer slog.DebugContext(ctx, "SHIM:CONTAINER:END  [RESIZE_PTY]", "id", c.ID, "execID", r.ExecID)
 	p, err := c.Process(r.ExecID)
 	if err != nil {
 		return err
@@ -601,33 +624,41 @@ func (c *Container) ResizePty(ctx context.Context, r *task.ResizePtyRequest) err
 
 // Kill a process
 func (c *Container) Kill(ctx context.Context, r *task.KillRequest) error {
-	slog.InfoContext(ctx, "TASK:CONTAINER:START[KILL]", "id", c.ID, "execID", r.ExecID)
-	defer slog.InfoContext(ctx, "TASK:CONTAINER:END  [KILL]", "id", c.ID, "execID", r.ExecID)
+	slog.DebugContext(ctx, "SHIM:CONTAINER:START[KILL]", "id", c.ID, "execID", r.ExecID)
+	defer slog.DebugContext(ctx, "SHIM:CONTAINER:END  [KILL]", "id", c.ID, "execID", r.ExecID)
 	p, err := c.Process(r.ExecID)
 	if err != nil {
 		return err
 	}
+
+	p.CloseIO()
+
 	err = p.Kill(ctx, r.Signal, r.All)
 	if err != nil {
-		slog.ErrorContext(ctx, "KILLING RUNM", "id", c.ID, "signal", r.Signal, "all", r.All, "error", err)
+		return err
+		// slog.ErrorContext(ctx, "KILLING RUNM", "id", c.ID, "signal", r.Signal, "all", r.All, "error", err)
 	}
 
+	// if r.Signal == 16 {
+	// 	p.Stdio().
+	// }
+
 	// kill vm
-	if c.runner != nil {
-		slog.InfoContext(ctx, "KILLING RUNM VM", "id", c.ID)
-		err = c.runner.Close(ctx)
-		if err != nil {
-			slog.ErrorContext(ctx, "KILLING RUNM VM", "id", c.ID, "error", err)
-		}
-	}
+	// if c.runner != nil {
+	// 	slog.InfoContext(ctx, "KILLING RUNM VM", "id", c.ID)
+	// 	err = c.runner.Close(ctx)
+	// 	if err != nil {
+	// 		slog.ErrorContext(ctx, "KILLING RUNM VM", "id", c.ID, "error", err)
+	// 	}
+	// }
 
 	return err
 }
 
 // CloseIO of a process
 func (c *Container) CloseIO(ctx context.Context, r *task.CloseIORequest) error {
-	slog.InfoContext(ctx, "TASK:CONTAINER:START[CLOSE_IO]", "id", c.ID, "execID", r.ExecID)
-	defer slog.InfoContext(ctx, "TASK:CONTAINER:END  [CLOSE_IO]", "id", c.ID, "execID", r.ExecID)
+	slog.DebugContext(ctx, "SHIM:CONTAINER:START[CLOSE_IO]", "id", c.ID, "execID", r.ExecID)
+	defer slog.DebugContext(ctx, "SHIM:CONTAINER:END  [CLOSE_IO]", "id", c.ID, "execID", r.ExecID)
 	p, err := c.Process(r.ExecID)
 	if err != nil {
 		return err
@@ -642,8 +673,8 @@ func (c *Container) CloseIO(ctx context.Context, r *task.CloseIORequest) error {
 
 // Checkpoint the container
 func (c *Container) Checkpoint(ctx context.Context, r *task.CheckpointTaskRequest) error {
-	slog.InfoContext(ctx, "TASK:CONTAINER:START[CHECKPOINT]", "id", c.ID)
-	defer slog.InfoContext(ctx, "TASK:CONTAINER:END  [CHECKPOINT]", "id", c.ID)
+	slog.DebugContext(ctx, "SHIM:CONTAINER:START[CHECKPOINT]", "id", c.ID)
+	defer slog.DebugContext(ctx, "SHIM:CONTAINER:END  [CHECKPOINT]", "id", c.ID)
 	p, err := c.Process("")
 	if err != nil {
 		return err
@@ -669,8 +700,8 @@ func (c *Container) Checkpoint(ctx context.Context, r *task.CheckpointTaskReques
 
 // Update the resource information of a running container
 func (c *Container) Update(ctx context.Context, r *task.UpdateTaskRequest) error {
-	slog.InfoContext(ctx, "TASK:CONTAINER:START[UPDATE]", "id", c.ID)
-	defer slog.InfoContext(ctx, "TASK:CONTAINER:END  [UPDATE]", "id", c.ID)
+	slog.DebugContext(ctx, "SHIM:CONTAINER:START[UPDATE]", "id", c.ID)
+	defer slog.DebugContext(ctx, "SHIM:CONTAINER:END  [UPDATE]", "id", c.ID)
 	p, err := c.Process("")
 	if err != nil {
 		return err

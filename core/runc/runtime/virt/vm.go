@@ -2,6 +2,7 @@ package virt
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	"github.com/containers/common/pkg/strongunits"
@@ -35,6 +36,8 @@ type RunmVMRuntime[VM vmm.VirtualMachine] struct {
 	vm         *vmm.RunningVM[VM]
 	oomWatcher *oom.Watcher
 
+	closers []func() error
+
 	runGroup *run.Group
 }
 
@@ -47,6 +50,8 @@ func NewRunmVMRuntime[VM vmm.VirtualMachine](
 ) (*RunmVMRuntime[VM], error) {
 
 	runGroup := run.New()
+
+	closers := []func() error{}
 
 	cfg := vmm.OCIVMConfig{
 		ID:             opts.ProcessCreateConfig.ID,
@@ -65,6 +70,10 @@ func NewRunmVMRuntime[VM vmm.VirtualMachine](
 	if err != nil {
 		return nil, err
 	}
+
+	closers = append(closers, func() error {
+		return vm.Close(ctx)
+	})
 
 	slog.InfoContext(ctx, "created oci vm, starting it", "id", vm.VM().ID(), "rawWriter==nil", cfg.RawWriter == nil, "delimWriter==nil", cfg.DelimWriter == nil)
 
@@ -100,6 +109,7 @@ func NewRunmVMRuntime[VM vmm.VirtualMachine](
 		RuntimeExtras:   srv,
 		CgroupAdapter:   srv,
 		EventHandler:    srv,
+		closers:         closers,
 		GuestManagement: srv,
 		runGroup:        runGroup,
 	}, nil
@@ -112,7 +122,14 @@ func (r *RunmVMRuntime[VM]) Alive() bool {
 
 // Close implements run.Runnable.
 func (r *RunmVMRuntime[VM]) Close(ctx context.Context) error {
-	return r.vm.VM().HardStop(ctx)
+	errs := []error{}
+	for _, closer := range r.closers {
+		if err := closer(); err != nil {
+			slog.ErrorContext(ctx, "error closing vm", "error", err)
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // Fields implements run.Runnable.

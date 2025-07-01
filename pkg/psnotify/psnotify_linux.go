@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"os"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -161,6 +162,7 @@ func (w *Watcher) isWatching(pid int, event uint32) bool {
 // Unlike bsd kqueue, netlink receives events for all pids,
 // so we apply filtering based on the watch table via isWatching()
 func (w *Watcher) handleEvent(data []byte) {
+	now := time.Now()
 	buf := bytes.NewBuffer(data)
 	msg := &cnMsg{}
 	hdr := &procEventHeader{}
@@ -182,7 +184,7 @@ func (w *Watcher) handleEvent(data []byte) {
 		}
 
 		if w.isWatching(ppid, PROC_EVENT_FORK) {
-			w.Fork <- &ProcEventFork{ParentPid: ppid, ChildPid: pid}
+			w.Fork <- &ProcEventFork{ParentPid: ppid, ChildPid: pid, Timestamp: now}
 		}
 	case PROC_EVENT_EXEC:
 		event := &execProcEvent{}
@@ -190,7 +192,7 @@ func (w *Watcher) handleEvent(data []byte) {
 		pid := int(event.ProcessTgid)
 
 		if w.isWatching(pid, PROC_EVENT_EXEC) {
-			w.Exec <- &ProcEventExec{Pid: pid}
+			w.Exec <- &ProcEventExec{Pid: pid, Timestamp: now}
 		}
 	case PROC_EVENT_EXIT:
 		event := &exitProcEvent{}
@@ -199,9 +201,19 @@ func (w *Watcher) handleEvent(data []byte) {
 
 		if w.isWatching(pid, PROC_EVENT_EXIT) {
 			w.RemoveWatch(pid)
-			w.Exit <- &ProcEventExit{Pid: pid}
+
+			w.Exit <- &ProcEventExit{Pid: int(event.ProcessTgid), ExitCode: int(event.ExitCode), ExitSignal: getSignal(event.ExitSignal), Timestamp: now}
 		}
 	}
+}
+
+const noSignal = ^uint32(0) // 0xFFFFFFFF
+
+func getSignal(exitSignal uint32) syscall.Signal {
+	if exitSignal == noSignal {
+		return 0
+	}
+	return syscall.Signal(exitSignal)
 }
 
 // Bind our netlink socket and

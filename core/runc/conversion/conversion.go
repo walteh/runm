@@ -213,7 +213,9 @@ func ConvertDeleteOptsFromProto(opts *runmv1.RuncDeleteOptions) *gorunc.DeleteOp
 func ConvertDeleteOptsToProto(opts *gorunc.DeleteOpts) *runmv1.RuncDeleteOptions {
 	out := &runmv1.RuncDeleteOptions{}
 	out.SetForce(opts.Force)
-	out.SetExtraArgs(opts.ExtraArgs)
+	if opts.ExtraArgs != nil {
+		out.SetExtraArgs(opts.ExtraArgs)
+	}
 	return out
 }
 

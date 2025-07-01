@@ -5,7 +5,9 @@ import (
 	"log/slog"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	taskv3 "github.com/containerd/containerd/api/runtime/task/v3"
@@ -59,6 +61,8 @@ func NewDebugTaskService(s cruntime.TaskServiceClient, enableLogErrors, enableLo
 	}
 }
 
+var counter atomic.Int64
+
 func wrap[I, O any](e *errTaskService, f func(context.Context, I) (O, error)) func(context.Context, I) (O, error) {
 
 	pc, _, _, _ := runtime.Caller(1)
@@ -68,23 +72,27 @@ func wrap[I, O any](e *errTaskService, f func(context.Context, I) (O, error)) fu
 
 	return func(ctx context.Context, req I) (resp O, retErr error) {
 		start := time.Now()
+		reqNum := counter.Add(1)
 
-		startLogRecord := slog.NewRecord(start, slog.LevelInfo, strings.ToUpper(realName)+"_START", pc)
+		startLogRecord := slog.NewRecord(start, slog.LevelDebug, "SHIM:START["+strings.ToUpper(realName)+"]", pc)
 		startLogRecord.AddAttrs(
 			slog.String("method", realName),
+			slog.Int64("req_num", reqNum),
 		)
 		slog.Default().Handler().Handle(ctx, startLogRecord)
 
 		defer func() {
 			end := time.Now()
-			endLogRecord := slog.NewRecord(end, slog.LevelInfo, strings.ToUpper(realName)+"_END", pc)
+			endLogRecord := slog.NewRecord(end, slog.LevelDebug, "SHIM:END  ["+strings.ToUpper(realName)+"]", pc)
 			endLogRecord.AddAttrs(
 				slog.String("method", realName),
 				slog.Duration("duration", end.Sub(start)),
+				slog.Any("err", retErr),
+				slog.Int64("req_num", reqNum),
 			)
 			slog.Default().Handler().Handle(ctx, endLogRecord)
 			if err := recover(); err != nil {
-				slog.ErrorContext(ctx, "panic in task service", "error", err)
+				slog.ErrorContext(ctx, "panic in task service", "error", err, "stack", string(debug.Stack()))
 				retErr = errors.Errorf("panic in task service in %s: %s", realName, err)
 			}
 		}()

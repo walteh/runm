@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -335,6 +336,10 @@ func (c *GRPCClientRuntime) Kill(ctx context.Context, id string, signal int, opt
 
 	_, err := c.runtimeGrpcService.Kill(ctx, req)
 	if err != nil {
+		if strings.Contains(err.Error(), "failed to write client preface") {
+			// this is expected if the container is already dead
+			return nil
+		}
 		return errors.Errorf("killing container: %w", err)
 	}
 	// if resp.GetGoError() != "" {
@@ -451,6 +456,7 @@ func (c *GRPCClientRuntime) SubscribeToReaperExits(ctx context.Context) (<-chan 
 				slog.ErrorContext(ctx, "error receiving reaper exit", "error", err)
 				return
 			}
+			slog.InfoContext(ctx, "reaper exit", "pid", exit.GetPid(), "status", exit.GetStatus())
 			ch <- gorunc.Exit{
 				Timestamp: exit.GetTimestamp().AsTime(),
 				Pid:       int(exit.GetPid()),

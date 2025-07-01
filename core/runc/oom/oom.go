@@ -77,6 +77,7 @@ func (w *Watcher) Run(ctx context.Context) error {
 			i := item{id: "root"}
 			select {
 			case ev := <-eventCh:
+				slog.Debug("EVENT", "id", i.id, "ev", ev)
 				i.ev = ev
 				itemCh <- i
 			case err := <-errCh:

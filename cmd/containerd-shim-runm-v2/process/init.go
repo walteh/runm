@@ -33,7 +33,6 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/console"
-	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/stdio"
 	"github.com/containerd/fifo"
 	"github.com/containerd/log"
@@ -86,6 +85,12 @@ type Init struct {
 
 	runtime       runtime.Runtime
 	cgroupAdapter runtime.CgroupAdapter
+}
+
+func (p *Init) CloseIO() {
+	if p.io != nil {
+		p.io.Close()
+	}
 }
 
 // New returns a new process
@@ -321,7 +326,7 @@ func (p *Init) Delete(ctx context.Context) error {
 
 func (p *Init) delete(ctx context.Context) error {
 	waitTimeout(ctx, &p.wg, 2*time.Second)
-	err := p.runtime.Delete(ctx, p.id, nil)
+	err := p.runtime.Delete(ctx, p.id, &gorunc.DeleteOpts{})
 	// ignore errors if a runtime has already deleted the process
 	// but we still hold metadata and pipes
 	//
@@ -340,12 +345,13 @@ func (p *Init) delete(ctx context.Context) error {
 		}
 		p.io.Close()
 	}
-	if err2 := mount.UnmountRecursive(p.Rootfs, 0); err2 != nil {
-		log.G(ctx).WithError(err2).Warn("failed to cleanup rootfs mount")
-		if err == nil {
-			err = errors.Errorf("failed rootfs umount: %w", err2)
-		}
-	}
+	// TODO: MAKE SURE WE DON"T NEED THIS
+	// if err2 := mount.UnmountRecursive(p.Rootfs, 0); err2 != nil {
+	// 	log.G(ctx).WithError(err2).Warn("failed to cleanup rootfs mount")
+	// 	if err == nil {
+	// 		err = errors.Errorf("failed rootfs umount: %w", err2)
+	// 	}
+	// }
 	return err
 }
 

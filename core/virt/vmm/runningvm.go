@@ -38,6 +38,8 @@ type RunningVM[VM VirtualMachine] struct {
 	hostOtlpPort uint32
 	bootloader   virtio.Bootloader
 
+	closeCancel context.CancelFunc
+
 	// streamexec   *streamexec.Client
 	portOnHostIP uint16
 	wait         chan error
@@ -174,6 +176,19 @@ func (r *RunningVM[VM]) ListenAndAcceptSingleVsockConnection(ctx context.Context
 // return sockConn, nil
 // }
 
+func (r *RunningVM[VM]) Close(ctx context.Context) error {
+	r.closeCancel()
+	if r.vm.CurrentState() == VirtualMachineStateTypeStopped {
+		return nil
+	}
+	err := r.vm.HardStop(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "error hard stopping vm", "error", err)
+		return errors.Errorf("hard stopping vm: %w", err)
+	}
+	return nil
+}
+
 func (r *RunningVM[VM]) ProxyVsock(ctx context.Context, port uint32) (*net.UnixConn, string, error) {
 	conn, err := r.vm.VSockConnect(ctx, uint32(port))
 	if err != nil {
@@ -259,7 +274,10 @@ func (r *RunningVM[VM]) RunCommandSimple(ctx context.Context, command string) ([
 
 func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 
+	ctx, closeCancel := context.WithCancel(ctx)
 	errgrp, _ := errgroup.WithContext(ctx)
+
+	rvm.closeCancel = closeCancel
 
 	errgrp.Go(func() error {
 		err := rvm.netdev.Wait(ctx)

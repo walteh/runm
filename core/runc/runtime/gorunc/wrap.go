@@ -62,21 +62,21 @@ func (r *GoRuncRuntime) Create(ctx context.Context, id, bundle string, options *
 	// 	}
 	// }()
 
-	// done := false
-	// defer func() {
-	// 	done = true
-	// 	slog.InfoContext(ctx, "done runc create")
-	// }()
-	// go func() {
-	// 	ticker := time.NewTicker(time.Second)
-	// 	defer ticker.Stop()
-	// 	for range ticker.C {
-	// 		if done {
-	// 			return
-	// 		}
-	// 		slog.InfoContext(ctx, "still running runc create")
-	// 	}
-	// }()
+	done := false
+	defer func() {
+		done = true
+		slog.InfoContext(ctx, "done runc create")
+	}()
+	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			if done {
+				return
+			}
+			slog.InfoContext(ctx, "still running runc create")
+		}
+	}()
 
 	options.NoNewKeyring = true
 

@@ -33,12 +33,35 @@ func (s *Server) SubscribeToReaperExits(_ *emptypb.Empty, srv grpc.ServerStreami
 	// }
 	// return nil
 
+	if s.customExitChan != nil {
+		for exit := range s.customExitChan {
+			go func() {
+				payload := &runmv1.ReaperExit{}
+				payload.SetStatus(int32(exit.Status))
+				payload.SetPid(int32(exit.Pid))
+				payload.SetTimestamp(timestamppb.New(exit.Timestamp))
+				if err := srv.Send(payload); err != nil {
+					slog.ErrorContext(srv.Context(), "failed to send reaper exit", "error", err)
+				}
+			}()
+		}
+		return nil
+	}
+
+	slog.InfoContext(srv.Context(), "subscribing to reaper exits")
+
+	defer func() {
+		slog.InfoContext(srv.Context(), "unsubscribing from reaper exits")
+	}()
+
 	exits, err := s.runtime.SubscribeToReaperExits(srv.Context())
 	if err != nil {
-		return err
+		slog.ErrorContext(srv.Context(), "failed to subscribe to reaper exits", "error", err)
+		return errors.Errorf("failed to subscribe to reaper exits: %w", err)
 	}
 
 	for exit := range exits {
+		slog.InfoContext(srv.Context(), "reaper exit", "pid", exit.Pid, "status", exit.Status)
 		payload := &runmv1.ReaperExit{}
 		payload.SetStatus(int32(exit.Status))
 		payload.SetPid(int32(exit.Pid))

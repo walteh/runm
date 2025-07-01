@@ -75,7 +75,7 @@ func setupLogging() func() {
 
 	// }
 
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(10 * time.Millisecond)
 	ticks := 0
 	closers = append(closers, func() {
 		ticker.Stop()
@@ -85,7 +85,7 @@ func setupLogging() func() {
 		for tick := range ticker.C {
 
 			ticks++
-			if ticks < 10 || ticks%60 == 0 {
+			if ticks < 1000 || ticks%100 == 0 {
 				slog.Info("still running in runc-test[init], waiting to be killed", "tick", tick)
 			}
 		}

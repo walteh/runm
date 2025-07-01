@@ -65,6 +65,9 @@ var _ runtime.Runtime = &MockRuntime{}
 //			StartFunc: func(ctx context.Context, id string) error {
 //				panic("mock out the Start method")
 //			},
+//			SubscribeToReaperExitsFunc: func(ctx context.Context) (<-chan runc.Exit, error) {
+//				panic("mock out the SubscribeToReaperExits method")
+//			},
 //			UpdateFunc: func(ctx context.Context, id string, resources *specs.LinuxResources) error {
 //				panic("mock out the Update method")
 //			},
@@ -116,6 +119,9 @@ type MockRuntime struct {
 
 	// StartFunc mocks the Start method.
 	StartFunc func(ctx context.Context, id string) error
+
+	// SubscribeToReaperExitsFunc mocks the SubscribeToReaperExits method.
+	SubscribeToReaperExitsFunc func(ctx context.Context) (<-chan runc.Exit, error)
 
 	// UpdateFunc mocks the Update method.
 	UpdateFunc func(ctx context.Context, id string, resources *specs.LinuxResources) error
@@ -240,6 +246,11 @@ type MockRuntime struct {
 			// ID is the id argument value.
 			ID string
 		}
+		// SubscribeToReaperExits holds details about calls to the SubscribeToReaperExits method.
+		SubscribeToReaperExits []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
 		// Update holds details about calls to the Update method.
 		Update []struct {
 			// Ctx is the ctx argument value.
@@ -250,21 +261,22 @@ type MockRuntime struct {
 			Resources *specs.LinuxResources
 		}
 	}
-	lockCheckpoint           sync.RWMutex
-	lockCreate               sync.RWMutex
-	lockDelete               sync.RWMutex
-	lockExec                 sync.RWMutex
-	lockKill                 sync.RWMutex
-	lockNewNullIO            sync.RWMutex
-	lockNewPipeIO            sync.RWMutex
-	lockNewTempConsoleSocket sync.RWMutex
-	lockPause                sync.RWMutex
-	lockPs                   sync.RWMutex
-	lockReadPidFile          sync.RWMutex
-	lockRestore              sync.RWMutex
-	lockResume               sync.RWMutex
-	lockStart                sync.RWMutex
-	lockUpdate               sync.RWMutex
+	lockCheckpoint             sync.RWMutex
+	lockCreate                 sync.RWMutex
+	lockDelete                 sync.RWMutex
+	lockExec                   sync.RWMutex
+	lockKill                   sync.RWMutex
+	lockNewNullIO              sync.RWMutex
+	lockNewPipeIO              sync.RWMutex
+	lockNewTempConsoleSocket   sync.RWMutex
+	lockPause                  sync.RWMutex
+	lockPs                     sync.RWMutex
+	lockReadPidFile            sync.RWMutex
+	lockRestore                sync.RWMutex
+	lockResume                 sync.RWMutex
+	lockStart                  sync.RWMutex
+	lockSubscribeToReaperExits sync.RWMutex
+	lockUpdate                 sync.RWMutex
 }
 
 // Checkpoint calls CheckpointFunc.
@@ -807,6 +819,38 @@ func (mock *MockRuntime) StartCalls() []struct {
 	mock.lockStart.RLock()
 	calls = mock.calls.Start
 	mock.lockStart.RUnlock()
+	return calls
+}
+
+// SubscribeToReaperExits calls SubscribeToReaperExitsFunc.
+func (mock *MockRuntime) SubscribeToReaperExits(ctx context.Context) (<-chan runc.Exit, error) {
+	if mock.SubscribeToReaperExitsFunc == nil {
+		panic("MockRuntime.SubscribeToReaperExitsFunc: method is nil but Runtime.SubscribeToReaperExits was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockSubscribeToReaperExits.Lock()
+	mock.calls.SubscribeToReaperExits = append(mock.calls.SubscribeToReaperExits, callInfo)
+	mock.lockSubscribeToReaperExits.Unlock()
+	return mock.SubscribeToReaperExitsFunc(ctx)
+}
+
+// SubscribeToReaperExitsCalls gets all the calls that were made to SubscribeToReaperExits.
+// Check the length with:
+//
+//	len(mockedRuntime.SubscribeToReaperExitsCalls())
+func (mock *MockRuntime) SubscribeToReaperExitsCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockSubscribeToReaperExits.RLock()
+	calls = mock.calls.SubscribeToReaperExits
+	mock.lockSubscribeToReaperExits.RUnlock()
 	return calls
 }
 

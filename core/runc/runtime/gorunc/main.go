@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"gitlab.com/tozd/go/errors"
@@ -18,7 +19,6 @@ import (
 
 	"github.com/opencontainers/runtime-spec/specs-go/features"
 
-	"github.com/containerd/containerd/v2/pkg/sys/reaper"
 	gorunc "github.com/containerd/go-runc"
 
 	"github.com/walteh/runm/core/runc/runtime"
@@ -45,11 +45,48 @@ func WrapdGoRuncRuntime(rt *gorunc.Runc) *GoRuncRuntime {
 	}
 }
 
+var initOnce sync.Once
+
+// In runm/core/runc/runtime/gorunc/main.go, add near the init function:
+
+type MonitorWithSubscribers interface {
+	gorunc.ProcessMonitor
+	Subscribe(ctx context.Context) chan gorunc.Exit
+	Unsubscribe(ctx context.Context, ch chan gorunc.Exit)
+}
+
+var customMonitor MonitorWithSubscribers
+
 func (r *GoRuncRuntime) SubscribeToReaperExits(ctx context.Context) (<-chan gorunc.Exit, error) {
-	if gorunc.Monitor != reaper.Default {
-		gorunc.Monitor = reaper.Default
-	}
-	return reaper.Default.Subscribe(), nil
+	slog.InfoContext(ctx, "subscribing to custom monitor exits")
+
+	initOnce.Do(func() {
+		// Check if we're running as PID 1
+		if os.Getpid() == 1 {
+			// Use the PID 1 optimized monitor
+			// Create a new PID 1 monitor
+			pid1Monitor := NewPid1Monitor()
+
+			// Set it as the global monitor
+			gorunc.Monitor = pid1Monitor
+
+			customMonitor = pid1Monitor
+			slog.Info("running as PID 1, using optimized monitor")
+		} else {
+			// Initialize the standard custom monitor
+			customMonitor = &CustomMonitor{
+				defaultMonitor: gorunc.Monitor,
+				subscribers:    make(map[chan gorunc.Exit]struct{}),
+			}
+
+			// Replace the default monitor with our custom monitor
+			gorunc.Monitor = customMonitor
+
+			slog.Debug("initialized custom process monitor")
+		}
+	})
+
+	return customMonitor.Subscribe(ctx), nil
 }
 
 func (r *GoRuncRuntime) NewTempConsoleSocket(ctx context.Context) (runtime.ConsoleSocket, error) {

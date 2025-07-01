@@ -11,15 +11,18 @@ import (
 	"github.com/walteh/runm/core/runc/state"
 
 	runmv1 "github.com/walteh/runm/proto/v1"
+
+	gorunc "github.com/containerd/go-runc"
 )
 
 type Server struct {
 	runtime       runtime.Runtime
 	runtimeExtras runtime.RuntimeExtras
 	// socketAllocator runtime.SocketAllocator
-	eventHandler  runtime.EventHandler
-	cgroupAdapter runtime.CgroupAdapter
-	bundleSource  string
+	eventHandler   runtime.EventHandler
+	cgroupAdapter  runtime.CgroupAdapter
+	bundleSource   string
+	customExitChan chan gorunc.Exit
 
 	state *state.State
 }
@@ -27,12 +30,19 @@ type Server struct {
 type ServerOpt func(*ServerOpts)
 
 type ServerOpts struct {
-	BundleSource string
+	BundleSource   string
+	CustomExitChan chan gorunc.Exit
 }
 
 func WithBundleSource(bundleSource string) ServerOpt {
 	return func(opts *ServerOpts) {
 		opts.BundleSource = bundleSource
+	}
+}
+
+func WithCustomExitChan(customExitChan chan gorunc.Exit) ServerOpt {
+	return func(opts *ServerOpts) {
+		opts.CustomExitChan = customExitChan
 	}
 }
 
@@ -49,12 +59,13 @@ func NewServer(
 	}
 
 	s := &Server{
-		runtime:       r,
-		runtimeExtras: runtimeExtras,
-		eventHandler:  eventHandler,
-		cgroupAdapter: cgroupAdapter,
-		bundleSource:  optz.BundleSource,
-		state:         state.NewState(),
+		runtime:        r,
+		runtimeExtras:  runtimeExtras,
+		eventHandler:   eventHandler,
+		cgroupAdapter:  cgroupAdapter,
+		bundleSource:   optz.BundleSource,
+		customExitChan: optz.CustomExitChan,
+		state:          state.NewState(),
 	}
 
 	return s
