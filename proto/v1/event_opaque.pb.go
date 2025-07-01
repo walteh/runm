@@ -7,6 +7,20 @@ import (
 	protovalidate "buf.build/go/protovalidate"
 )
 
+// NewReaperExit creates a new ReaperExit using the builder
+func NewReaperExit(b *ReaperExit_builder) *ReaperExit {
+	return b.Build()
+}
+
+// NewReaperExitE creates a new ReaperExit using the builder with validation
+func NewReaperExitE(b *ReaperExit_builder) (*ReaperExit, error) {
+	m := b.Build()
+	if err := protovalidate.Validate(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // NewReceiveEventsRequest creates a new ReceiveEventsRequest using the builder
 func NewReceiveEventsRequest(b *ReceiveEventsRequest_builder) *ReceiveEventsRequest {
 	return b.Build()

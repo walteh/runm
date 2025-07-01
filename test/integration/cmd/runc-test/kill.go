@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 
@@ -32,30 +33,34 @@ signal to the init process of the "ubuntu01" container:
 		},
 	},
 	Action: func(context *cli.Context) error {
+		slog.Info("KILLING RUNC - CHECKING ARGS", "all", context.Bool("all"), "args", context.Args())
 		if err := checkArgs(context, 1, minArgs); err != nil {
 			return err
 		}
 		if err := checkArgs(context, 2, maxArgs); err != nil {
 			return err
 		}
+		slog.Info("KILLING RUNC - getting container")
 		container, err := getContainer(context)
 		if err != nil {
 			return err
 		}
-
+		slog.Info("KILLING RUNC - getting signal")
 		sigstr := context.Args().Get(1)
 		if sigstr == "" {
 			sigstr = "SIGTERM"
 		}
-
+		slog.Info("KILLING RUNC - parsing signal")
 		signal, err := parseSignal(sigstr)
 		if err != nil {
 			return err
 		}
+		slog.Info("KILLING RUNC - sending signal")
 		err = container.Signal(signal)
 		if errors.Is(err, libcontainer.ErrNotRunning) && context.Bool("all") {
 			err = nil
 		}
+		slog.Info("KILLING RUNC - done", "error", err)
 		return err
 	},
 }

@@ -200,6 +200,8 @@ func main() {
 			_ = logging.NewDefaultDevLogger(loggerName, delimConn, opts...)
 		}
 
+		slog.Info("RUNC STARTED")
+
 		return configLogrus(context)
 	}
 
@@ -227,9 +229,10 @@ func main() {
 		}
 	}()
 
-	defer func() {
-		slog.Debug("DEBUG: RUNC IS DONE")
-	}()
+	app.After = func(context *cli.Context) error {
+		slog.Info("RUNC ENDED")
+		return nil
+	}
 
 	// If the command returns an error, cli takes upon itself to print
 	// the error on cli.ErrWriter and exit.

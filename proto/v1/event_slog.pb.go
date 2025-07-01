@@ -8,6 +8,23 @@ import (
 	slog "log/slog"
 )
 
+func (x *ReaperExit) LogValue() slog.Value {
+	if x == nil {
+		return slog.AnyValue(nil)
+	}
+	attrs := make([]slog.Attr, 0, 3)
+	if x.GetTimestamp() != nil {
+		if v, ok := interface{}(x.GetTimestamp()).(slog.LogValuer); ok {
+			attrs = append(attrs, slog.Attr{Key: "timestamp", Value: v.LogValue()})
+		} else {
+			attrs = append(attrs, slog.Any("timestamp", x.GetTimestamp()))
+		}
+	}
+	attrs = append(attrs, slog.Int64("pid", int64(x.GetPid())))
+	attrs = append(attrs, slog.Int64("status", int64(x.GetStatus())))
+	return slog.GroupValue(attrs...)
+}
+
 func (x *ReceiveEventsRequest) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)

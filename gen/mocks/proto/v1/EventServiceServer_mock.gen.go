@@ -29,6 +29,9 @@ var _ runmv1.EventServiceServer = &MockEventServiceServer{}
 //			ReceiveEventsFunc: func(empty *emptypb.Empty, serverStreamingServer grpc.ServerStreamingServer[runmv1.PublishEventsResponse]) error {
 //				panic("mock out the ReceiveEvents method")
 //			},
+//			SubscribeToReaperExitsFunc: func(empty *emptypb.Empty, serverStreamingServer grpc.ServerStreamingServer[runmv1.ReaperExit]) error {
+//				panic("mock out the SubscribeToReaperExits method")
+//			},
 //		}
 //
 //		// use mockedEventServiceServer in code that requires runmv1.EventServiceServer
@@ -41,6 +44,9 @@ type MockEventServiceServer struct {
 
 	// ReceiveEventsFunc mocks the ReceiveEvents method.
 	ReceiveEventsFunc func(empty *emptypb.Empty, serverStreamingServer grpc.ServerStreamingServer[runmv1.PublishEventsResponse]) error
+
+	// SubscribeToReaperExitsFunc mocks the SubscribeToReaperExits method.
+	SubscribeToReaperExitsFunc func(empty *emptypb.Empty, serverStreamingServer grpc.ServerStreamingServer[runmv1.ReaperExit]) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -58,9 +64,17 @@ type MockEventServiceServer struct {
 			// ServerStreamingServer is the serverStreamingServer argument value.
 			ServerStreamingServer grpc.ServerStreamingServer[runmv1.PublishEventsResponse]
 		}
+		// SubscribeToReaperExits holds details about calls to the SubscribeToReaperExits method.
+		SubscribeToReaperExits []struct {
+			// Empty is the empty argument value.
+			Empty *emptypb.Empty
+			// ServerStreamingServer is the serverStreamingServer argument value.
+			ServerStreamingServer grpc.ServerStreamingServer[runmv1.ReaperExit]
+		}
 	}
-	lockPublishEvent  sync.RWMutex
-	lockReceiveEvents sync.RWMutex
+	lockPublishEvent           sync.RWMutex
+	lockReceiveEvents          sync.RWMutex
+	lockSubscribeToReaperExits sync.RWMutex
 }
 
 // PublishEvent calls PublishEventFunc.
@@ -132,5 +146,41 @@ func (mock *MockEventServiceServer) ReceiveEventsCalls() []struct {
 	mock.lockReceiveEvents.RLock()
 	calls = mock.calls.ReceiveEvents
 	mock.lockReceiveEvents.RUnlock()
+	return calls
+}
+
+// SubscribeToReaperExits calls SubscribeToReaperExitsFunc.
+func (mock *MockEventServiceServer) SubscribeToReaperExits(empty *emptypb.Empty, serverStreamingServer grpc.ServerStreamingServer[runmv1.ReaperExit]) error {
+	if mock.SubscribeToReaperExitsFunc == nil {
+		panic("MockEventServiceServer.SubscribeToReaperExitsFunc: method is nil but EventServiceServer.SubscribeToReaperExits was just called")
+	}
+	callInfo := struct {
+		Empty                 *emptypb.Empty
+		ServerStreamingServer grpc.ServerStreamingServer[runmv1.ReaperExit]
+	}{
+		Empty:                 empty,
+		ServerStreamingServer: serverStreamingServer,
+	}
+	mock.lockSubscribeToReaperExits.Lock()
+	mock.calls.SubscribeToReaperExits = append(mock.calls.SubscribeToReaperExits, callInfo)
+	mock.lockSubscribeToReaperExits.Unlock()
+	return mock.SubscribeToReaperExitsFunc(empty, serverStreamingServer)
+}
+
+// SubscribeToReaperExitsCalls gets all the calls that were made to SubscribeToReaperExits.
+// Check the length with:
+//
+//	len(mockedEventServiceServer.SubscribeToReaperExitsCalls())
+func (mock *MockEventServiceServer) SubscribeToReaperExitsCalls() []struct {
+	Empty                 *emptypb.Empty
+	ServerStreamingServer grpc.ServerStreamingServer[runmv1.ReaperExit]
+} {
+	var calls []struct {
+		Empty                 *emptypb.Empty
+		ServerStreamingServer grpc.ServerStreamingServer[runmv1.ReaperExit]
+	}
+	mock.lockSubscribeToReaperExits.RLock()
+	calls = mock.calls.SubscribeToReaperExits
+	mock.lockSubscribeToReaperExits.RUnlock()
 	return calls
 }

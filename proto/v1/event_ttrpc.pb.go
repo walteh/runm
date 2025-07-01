@@ -11,6 +11,7 @@ import (
 type TTRPCEventServiceService interface {
 	ReceiveEvents(context.Context, *emptypb.Empty, TTRPCEventService_ReceiveEventsServer) error
 	PublishEvent(context.Context, *PublishEventRequest) (*PublishEventResponse, error)
+	SubscribeToReaperExits(context.Context, *emptypb.Empty, TTRPCEventService_SubscribeToReaperExitsServer) error
 }
 
 type TTRPCEventService_ReceiveEventsServer interface {
@@ -23,6 +24,19 @@ type ttrpceventserviceReceiveEventsServer struct {
 }
 
 func (x *ttrpceventserviceReceiveEventsServer) Send(m *PublishEventsResponse) error {
+	return x.StreamServer.SendMsg(m)
+}
+
+type TTRPCEventService_SubscribeToReaperExitsServer interface {
+	Send(*ReaperExit) error
+	ttrpc.StreamServer
+}
+
+type ttrpceventserviceSubscribeToReaperExitsServer struct {
+	ttrpc.StreamServer
+}
+
+func (x *ttrpceventserviceSubscribeToReaperExitsServer) Send(m *ReaperExit) error {
 	return x.StreamServer.SendMsg(m)
 }
 
@@ -49,6 +63,17 @@ func RegisterTTRPCEventServiceService(srv *ttrpc.Server, svc TTRPCEventServiceSe
 				StreamingClient: false,
 				StreamingServer: true,
 			},
+			"SubscribeToReaperExits": {
+				Handler: func(ctx context.Context, stream ttrpc.StreamServer) (interface{}, error) {
+					m := new(emptypb.Empty)
+					if err := stream.RecvMsg(m); err != nil {
+						return nil, err
+					}
+					return nil, svc.SubscribeToReaperExits(ctx, m, &ttrpceventserviceSubscribeToReaperExitsServer{stream})
+				},
+				StreamingClient: false,
+				StreamingServer: true,
+			},
 		},
 	})
 }
@@ -56,6 +81,7 @@ func RegisterTTRPCEventServiceService(srv *ttrpc.Server, svc TTRPCEventServiceSe
 type TTRPCEventServiceClient interface {
 	ReceiveEvents(context.Context, *emptypb.Empty) (TTRPCEventService_ReceiveEventsClient, error)
 	PublishEvent(context.Context, *PublishEventRequest) (*PublishEventResponse, error)
+	SubscribeToReaperExits(context.Context, *emptypb.Empty) (TTRPCEventService_SubscribeToReaperExitsClient, error)
 }
 
 type ttrpceventserviceClient struct {
@@ -103,4 +129,33 @@ func (c *ttrpceventserviceClient) PublishEvent(ctx context.Context, req *Publish
 		return nil, err
 	}
 	return &resp, nil
+}
+
+func (c *ttrpceventserviceClient) SubscribeToReaperExits(ctx context.Context, req *emptypb.Empty) (TTRPCEventService_SubscribeToReaperExitsClient, error) {
+	stream, err := c.client.NewStream(ctx, &ttrpc.StreamDesc{
+		StreamingClient: false,
+		StreamingServer: true,
+	}, "runm.v1.EventService", "SubscribeToReaperExits", req)
+	if err != nil {
+		return nil, err
+	}
+	x := &ttrpceventserviceSubscribeToReaperExitsClient{stream}
+	return x, nil
+}
+
+type TTRPCEventService_SubscribeToReaperExitsClient interface {
+	Recv() (*ReaperExit, error)
+	ttrpc.ClientStream
+}
+
+type ttrpceventserviceSubscribeToReaperExitsClient struct {
+	ttrpc.ClientStream
+}
+
+func (x *ttrpceventserviceSubscribeToReaperExitsClient) Recv() (*ReaperExit, error) {
+	m := new(ReaperExit)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }

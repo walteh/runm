@@ -29,6 +29,9 @@ var _ runmv1.EventServiceClient = &MockEventServiceClient{}
 //			ReceiveEventsFunc: func(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[runmv1.PublishEventsResponse], error) {
 //				panic("mock out the ReceiveEvents method")
 //			},
+//			SubscribeToReaperExitsFunc: func(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[runmv1.ReaperExit], error) {
+//				panic("mock out the SubscribeToReaperExits method")
+//			},
 //		}
 //
 //		// use mockedEventServiceClient in code that requires runmv1.EventServiceClient
@@ -41,6 +44,9 @@ type MockEventServiceClient struct {
 
 	// ReceiveEventsFunc mocks the ReceiveEvents method.
 	ReceiveEventsFunc func(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[runmv1.PublishEventsResponse], error)
+
+	// SubscribeToReaperExitsFunc mocks the SubscribeToReaperExits method.
+	SubscribeToReaperExitsFunc func(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[runmv1.ReaperExit], error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -62,9 +68,19 @@ type MockEventServiceClient struct {
 			// Opts is the opts argument value.
 			Opts []grpc.CallOption
 		}
+		// SubscribeToReaperExits holds details about calls to the SubscribeToReaperExits method.
+		SubscribeToReaperExits []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// In is the in argument value.
+			In *emptypb.Empty
+			// Opts is the opts argument value.
+			Opts []grpc.CallOption
+		}
 	}
-	lockPublishEvent  sync.RWMutex
-	lockReceiveEvents sync.RWMutex
+	lockPublishEvent           sync.RWMutex
+	lockReceiveEvents          sync.RWMutex
+	lockSubscribeToReaperExits sync.RWMutex
 }
 
 // PublishEvent calls PublishEventFunc.
@@ -144,5 +160,45 @@ func (mock *MockEventServiceClient) ReceiveEventsCalls() []struct {
 	mock.lockReceiveEvents.RLock()
 	calls = mock.calls.ReceiveEvents
 	mock.lockReceiveEvents.RUnlock()
+	return calls
+}
+
+// SubscribeToReaperExits calls SubscribeToReaperExitsFunc.
+func (mock *MockEventServiceClient) SubscribeToReaperExits(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[runmv1.ReaperExit], error) {
+	if mock.SubscribeToReaperExitsFunc == nil {
+		panic("MockEventServiceClient.SubscribeToReaperExitsFunc: method is nil but EventServiceClient.SubscribeToReaperExits was just called")
+	}
+	callInfo := struct {
+		Ctx  context.Context
+		In   *emptypb.Empty
+		Opts []grpc.CallOption
+	}{
+		Ctx:  ctx,
+		In:   in,
+		Opts: opts,
+	}
+	mock.lockSubscribeToReaperExits.Lock()
+	mock.calls.SubscribeToReaperExits = append(mock.calls.SubscribeToReaperExits, callInfo)
+	mock.lockSubscribeToReaperExits.Unlock()
+	return mock.SubscribeToReaperExitsFunc(ctx, in, opts...)
+}
+
+// SubscribeToReaperExitsCalls gets all the calls that were made to SubscribeToReaperExits.
+// Check the length with:
+//
+//	len(mockedEventServiceClient.SubscribeToReaperExitsCalls())
+func (mock *MockEventServiceClient) SubscribeToReaperExitsCalls() []struct {
+	Ctx  context.Context
+	In   *emptypb.Empty
+	Opts []grpc.CallOption
+} {
+	var calls []struct {
+		Ctx  context.Context
+		In   *emptypb.Empty
+		Opts []grpc.CallOption
+	}
+	mock.lockSubscribeToReaperExits.RLock()
+	calls = mock.calls.SubscribeToReaperExits
+	mock.lockSubscribeToReaperExits.RUnlock()
 	return calls
 }

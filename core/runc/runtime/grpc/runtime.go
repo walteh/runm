@@ -11,6 +11,7 @@ import (
 
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"gitlab.com/tozd/go/errors"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	gorunc "github.com/containerd/go-runc"
 
@@ -435,4 +436,29 @@ func (c *GRPCClientRuntime) Restore(ctx context.Context, id, bundle string, opti
 	// 	return -1, errors.Errorf("go error in restore: %s", resp.GetGoError())
 	// }
 	return int(resp.GetStatus()), nil
+}
+
+func (c *GRPCClientRuntime) SubscribeToReaperExits(ctx context.Context) (<-chan gorunc.Exit, error) {
+	ch := make(chan gorunc.Exit, 32)
+	srv, err := c.eventService.SubscribeToReaperExits(ctx, &emptypb.Empty{})
+	if err != nil {
+		return nil, errors.Errorf("subscribing to reaper exits: %w", err)
+	}
+	go func() {
+		for {
+			exit, err := srv.Recv()
+			if err != nil {
+				slog.ErrorContext(ctx, "error receiving reaper exit", "error", err)
+				return
+			}
+			ch <- gorunc.Exit{
+				Timestamp: exit.GetTimestamp().AsTime(),
+				Pid:       int(exit.GetPid()),
+				Status:    int(exit.GetStatus()),
+			}
+
+		}
+	}()
+
+	return ch, nil
 }

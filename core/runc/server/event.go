@@ -8,6 +8,7 @@ import (
 	"gitlab.com/tozd/go/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/walteh/runm/core/runc/runtime"
 
@@ -15,6 +16,40 @@ import (
 )
 
 var _ runmv1.EventServiceServer = (*Server)(nil)
+
+func (s *Server) SubscribeToReaperExits(_ *emptypb.Empty, srv grpc.ServerStreamingServer[runmv1.ReaperExit]) error {
+	// gorunc.Monitor = reaper.Default
+	// rec := reaper.Default.Subscribe()
+	// defer reaper.Default.Unsubscribe(rec)
+
+	// for exit := range rec {
+	// 	payload := &runmv1.ReaperExit{}
+	// 	payload.SetStatus(int32(exit.Status))
+	// 	payload.SetPid(int32(exit.Pid))
+	// 	payload.SetTimestamp(timestamppb.New(exit.Timestamp))
+	// 	if err := srv.Send(payload); err != nil {
+	// 		return err
+	// 	}
+	// }
+	// return nil
+
+	exits, err := s.runtime.SubscribeToReaperExits(srv.Context())
+	if err != nil {
+		return err
+	}
+
+	for exit := range exits {
+		payload := &runmv1.ReaperExit{}
+		payload.SetStatus(int32(exit.Status))
+		payload.SetPid(int32(exit.Pid))
+		payload.SetTimestamp(timestamppb.New(exit.Timestamp))
+		if err := srv.Send(payload); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
 
 // PublishEvent implements runmv1.EventServiceServer.
 func (s *Server) PublishEvent(ctx context.Context, req *runmv1.PublishEventRequest) (*runmv1.PublishEventResponse, error) {

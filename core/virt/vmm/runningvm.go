@@ -402,8 +402,17 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 		slog.ErrorContext(ctx, "failed to time sync", "error", err)
 		return errors.Errorf("failed to time sync: %w", err)
 	}
+	slog.InfoContext(ctx, "time sync 1", "response", response)
 
-	slog.InfoContext(ctx, "time sync", "response", response)
+	// this first request, will take a few extra milliseconds, so we make the same call again
+
+	tsreq.SetUnixTimeNs(uint64(time.Now().UnixNano()))
+	response, err = connection.Management().GuestTimeSync(ctx, tsreq)
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to time sync", "error", err)
+		return errors.Errorf("failed to time sync: %w", err)
+	}
+	slog.InfoContext(ctx, "time sync 2", "response", response)
 
 	return nil
 }

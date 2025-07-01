@@ -68,8 +68,9 @@ func BindConsoleToSocket(ctx context.Context, cons runtime.ConsoleSocket, sock r
 
 func halfCloseWrite(conn net.Conn) {
 	// Attempt a half-close if supported (e.g., Unix domain or TCP)
-	if uc, ok := conn.(interface{ CloseWrite() error }); ok {
+	if uc, ok := conn.(*net.UnixConn); ok {
 		uc.CloseWrite() // sends FIN (EOF) to peer  [oai_citation:8‡github.com](https://github.com/golang/go/issues/67337?utm_source=chatgpt.com)
+		conn.Close()
 	} else {
 		conn.Close() // fallback: full close
 	}

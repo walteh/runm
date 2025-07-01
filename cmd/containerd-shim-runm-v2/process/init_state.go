@@ -20,6 +20,7 @@ package process
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/containerd/log"
 	"gitlab.com/tozd/go/errors"
@@ -93,6 +94,7 @@ func (s *createdState) Delete(ctx context.Context) error {
 }
 
 func (s *createdState) Kill(ctx context.Context, sig uint32, all bool) error {
+	slog.InfoContext(ctx, "KILLING RUNM from created state", "id", s.p.id, "signal", sig, "all", all)
 	return s.p.kill(ctx, sig, all)
 }
 
@@ -202,6 +204,7 @@ func (s *createdCheckpointState) Delete(ctx context.Context) error {
 }
 
 func (s *createdCheckpointState) Kill(ctx context.Context, sig uint32, all bool) error {
+	slog.InfoContext(ctx, "KILLING RUNM from created checkpoint state", "id", s.p.id, "signal", sig, "all", all)
 	return s.p.kill(ctx, sig, all)
 }
 
@@ -273,6 +276,7 @@ func (s *runningState) Delete(ctx context.Context) error {
 }
 
 func (s *runningState) Kill(ctx context.Context, sig uint32, all bool) error {
+	slog.InfoContext(ctx, "KILLING RUNM from running state", "id", s.p.id, "signal", sig, "all", all)
 	return s.p.kill(ctx, sig, all)
 }
 
@@ -337,6 +341,7 @@ func (s *pausedState) Delete(ctx context.Context) error {
 }
 
 func (s *pausedState) Kill(ctx context.Context, sig uint32, all bool) error {
+	slog.InfoContext(ctx, "KILLING RUNM from paused state", "id", s.p.id, "signal", sig, "all", all)
 	return s.p.kill(ctx, sig, all)
 }
 
@@ -402,6 +407,7 @@ func (s *stoppedState) Delete(ctx context.Context) error {
 }
 
 func (s *stoppedState) Kill(ctx context.Context, sig uint32, all bool) error {
+	slog.InfoContext(ctx, "KILLING RUNM from stopped state", "id", s.p.id, "signal", sig, "all", all)
 	return s.p.kill(ctx, sig, all)
 }
 

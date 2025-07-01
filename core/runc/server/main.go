@@ -39,7 +39,6 @@ func WithBundleSource(bundleSource string) ServerOpt {
 func NewServer(
 	r runtime.Runtime,
 	runtimeExtras runtime.RuntimeExtras,
-	// socketAllocator runtime.SocketAllocator,
 	eventHandler runtime.EventHandler,
 	cgroupAdapter runtime.CgroupAdapter,
 	opts ...ServerOpt) *Server {
@@ -52,7 +51,6 @@ func NewServer(
 	s := &Server{
 		runtime:       r,
 		runtimeExtras: runtimeExtras,
-		// socketAllocator: socketAllocator,
 		eventHandler:  eventHandler,
 		cgroupAdapter: cgroupAdapter,
 		bundleSource:  optz.BundleSource,
@@ -69,7 +67,6 @@ func (s *Server) RegisterGrpcServer(grpcServer *grpc.Server) {
 	runmv1.RegisterCgroupAdapterServiceServer(grpcServer, s)
 	runmv1.RegisterEventServiceServer(grpcServer, s)
 	runmv1.RegisterGuestManagementServiceServer(grpcServer, s)
-
 }
 
 // 	// Create gRPC server

@@ -14,7 +14,7 @@ import (
 	_ "google.golang.org/protobuf/types/known/anypb"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	_ "google.golang.org/protobuf/types/known/structpb"
-	_ "google.golang.org/protobuf/types/known/timestamppb"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	unsafe "unsafe"
 )
@@ -26,6 +26,102 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type ReaperExit struct {
+	state                protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Timestamp *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=timestamp"`
+	xxx_hidden_Pid       int32                  `protobuf:"varint,2,opt,name=pid"`
+	xxx_hidden_Status    int32                  `protobuf:"varint,3,opt,name=status"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *ReaperExit) Reset() {
+	*x = ReaperExit{}
+	mi := &file_v1_event_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReaperExit) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReaperExit) ProtoMessage() {}
+
+func (x *ReaperExit) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_event_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *ReaperExit) GetTimestamp() *timestamppb.Timestamp {
+	if x != nil {
+		return x.xxx_hidden_Timestamp
+	}
+	return nil
+}
+
+func (x *ReaperExit) GetPid() int32 {
+	if x != nil {
+		return x.xxx_hidden_Pid
+	}
+	return 0
+}
+
+func (x *ReaperExit) GetStatus() int32 {
+	if x != nil {
+		return x.xxx_hidden_Status
+	}
+	return 0
+}
+
+func (x *ReaperExit) SetTimestamp(v *timestamppb.Timestamp) {
+	x.xxx_hidden_Timestamp = v
+}
+
+func (x *ReaperExit) SetPid(v int32) {
+	x.xxx_hidden_Pid = v
+}
+
+func (x *ReaperExit) SetStatus(v int32) {
+	x.xxx_hidden_Status = v
+}
+
+func (x *ReaperExit) HasTimestamp() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_Timestamp != nil
+}
+
+func (x *ReaperExit) ClearTimestamp() {
+	x.xxx_hidden_Timestamp = nil
+}
+
+type ReaperExit_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	Timestamp *timestamppb.Timestamp
+	Pid       int32
+	Status    int32
+}
+
+func (b0 ReaperExit_builder) Build() *ReaperExit {
+	m0 := &ReaperExit{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Timestamp = b.Timestamp
+	x.xxx_hidden_Pid = b.Pid
+	x.xxx_hidden_Status = b.Status
+	return m0
+}
+
 type ReceiveEventsRequest struct {
 	state         protoimpl.MessageState `protogen:"opaque.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -34,7 +130,7 @@ type ReceiveEventsRequest struct {
 
 func (x *ReceiveEventsRequest) Reset() {
 	*x = ReceiveEventsRequest{}
-	mi := &file_v1_event_proto_msgTypes[0]
+	mi := &file_v1_event_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -46,7 +142,7 @@ func (x *ReceiveEventsRequest) String() string {
 func (*ReceiveEventsRequest) ProtoMessage() {}
 
 func (x *ReceiveEventsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_event_proto_msgTypes[0]
+	mi := &file_v1_event_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -79,7 +175,7 @@ type PublishEventRequest struct {
 
 func (x *PublishEventRequest) Reset() {
 	*x = PublishEventRequest{}
-	mi := &file_v1_event_proto_msgTypes[1]
+	mi := &file_v1_event_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -91,7 +187,7 @@ func (x *PublishEventRequest) String() string {
 func (*PublishEventRequest) ProtoMessage() {}
 
 func (x *PublishEventRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_event_proto_msgTypes[1]
+	mi := &file_v1_event_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -151,7 +247,7 @@ type PublishEventResponse struct {
 
 func (x *PublishEventResponse) Reset() {
 	*x = PublishEventResponse{}
-	mi := &file_v1_event_proto_msgTypes[2]
+	mi := &file_v1_event_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -163,7 +259,7 @@ func (x *PublishEventResponse) String() string {
 func (*PublishEventResponse) ProtoMessage() {}
 
 func (x *PublishEventResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_event_proto_msgTypes[2]
+	mi := &file_v1_event_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -196,7 +292,7 @@ type PublishEventsResponse struct {
 
 func (x *PublishEventsResponse) Reset() {
 	*x = PublishEventsResponse{}
-	mi := &file_v1_event_proto_msgTypes[3]
+	mi := &file_v1_event_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -208,7 +304,7 @@ func (x *PublishEventsResponse) String() string {
 func (*PublishEventsResponse) ProtoMessage() {}
 
 func (x *PublishEventsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_event_proto_msgTypes[3]
+	mi := &file_v1_event_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -264,7 +360,12 @@ var File_v1_event_proto protoreflect.FileDescriptor
 
 const file_v1_event_proto_rawDesc = "" +
 	"\n" +
-	"\x0ev1/event.proto\x12\arunm.v1\x1a\x1bbuf/validate/validate.proto\x1a\x19google/protobuf/any.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a!google/protobuf/go_features.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x16\n" +
+	"\x0ev1/event.proto\x12\arunm.v1\x1a\x1bbuf/validate/validate.proto\x1a\x19google/protobuf/any.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a!google/protobuf/go_features.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"p\n" +
+	"\n" +
+	"ReaperExit\x128\n" +
+	"\ttimestamp\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12\x10\n" +
+	"\x03pid\x18\x02 \x01(\x05R\x03pid\x12\x16\n" +
+	"\x06status\x18\x03 \x01(\x05R\x06status\"\x16\n" +
 	"\x14ReceiveEventsRequest\"F\n" +
 	"\x13PublishEventRequest\x12\x14\n" +
 	"\x05topic\x18\x01 \x01(\tR\x05topic\x12\x19\n" +
@@ -272,31 +373,37 @@ const file_v1_event_proto_rawDesc = "" +
 	"\x14PublishEventResponse\"H\n" +
 	"\x15PublishEventsResponse\x12\x14\n" +
 	"\x05topic\x18\x01 \x01(\tR\x05topic\x12\x19\n" +
-	"\braw_json\x18\x02 \x01(\fR\arawJson2\xa6\x01\n" +
+	"\braw_json\x18\x02 \x01(\fR\arawJson2\xef\x01\n" +
 	"\fEventService\x12I\n" +
 	"\rReceiveEvents\x12\x16.google.protobuf.Empty\x1a\x1e.runm.v1.PublishEventsResponse0\x01\x12K\n" +
-	"\fPublishEvent\x12\x1c.runm.v1.PublishEventRequest\x1a\x1d.runm.v1.PublishEventResponseB\x88\x01\n" +
+	"\fPublishEvent\x12\x1c.runm.v1.PublishEventRequest\x1a\x1d.runm.v1.PublishEventResponse\x12G\n" +
+	"\x16SubscribeToReaperExits\x12\x16.google.protobuf.Empty\x1a\x13.runm.v1.ReaperExit0\x01B\x88\x01\n" +
 	"\vcom.runm.v1B\n" +
 	"EventProtoP\x01Z&github.com/walteh/runm/proto/v1;runmv1\xa2\x02\x03RXX\xaa\x02\aRunm.V1\xca\x02\aRunm\\V1\xe2\x02\x13Runm\\V1\\GPBMetadata\xea\x02\bRunm::V1\x92\x03\a\xd2>\x02\x10\x03\b\x02b\beditionsp\xe8\a"
 
-var file_v1_event_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_v1_event_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_v1_event_proto_goTypes = []any{
-	(*ReceiveEventsRequest)(nil),  // 0: runm.v1.ReceiveEventsRequest
-	(*PublishEventRequest)(nil),   // 1: runm.v1.PublishEventRequest
-	(*PublishEventResponse)(nil),  // 2: runm.v1.PublishEventResponse
-	(*PublishEventsResponse)(nil), // 3: runm.v1.PublishEventsResponse
-	(*emptypb.Empty)(nil),         // 4: google.protobuf.Empty
+	(*ReaperExit)(nil),            // 0: runm.v1.ReaperExit
+	(*ReceiveEventsRequest)(nil),  // 1: runm.v1.ReceiveEventsRequest
+	(*PublishEventRequest)(nil),   // 2: runm.v1.PublishEventRequest
+	(*PublishEventResponse)(nil),  // 3: runm.v1.PublishEventResponse
+	(*PublishEventsResponse)(nil), // 4: runm.v1.PublishEventsResponse
+	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),         // 6: google.protobuf.Empty
 }
 var file_v1_event_proto_depIdxs = []int32{
-	4, // 0: runm.v1.EventService.ReceiveEvents:input_type -> google.protobuf.Empty
-	1, // 1: runm.v1.EventService.PublishEvent:input_type -> runm.v1.PublishEventRequest
-	3, // 2: runm.v1.EventService.ReceiveEvents:output_type -> runm.v1.PublishEventsResponse
-	2, // 3: runm.v1.EventService.PublishEvent:output_type -> runm.v1.PublishEventResponse
-	2, // [2:4] is the sub-list for method output_type
-	0, // [0:2] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	5, // 0: runm.v1.ReaperExit.timestamp:type_name -> google.protobuf.Timestamp
+	6, // 1: runm.v1.EventService.ReceiveEvents:input_type -> google.protobuf.Empty
+	2, // 2: runm.v1.EventService.PublishEvent:input_type -> runm.v1.PublishEventRequest
+	6, // 3: runm.v1.EventService.SubscribeToReaperExits:input_type -> google.protobuf.Empty
+	4, // 4: runm.v1.EventService.ReceiveEvents:output_type -> runm.v1.PublishEventsResponse
+	3, // 5: runm.v1.EventService.PublishEvent:output_type -> runm.v1.PublishEventResponse
+	0, // 6: runm.v1.EventService.SubscribeToReaperExits:output_type -> runm.v1.ReaperExit
+	4, // [4:7] is the sub-list for method output_type
+	1, // [1:4] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_v1_event_proto_init() }
@@ -310,7 +417,7 @@ func file_v1_event_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_event_proto_rawDesc), len(file_v1_event_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

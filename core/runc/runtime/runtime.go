@@ -114,6 +114,7 @@ type Runtime interface {
 	Resume(ctx context.Context, id string) error
 	Ps(ctx context.Context, id string) ([]int, error)
 	ReadPidFile(ctx context.Context, path string) (int, error)
+	SubscribeToReaperExits(ctx context.Context) (<-chan gorunc.Exit, error)
 }
 
 type ConsoleSocket interface {

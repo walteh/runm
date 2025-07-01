@@ -18,6 +18,7 @@ import (
 
 	"github.com/opencontainers/runtime-spec/specs-go/features"
 
+	"github.com/containerd/containerd/v2/pkg/sys/reaper"
 	gorunc "github.com/containerd/go-runc"
 
 	"github.com/walteh/runm/core/runc/runtime"
@@ -42,6 +43,13 @@ func WrapdGoRuncRuntime(rt *gorunc.Runc) *GoRuncRuntime {
 	return &GoRuncRuntime{
 		internal: rt,
 	}
+}
+
+func (r *GoRuncRuntime) SubscribeToReaperExits(ctx context.Context) (<-chan gorunc.Exit, error) {
+	if gorunc.Monitor != reaper.Default {
+		gorunc.Monitor = reaper.Default
+	}
+	return reaper.Default.Subscribe(), nil
 }
 
 func (r *GoRuncRuntime) NewTempConsoleSocket(ctx context.Context) (runtime.ConsoleSocket, error) {

@@ -32,12 +32,9 @@ import (
 )
 
 type OCIVMConfig struct {
-	ID           string
-	Bundle       string
-	RootfsMounts []process.Mount
-	// StderrWriter io.Writer
-	// StdoutWriter io.Writer
-	// StdinReader  io.Reader
+	ID             string
+	Bundle         string
+	RootfsMounts   []process.Mount
 	Spec           *oci.Spec
 	StartingMemory strongunits.B
 	VCPUs          uint64

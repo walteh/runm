@@ -20,8 +20,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	EventService_ReceiveEvents_FullMethodName = "/runm.v1.EventService/ReceiveEvents"
-	EventService_PublishEvent_FullMethodName  = "/runm.v1.EventService/PublishEvent"
+	EventService_ReceiveEvents_FullMethodName          = "/runm.v1.EventService/ReceiveEvents"
+	EventService_PublishEvent_FullMethodName           = "/runm.v1.EventService/PublishEvent"
+	EventService_SubscribeToReaperExits_FullMethodName = "/runm.v1.EventService/SubscribeToReaperExits"
 )
 
 // EventServiceClient is the client API for EventService service.
@@ -30,6 +31,7 @@ const (
 type EventServiceClient interface {
 	ReceiveEvents(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[PublishEventsResponse], error)
 	PublishEvent(ctx context.Context, in *PublishEventRequest, opts ...grpc.CallOption) (*PublishEventResponse, error)
+	SubscribeToReaperExits(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ReaperExit], error)
 }
 
 type eventServiceClient struct {
@@ -69,12 +71,32 @@ func (c *eventServiceClient) PublishEvent(ctx context.Context, in *PublishEventR
 	return out, nil
 }
 
+func (c *eventServiceClient) SubscribeToReaperExits(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ReaperExit], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &EventService_ServiceDesc.Streams[1], EventService_SubscribeToReaperExits_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[emptypb.Empty, ReaperExit]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type EventService_SubscribeToReaperExitsClient = grpc.ServerStreamingClient[ReaperExit]
+
 // EventServiceServer is the server API for EventService service.
 // All implementations should embed UnimplementedEventServiceServer
 // for forward compatibility.
 type EventServiceServer interface {
 	ReceiveEvents(*emptypb.Empty, grpc.ServerStreamingServer[PublishEventsResponse]) error
 	PublishEvent(context.Context, *PublishEventRequest) (*PublishEventResponse, error)
+	SubscribeToReaperExits(*emptypb.Empty, grpc.ServerStreamingServer[ReaperExit]) error
 }
 
 // UnimplementedEventServiceServer should be embedded to have
@@ -89,6 +111,9 @@ func (UnimplementedEventServiceServer) ReceiveEvents(*emptypb.Empty, grpc.Server
 }
 func (UnimplementedEventServiceServer) PublishEvent(context.Context, *PublishEventRequest) (*PublishEventResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PublishEvent not implemented")
+}
+func (UnimplementedEventServiceServer) SubscribeToReaperExits(*emptypb.Empty, grpc.ServerStreamingServer[ReaperExit]) error {
+	return status.Errorf(codes.Unimplemented, "method SubscribeToReaperExits not implemented")
 }
 func (UnimplementedEventServiceServer) testEmbeddedByValue() {}
 
@@ -139,6 +164,17 @@ func _EventService_PublishEvent_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _EventService_SubscribeToReaperExits_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(emptypb.Empty)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(EventServiceServer).SubscribeToReaperExits(m, &grpc.GenericServerStream[emptypb.Empty, ReaperExit]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type EventService_SubscribeToReaperExitsServer = grpc.ServerStreamingServer[ReaperExit]
+
 // EventService_ServiceDesc is the grpc.ServiceDesc for EventService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -155,6 +191,11 @@ var EventService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "ReceiveEvents",
 			Handler:       _EventService_ReceiveEvents_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "SubscribeToReaperExits",
+			Handler:       _EventService_SubscribeToReaperExits_Handler,
 			ServerStreams: true,
 		},
 	},

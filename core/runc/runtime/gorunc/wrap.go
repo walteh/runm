@@ -108,6 +108,7 @@ func (r *GoRuncRuntime) Exec(ctx context.Context, id string, spec specs.Process,
 // Kill implements runtime.Runtime.
 func (r *GoRuncRuntime) Kill(ctx context.Context, id string, signal int, opts *gorunc.KillOpts) error {
 	return WrapWithRuntimeError(ctx, r, func() error {
+		slog.InfoContext(ctx, "KILLING RUNC", "id", id, "signal", signal, "opts.all", opts.All)
 		return r.internal.Kill(ctx, id, signal, opts)
 	})
 }

@@ -77,6 +77,9 @@ func setupLogging() func() {
 
 	ticker := time.NewTicker(1 * time.Second)
 	ticks := 0
+	closers = append(closers, func() {
+		ticker.Stop()
+	})
 
 	go func() {
 		for tick := range ticker.C {
@@ -89,7 +92,6 @@ func setupLogging() func() {
 	}()
 
 	return func() {
-		ticker.Stop()
 		for _, closer := range closers {
 			closer()
 		}

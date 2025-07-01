@@ -514,6 +514,12 @@ tasks:
                     docker.io/oven/bun:alpine \
                     --version
 
+    containerd:2025-07-01:01:
+        desc: runs the shim for 2025-07-01
+        cmds:
+          - task: dev:shim:killall
+          - cmd: sudo -A go tool goshim run ./test/integration/cmd/containerd-test
+
     setup:
         desc: sets up the environment
         cmds:

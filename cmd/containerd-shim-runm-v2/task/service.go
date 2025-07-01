@@ -33,7 +33,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/shutdown"
 	"github.com/containerd/containerd/v2/pkg/stdio"
-	"github.com/containerd/containerd/v2/pkg/sys/reaper"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/log"
@@ -63,9 +62,9 @@ var (
 func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.Service, rtc runtime.RuntimeCreator) (taskv3.TTRPCTaskService, error) {
 
 	s := &service{
-		context:              ctx,
-		events:               make(chan interface{}, 128),
-		ec:                   reaper.Default.Subscribe(),
+		context: ctx,
+		events:  make(chan interface{}, 128),
+		// ec:                   reaper.Default.Subscribe(), // todo: we need to proxy the reaper events from the vm to the host
 		ep:                   nil,
 		shutdown:             sd,
 		containers:           make(map[string]*runm.Container),
@@ -76,8 +75,8 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 		exitSubscribers:      make(map[*map[int][]gorunc.Exit]struct{}),
 		creator:              rtc,
 	}
-	go s.processExits()
-	gorunc.Monitor = reaper.Default
+	// go s.processExits()
+	// gorunc.Monitor = reaper.Default // todo: we need to proxy the reaper events from the vm to the host
 	if err := s.initPlatform(); err != nil {
 		return nil, fmt.Errorf("failed to initialized platform behavior: %w", err)
 	}
@@ -547,6 +546,7 @@ func (s *service) Kill(ctx context.Context, r *taskv3.KillRequest) (*ptypes.Empt
 	if err != nil {
 		return nil, err
 	}
+	slog.InfoContext(ctx, "KILLING RUNM with opts", "id", container.ID, "signal", r.Signal, "all", r.All)
 	if err := container.Kill(ctx, r); err != nil {
 		return nil, errgrpc.ToGRPC(err)
 	}
@@ -750,6 +750,7 @@ func (s *service) processExits() {
 		s.lifecycleMu.Unlock()
 
 		for _, cp := range cps {
+			// todo: here we need to mkae sure we are getting to here
 			if ip, ok := cp.Process.(*process.Init); ok {
 				s.handleInitExit(e, cp.Container, ip)
 			} else {
