@@ -34,6 +34,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/console"
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/stdio"
 	"github.com/containerd/fifo"
 	"github.com/containerd/log"
@@ -337,6 +338,7 @@ func (p *Init) delete(ctx context.Context) error {
 		if strings.Contains(err.Error(), "does not exist") {
 			err = nil
 		} else {
+
 			err = errors.Errorf("failed to delete task: %w", err)
 		}
 	}
@@ -360,12 +362,12 @@ func (p *Init) delete(ctx context.Context) error {
 	}
 
 	// // TODO: MAKE SURE WE DON"T NEED THIS
-	// if err2 := mount.UnmountRecursive(p.Rootfs, 0); err2 != nil {
-	// 	log.G(ctx).WithError(err2).Warn("failed to cleanup rootfs mount")
-	// 	if err == nil {
-	// 		err = errors.Errorf("failed rootfs umount: %w", err2)
-	// 	}
-	// }
+	if err2 := mount.UnmountRecursive(p.Rootfs, 0); err2 != nil {
+		log.G(ctx).WithError(err2).Warn("failed to cleanup rootfs mount")
+		if err == nil {
+			err = errors.Errorf("failed rootfs umount: %w", err2)
+		}
+	}
 
 	return err
 }

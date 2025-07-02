@@ -1,6 +1,6 @@
 module github.com/walteh/runm
 
-go 1.24.4
+go 1.25
 
 exclude github.com/containerd/nerdctl/mod/tigron v0.0.0
 

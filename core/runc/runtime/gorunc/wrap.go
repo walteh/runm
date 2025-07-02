@@ -2,13 +2,14 @@ package goruncruntime
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os/exec"
+	"path/filepath"
 	"time"
 
 	gorunc "github.com/containerd/go-runc"
 	"github.com/opencontainers/runtime-spec/specs-go"
+	"gitlab.com/tozd/go/errors"
 )
 
 func (r *GoRuncRuntime) Create(ctx context.Context, id, bundle string, options *gorunc.CreateOpts) error {
@@ -16,10 +17,17 @@ func (r *GoRuncRuntime) Create(ctx context.Context, id, bundle string, options *
 
 	output, err := exec.CommandContext(ctx, "/bin/busybox", "ls", "-lah", bundle).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to list bundle: %w (output: %q)", err, string(output))
+		slog.ErrorContext(ctx, "failed to list bundle", "error", err, "output", string(output))
+		return errors.Errorf("failed to list bundle: %w", err)
 	}
 	slog.InfoContext(ctx, "ls -lahr: "+string(output), "bundle", bundle)
 
+	output, err = exec.CommandContext(ctx, "/bin/busybox", "ls", "-lah", filepath.Join(bundle, "rootfs")).CombinedOutput()
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to list bundle", "error", err, "output", string(output))
+		return errors.Errorf("failed to list bundle: %w", err)
+	}
+	slog.InfoContext(ctx, "ls -lah: "+string(output), "bundle", bundle)
 	// // Handle the exec FIFO in a separate goroutine to ensure proper synchronization
 	// // This is critical for container initialization
 	// go func() {

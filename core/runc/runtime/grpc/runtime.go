@@ -3,6 +3,7 @@ package grpcruntime
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"os"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"gitlab.com/tozd/go/errors"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	gorunc "github.com/containerd/go-runc"
@@ -453,7 +455,13 @@ func (c *GRPCClientRuntime) SubscribeToReaperExits(ctx context.Context) (<-chan 
 		for {
 			exit, err := srv.Recv()
 			if err != nil {
-				slog.ErrorContext(ctx, "error receiving reaper exit", "error", err)
+				grpcErr := status.Convert(err)
+				if errors.As(err, &io.EOF) {
+					slog.DebugContext(ctx, "reaper exit channel closed")
+					return
+				}
+
+				slog.ErrorContext(ctx, "reaper exit channel closed with error", "err", grpcErr, "code", grpcErr.Code())
 				return
 			}
 			slog.InfoContext(ctx, "reaper exit", "pid", exit.GetPid(), "status", exit.GetStatus())

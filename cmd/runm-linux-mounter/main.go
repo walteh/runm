@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"syscall"
 
@@ -287,24 +288,24 @@ func mount(ctx context.Context) error {
 		ExecCmdForwardingStdio(ctx, "ls", "-la", bundleSource)
 	}
 
-	disableNewRoot := true
+	// disableNewRoot := true
 
-	if !disableNewRoot {
+	// if !disableNewRoot {
 
-		if _, err := os.Stat(constants.NewRootAbsPath); os.IsNotExist(err) {
-			os.MkdirAll(constants.NewRootAbsPath, 0755)
-		}
+	// 	if _, err := os.Stat(constants.NewRootAbsPath); os.IsNotExist(err) {
+	// 		os.MkdirAll(constants.NewRootAbsPath, 0755)
+	// 	}
 
-		err = ExecCmdForwardingStdio(ctx, "mount", "-t", "virtiofs", constants.RootfsVirtioTag, constants.NewRootAbsPath)
-		if err != nil {
-			return errors.Errorf("problem mounting rootfs virtiofs: %w", err)
-		}
+	// 	err = ExecCmdForwardingStdio(ctx, "mount", "-t", "virtiofs", constants.RootfsVirtioTag, constants.NewRootAbsPath)
+	// 	if err != nil {
+	// 		return errors.Errorf("problem mounting rootfs virtiofs: %w", err)
+	// 	}
 
-		// Add debugging for rootfs mount
-		slog.InfoContext(ctx, "DEBUG: Rootfs virtiofs mount completed", "tag", constants.RootfsVirtioTag, "path", constants.NewRootAbsPath)
-		ExecCmdForwardingStdio(ctx, "ls", "-la", constants.NewRootAbsPath)
+	// 	// Add debugging for rootfs mount
+	// 	slog.InfoContext(ctx, "DEBUG: Rootfs virtiofs mount completed", "tag", constants.RootfsVirtioTag, "path", constants.NewRootAbsPath)
+	// 	ExecCmdForwardingStdio(ctx, "ls", "-la", constants.NewRootAbsPath)
 
-	}
+	// }
 
 	// err = ExecCmdForwardingStdio(ctx, "ls", "-lah", "/proc")
 	// if err != nil {
@@ -367,6 +368,8 @@ func mount(ctx context.Context) error {
 	if err != nil {
 		return errors.Errorf("problem mounting rootfs: %w", err)
 	}
+
+	os.MkdirAll(filepath.Join(constants.NewRootAbsPath, bundleSource, "rootfs"), 0755)
 
 	// mount bundle/rootfs onto itself
 	if err := ExecCmdForwardingStdio(ctx, "mount", "--bind", filepath.Join(constants.NewRootAbsPath, bundleSource, "rootfs"), filepath.Join(constants.NewRootAbsPath, bundleSource, "rootfs")); err != nil {
@@ -458,6 +461,13 @@ func mountRootfsPrimary(ctx context.Context) error {
 
 func mountRootfsSecondary(ctx context.Context, prefix string, customMounts []specs.Mount) error {
 	cmds := [][]string{}
+
+	slices.SortFunc(customMounts, func(a, b specs.Mount) int {
+		if a.Type == "virtiofs" {
+			return 1
+		}
+		return -1
+	})
 
 	for _, mount := range customMounts {
 

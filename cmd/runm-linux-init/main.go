@@ -212,7 +212,6 @@ func (r *runmLinuxInit) configureRuntimeServer(ctx context.Context) (*grpc.Serve
 	serverz := server.NewServer(
 		realRuntime,
 		mockRuntimeExtras,
-		// realSocketAllocator,
 		realEventHandler,
 		cgroupAdapter,
 		server.WithBundleSource(bundleSource),

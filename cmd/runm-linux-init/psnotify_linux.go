@@ -22,6 +22,9 @@ func waitByPidfd(pid int) error {
 	// 1) Open a pidfd (requires Linux ≥5.3)
 	pidfd, err := unix.PidfdOpen(pid, unix.PIDFD_NONBLOCK)
 	if err != nil {
+		if err.Error() == "no such process" {
+			return nil
+		}
 		return err
 	}
 	defer unix.Close(pidfd)

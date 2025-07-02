@@ -125,7 +125,8 @@ func (r *runmLinuxInit) runPsnotify(ctx context.Context, exitChan chan gorunc.Ex
 			go func() {
 				err := waitByPidfd(pid)
 				if err != nil {
-					slog.ErrorContext(ctx, "failed to wait for process", "error", err)
+					attrs = append(attrs, slog.String("error", err.Error()))
+					slog.LogAttrs(ctx, slog.LevelError, "failed to wait for process", attrs...)
 					return
 				}
 				slog.LogAttrs(ctx, slog.LevelDebug, "PSNOTIFY[IO_CLOSED]", attrs...)

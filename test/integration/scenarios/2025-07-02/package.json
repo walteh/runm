@@ -1,0 +1,13 @@
+{
+	"name": "runm-test-project",
+	"version": "1.0.0",
+	"type": "module",
+	"scripts": {
+		"build": "bun build ./src/index.ts --outdir ./dist --target bun",
+		"test": "bun test",
+		"start": "bun run ./dist/index.js"
+	},
+	"dependencies": {
+		"chalk": "^5.3.0"
+	}
+}

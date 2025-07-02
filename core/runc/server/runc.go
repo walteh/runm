@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net"
+	"strings"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -142,6 +143,9 @@ func (s *Server) Kill(ctx context.Context, req *runmv1.RuncKillRequest) (*runmv1
 
 	err := s.runtime.Kill(ctx, req.GetId(), int(req.GetSignal()), opts)
 	if err != nil {
+		if strings.HasSuffix(err.Error(), "container not running") {
+			return resp, nil
+		}
 		return nil, errors.Errorf("killing container: %w", err)
 	}
 	return resp, nil

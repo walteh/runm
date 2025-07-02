@@ -315,17 +315,22 @@ tasks:
     linux:vf-offline:*:
         label: 'linux:vf-offline:{{.ARCH}}'
         requires: {vars: [ARCH]}
-        desc: builds the initramfs
+        desc: builds the vf-offline
         sources:
-          - ./linux/initramfs/**
+          - ./gen/build/linux_vf_{{ .ARCH }}/**
+          - '**/*.go'
         generates:
-          - ./gen/build/initramfs_{{ .ARCH }}/**
+          - ./gen/build/linux_vf_offline_{{ .ARCH }}/**
         vars:
             ARCH: "{{index .MATCH 0}}"
             VF_DIR: "{{.BUILD_OUT_DIR}}/linux_vf_{{ .ARCH }}"
             OUT_DIR: "{{.BUILD_OUT_DIR}}/linux_vf_offline_{{ .ARCH }}"
             TMP_DIR:
                 sh: mktemp -d
+            GO_BINARIES_TO_BUILD:
+              - runm-linux-mounter
+              - runm-linux-init
+              - runm-linux-host-fork-exec-proxy
         cmds:
           - defer: rm -rf {{.TMP_DIR}}
           - cmd: mkdir -p {{.TMP_DIR}} {{.TMP_DIR}}/initramfs {{.TMP_DIR}}/mbin {{.OUT_DIR}}
@@ -338,28 +343,19 @@ tasks:
           - cmd: unsquashfs  -d {{.TMP_DIR}}/mbin {{.TMP_DIR}}/mbin.squashfs
 
           - cmd: ls -lahr {{.TMP_DIR}}
+          - for: {var: GO_BINARIES_TO_BUILD}
+            cmd: |-
+                GOOS=linux GOARCH=${ARCH} go build \
+                    -ldflags="-s -w -extldflags=-static" \
+                     -o {{.TMP_DIR}}/initramfs/{{.ITEM}} ./cmd/{{.ITEM}}
 
-          - |-
-            GOOS=linux GOARCH=${ARCH} go build \
-                -ldflags="-s -w -extldflags=-static" \
-                 -o {{.TMP_DIR}}/initramfs/runm-linux-mounter ./cmd/runm-linux-mounter
-          - |-
-            GOOS=linux GOARCH=${ARCH} go build \
-                -ldflags="-s -w -extldflags=-static" \
-                 -o {{.TMP_DIR}}/mbin/runm-linux-init ./cmd/runm-linux-init
-          - |-
-            GOOS=linux GOARCH=${ARCH} go build \
-                -ldflags="-s -w -extldflags=-static" \
-                 -o {{.TMP_DIR}}/mbin/runm-linux-host-fork-exec-proxy ./cmd/runm-linux-host-fork-exec-proxy
+          - cmd: mksquashfs {{.TMP_DIR}}/mbin/* {{.TMP_DIR}}/mbin-new.squashfs  -quiet
+          - cmd: cd {{.TMP_DIR}}/initramfs && find . -print0 | cpio --null -o --format=newc > {{.TMP_DIR}}/initramfs-new.cpio
+          - cmd: gzip -1 -q {{.TMP_DIR}}/initramfs-new.cpio
 
-          - mksquashfs {{.TMP_DIR}}/mbin/* {{.TMP_DIR}}/mbin-new.squashfs  -quiet
-          - |-
-            cd {{.TMP_DIR}}/initramfs && find . -print0 | cpio --null -o --format=newc > {{.TMP_DIR}}/initramfs-new.cpio
-          - gzip -1 -q {{.TMP_DIR}}/initramfs-new.cpio
-
-          - cp {{.VF_DIR}}/kernel {{.OUT_DIR}}/kernel
-          - cp {{.TMP_DIR}}/initramfs-new.cpio.gz {{.OUT_DIR}}/initramfs.cpio.gz
-          - cp {{.TMP_DIR}}/mbin-new.squashfs {{.OUT_DIR}}/mbin.squashfs
+          - cmd: cp {{.VF_DIR}}/kernel {{.OUT_DIR}}/kernel
+          - cmd: cp {{.TMP_DIR}}/initramfs-new.cpio.gz {{.OUT_DIR}}/initramfs.cpio.gz
+          - cmd: cp {{.TMP_DIR}}/mbin-new.squashfs {{.OUT_DIR}}/mbin.squashfs
 
     linux:all:
         desc: builds all linux components
@@ -428,9 +424,11 @@ tasks:
     dev:shim:killall:
         desc: kills all running containers
         cmds:
+          - cmd: sudo -A pkill -f containerd-shim-runm-v2 || true
           - cmd: sudo -A pkill -f containerd-shim-runc-v2 || true
           - cmd: sudo -A pkill -f nerdctl-test || true
           - cmd: sudo -A killall -9 containerd-shim-runc-v2 || true
+          - cmd: sudo -A killall -9 containerd-shim-runm-v2 || true
           - cmd: sudo -A killall -9 nerdctl-test || true
 
     dev:2025-06-08:01:
@@ -497,7 +495,7 @@ tasks:
           - cmd: ./gow run -codesign ./cmd/proc-demo -{{.ARG}}
 
     dev:2025-06-18:01:
-        desc: runs the shim for 2025-06-08
+        desc: runs the shim for 2025-06-18
         env:
             LINUX_RUNTIME_BUILD_DIR:
                 sh: realpath ./gen/build/linux_vf_arm64
@@ -513,6 +511,31 @@ tasks:
                     --rm \
                     docker.io/oven/bun:alpine \
                     --version
+
+    dev:2025-07-02:01:
+        desc: runs the shim for 2025-07-02 - complex TypeScript compilation and execution
+        env:
+            LINUX_RUNTIME_BUILD_DIR:
+                sh: realpath ./gen/build/linux_vf_arm64
+        vars:
+            SCENARIO_DIR:
+                sh: realpath ./test/integration/scenarios/2025-07-02
+        cmds:
+          - task: dev:shim:killall
+          - task: linux:vf-offline:arm64
+
+          # Run the complex scenario using the prepared scenario directory
+          - cmd: |-
+                timeout 30s sudo -A -E go tool goshim run -codesign -log-file-to-append-in=.logs/containerd.log ./test/integration/cmd/nerdctl-test run \
+                    --platform=linux/arm64 \
+                    --network=host \
+                    --runtime=containerd.shim.runc.v2 \
+                    --pull=missing \
+                    --rm \
+                    --workdir=/app \
+                    --mount=type=bind,src={{.SCENARIO_DIR}},dst=/app \
+                    docker.io/oven/bun:alpine \
+                    sh -c "echo '📦 Installing dependencies...' && bun install && echo '🧪 Running tests...' && bun test && echo '🔨 Building project...' && bun run build && echo '🏃 Running compiled app...' && bun run start"
 
     containerd:2025-07-01:01:
         desc: runs the shim for 2025-07-01

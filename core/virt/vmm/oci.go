@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -255,6 +254,7 @@ func bindMountToVirtioFs(ctx context.Context, mount specs.Mount, containerId str
 		mount.Type = "virtiofs"
 		mount.Source = tag
 		mount.Options = []string{}
+		mount.Destination = filepath.Dir(mount.Source)
 
 		return &mount, shareDev, nil
 
@@ -307,6 +307,8 @@ func PrepareContainerMounts(ctx context.Context, spec *oci.Spec, containerId str
 	bindMounts := []specs.Mount{}
 	devices := []virtio.VirtioDevice{}
 
+	// convertToCustomMount := false
+
 	// log all the mounts
 
 	for _, mount := range spec.Mounts {
@@ -316,6 +318,19 @@ func PrepareContainerMounts(ctx context.Context, spec *oci.Spec, containerId str
 
 		switch mount.Type {
 		case "bind", "rbind":
+			// if convertToCustomMount {
+			// 	mnt, dev, err := bindMountToVirtioFs(ctx, mount, containerId)
+			// 	if err != nil {
+			// 		return nil, nil, errors.Errorf("binding mount to virtio fs: %w", err)
+			// 	}
+			// 	if mnt != nil {
+			// 		bindMounts = append(bindMounts, *mnt)
+			// 	}
+			// 	if dev != nil {
+			// 		devices = append(devices, dev)
+			// 	}
+			// } else {
+			bindMounts = append(bindMounts, mount)
 			mnt, dev, err := bindMountToVirtioFs(ctx, mount, containerId)
 			if err != nil {
 				return nil, nil, errors.Errorf("binding mount to virtio fs: %w", err)
@@ -326,6 +341,7 @@ func PrepareContainerMounts(ctx context.Context, spec *oci.Spec, containerId str
 			if dev != nil {
 				devices = append(devices, dev)
 			}
+			// }
 		case "tmpfs":
 			if mount.Destination == "/dev" {
 				bindMounts = append(bindMounts, specs.Mount{
@@ -372,19 +388,29 @@ func PrepareContainerVirtioDevicesFromRootfs(ctx context.Context, wrkdir string,
 		return nil, errors.Errorf("creating rootfs virtio device: %w", err)
 	}
 
-	outMounts = append(outMounts, specs.Mount{
-		Type:        "virtiofs",
-		Source:      constants.RootfsVirtioTag,
-		Destination: "", // the root
-		Options: slices.DeleteFunc(rootfsMount.Options, func(opt string) bool {
-			return opt == "rbind" || opt == "bind"
-		}),
-	})
+	// outMounts = append(outMounts, specs.Mount{
+	// 	Type:        "virtiofs",
+	// 	Source:      constants.RootfsVirtioTag,
+	// 	Destination: "", // the root
+	// 	Options: slices.DeleteFunc(rootfsMount.Options, func(opt string) bool {
+	// 		return opt == "rbind" || opt == "bind"
+	// 	}),
+	// })
 
 	// consoleAttachment := virtio.NewFileHandleDeviceAttachment(os.NewFile(uintptr(ctrconfig.StdinFD), "ptymaster"), virtio.DeviceSerial)
 	// consoleConfig.SetAttachment(consoleAttachment)
 
 	devices = append(devices, blkDev)
+
+	for _, mount := range rootfsMounts {
+		bindMounts = append(bindMounts, specs.Mount{
+			Type:        mount.Type,
+			Source:      mount.Source,
+			Destination: mount.Target,
+			Options:     mount.Options,
+		})
+
+	}
 
 	specBytes, err := json.Marshal(ctrconfig)
 	if err != nil {
@@ -417,53 +443,6 @@ func PrepareContainerVirtioDevicesFromRootfs(ctx context.Context, wrkdir string,
 			return nil, errors.Errorf("writing file to block device: %w", err)
 		}
 	}
-
-	timesyncFile := filepath.Join(ec1DataPath, "timesync")
-
-	_, zoneoffset := time.Now().Zone()
-
-	wg.Go(func() error {
-		timez := strconv.Itoa(int(time.Now().UnixNano()))
-		timez += ":" + strconv.Itoa(zoneoffset)
-		// write once
-		err := os.WriteFile(timesyncFile, []byte(timez), 0644)
-		if err != nil {
-			slog.ErrorContext(ctx, "error writing timesync file", "error", err)
-		}
-		return nil
-	})
-
-	timeout := time.NewTimer(1 * time.Second)
-
-	// create a temporary timesync file
-	go func() {
-
-		for {
-			select {
-			case <-timeout.C:
-				err := os.WriteFile(timesyncFile, []byte("done"), 0644)
-				if err != nil {
-					slog.ErrorContext(ctx, "error writing timesync file", "error", err)
-				}
-				return
-			default:
-				timez := strconv.Itoa(int(time.Now().UnixNano()))
-				timez += ":" + strconv.Itoa(zoneoffset)
-				// slog.InfoContext(ctx, "writing timesync file", "time", timez)
-				err := os.WriteFile(timesyncFile, []byte(timez), 0644)
-				if err != nil {
-					slog.ErrorContext(ctx, "error writing timesync file", "error", err)
-				}
-			}
-		}
-	}()
-
-	// ec1Dev, err := virtio.VirtioFsNew(ec1DataPath, constants.Ec1VirtioTag)
-	// if err != nil {
-	// 	return nil, errors.Errorf("creating ec1 virtio device: %w", err)
-	// }
-
-	// devices = append(devices, ec1Dev)
 
 	return devices, nil
 }

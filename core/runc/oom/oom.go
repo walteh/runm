@@ -2,6 +2,7 @@ package oom
 
 import (
 	"context"
+	"io"
 	"log/slog"
 
 	"github.com/containerd/containerd/v2/core/events"
@@ -82,7 +83,7 @@ func (w *Watcher) Run(ctx context.Context) error {
 				itemCh <- i
 			case err := <-errCh:
 				// channel is closed when cgroup gets deleted
-				if err != nil {
+				if err != nil && !errors.As(err, io.EOF) {
 					i.err = err
 					itemCh <- i
 					// we no longer get any event/err when we got an err

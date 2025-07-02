@@ -1,6 +1,6 @@
 module github.com/walteh/runm/tools
 
-go 1.24.4
+go 1.25
 
 // conflicts with newer pkg versions like
 // - google.golang.org/grpc ./stats/opentelemetry
