@@ -1,6 +1,7 @@
 package socket
 
 import (
+	"bufio"
 	"context"
 	"io"
 	"log/slog"
@@ -68,12 +69,14 @@ func BindConsoleToSocket(ctx context.Context, cons runtime.ConsoleSocket, sock r
 
 func halfCloseWrite(conn net.Conn) {
 	// Attempt a half-close if supported (e.g., Unix domain or TCP)
-	if uc, ok := conn.(*net.UnixConn); ok {
-		uc.CloseWrite() // sends FIN (EOF) to peer  [oai_citation:8‡github.com](https://github.com/golang/go/issues/67337?utm_source=chatgpt.com)
-		conn.Close()
-	} else {
-		conn.Close() // fallback: full close
-	}
+	// if uc, ok := conn.(*net.UnixConn); ok {
+	// 	uc.CloseWrite() // sends FIN (EOF) to peer  [oai_citation:8‡github.com](https://github.com/golang/go/issues/67337?utm_source=chatgpt.com)
+	// 	conn.Close()
+	// } else {
+	// 	conn.Close() // fallback: full close
+	// }
+
+	conn.Close()
 }
 
 type breakOnZeroReader struct {
@@ -95,13 +98,15 @@ func copyLoggingAllBytesSomehow(ctx context.Context, name string, w io.Writer, r
 	nr := io.TeeReader(wrapped, pw)
 	go func() {
 		for {
-			buf := make([]byte, 1)
-			_, err := pr.Read(buf)
+			buf := bufio.NewScanner(pr)
+			buf.Split(bufio.ScanLines)
+			buf.Scan()
+			err := buf.Err()
 			if err != nil {
 				slog.ErrorContext(ctx, "error reading byte", "name", name, "error", err)
 				return
 			}
-			slog.InfoContext(ctx, "copied byte", "name", name, "byte", buf[0], "string", string(buf))
+			slog.InfoContext(ctx, "teed line for reader", "name", name, "data", buf.Text())
 		}
 	}()
 	return io.Copy(w, nr)
@@ -125,8 +130,12 @@ func BindIOToSockets(ctx context.Context, ios runtime.IO, stdin, stdout, stderr 
 				return
 			}
 			slog.InfoContext(ctx, "copying stdin")
-			copyLoggingAllBytesSomehow(ctx, "stdin", ios.Stdin(), stdin.Conn())
-			slog.InfoContext(ctx, "closing io.Stdin()")
+			_, err := copyLoggingAllBytesSomehow(ctx, "stdin", ios.Stdin(), stdin.Conn())
+			if err != nil {
+				slog.WarnContext(ctx, "closing io.Stdin with error", "error", err)
+			} else {
+				slog.InfoContext(ctx, "closing io.Stdin with NO error")
+			}
 			ios.Stdin().Close() // close FIFO writer to signal EOF
 			halfCloseWrite(stdin.Conn())
 		}()
@@ -142,8 +151,12 @@ func BindIOToSockets(ctx context.Context, ios runtime.IO, stdin, stdout, stderr 
 				return
 			}
 			slog.InfoContext(ctx, "copying stdout")
-			copyLoggingAllBytesSomehow(ctx, "stdout", stdout.Conn(), ios.Stdout())
-			slog.InfoContext(ctx, "closing stdout")
+			_, err := copyLoggingAllBytesSomehow(ctx, "stdout", stdout.Conn(), ios.Stdout())
+			if err != nil {
+				slog.WarnContext(ctx, "closing io.Stdout with error", "error", err)
+			} else {
+				slog.InfoContext(ctx, "closing io.Stdout with NO error")
+			}
 			halfCloseWrite(stdout.Conn()) // signal EOF to guest reader
 		}()
 	}
@@ -158,8 +171,12 @@ func BindIOToSockets(ctx context.Context, ios runtime.IO, stdin, stdout, stderr 
 				return
 			}
 			slog.InfoContext(ctx, "copying stderr")
-			copyLoggingAllBytesSomehow(ctx, "stderr", stderr.Conn(), ios.Stderr())
-			slog.InfoContext(ctx, "closing stderr")
+			_, err := copyLoggingAllBytesSomehow(ctx, "stderr", stderr.Conn(), ios.Stderr())
+			if err != nil {
+				slog.WarnContext(ctx, "closing io.Stderr with error", "error", err)
+			} else {
+				slog.InfoContext(ctx, "closing io.Stderr with NO error")
+			}
 			halfCloseWrite(stderr.Conn()) // signal EOF
 		}()
 	}

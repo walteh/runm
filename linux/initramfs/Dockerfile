@@ -3,7 +3,7 @@
 ########################################################
 
 ARG BUSYBOX_VERSION=1.36.1
-ARG GO_VERSION=1.24
+ARG GO_VERSION=1.25rc1
 ARG ALPINE_VERSION=3.22
 ARG ALPINE_BUSYBOX_VERSION=3.21
 ARG DEBIAN_CODENAME=bookworm

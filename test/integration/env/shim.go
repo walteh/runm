@@ -21,6 +21,7 @@ import (
 
 	slogctx "github.com/veqryn/slog-context"
 
+	"github.com/containerd/log"
 	"github.com/walteh/runm/cmd/containerd-shim-runm-v2/manager"
 	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/logging"
@@ -45,9 +46,11 @@ func (d *simpleOtelDialer) DialContext(ctx context.Context, _, _ string) (net.Co
 
 var mode = guessShimMode()
 
-func setupOtelForShim(ctx context.Context) (*slog.Logger, func() error, error) {
+func SetupOtelForNerdctl(ctx context.Context) (*slog.Logger, func() error, error) {
+	return setupOtelForShim(ctx, "nerdctl")
+}
 
-	shimName := fmt.Sprintf("shim[%s]", mode)
+func setupOtelForShim(ctx context.Context, shimName string) (*slog.Logger, func() error, error) {
 
 	opts := []logging.OptLoggerOptsSetter{
 		logging.WithDelimiter(constants.VsockDelimitedLogProxyDelimiter),
@@ -93,6 +96,11 @@ func setupOtelForShim(ctx context.Context) (*slog.Logger, func() error, error) {
 		return nil, nil, err
 	}
 
+	log.L = &logrus.Entry{
+		Logger: logrus.StandardLogger(),
+		Data:   make(log.Fields, 6),
+	}
+
 	return logging.NewDefaultDevLoggerWithOtel(ctx, shimName, logProxySockDelim, otelInstances, opts...), func() error {
 		rawWriterSock.Close()
 		logProxySockDelim.Close()
@@ -115,7 +123,7 @@ func ShimMain() {
 
 	// slog.Info("dialed otel proxy socket", "conn", otelProxySock)
 
-	logger, sd, err := setupOtelForShim(ctx)
+	logger, sd, err := setupOtelForShim(ctx, fmt.Sprintf("shim[%s]", mode))
 	if err != nil {
 		slog.Error("Failed to setup otel", "error", err)
 		os.Exit(1)

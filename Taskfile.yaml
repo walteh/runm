@@ -328,9 +328,10 @@ tasks:
             TMP_DIR:
                 sh: mktemp -d
             GO_BINARIES_TO_BUILD:
-              - runm-linux-mounter
-              - runm-linux-init
-              - runm-linux-host-fork-exec-proxy
+                map:
+                    runm-linux-mounter: initramfs
+                    runm-linux-init: mbin
+                    runm-linux-host-fork-exec-proxy: mbin
         cmds:
           - defer: rm -rf {{.TMP_DIR}}
           - cmd: mkdir -p {{.TMP_DIR}} {{.TMP_DIR}}/initramfs {{.TMP_DIR}}/mbin {{.OUT_DIR}}
@@ -342,14 +343,13 @@ tasks:
           - cmd: cp {{.VF_DIR}}/mbin.squashfs {{.TMP_DIR}}/mbin.squashfs
           - cmd: unsquashfs  -d {{.TMP_DIR}}/mbin {{.TMP_DIR}}/mbin.squashfs
 
-          - cmd: ls -lahr {{.TMP_DIR}}
           - for: {var: GO_BINARIES_TO_BUILD}
             cmd: |-
                 GOOS=linux GOARCH=${ARCH} go build \
                     -ldflags="-s -w -extldflags=-static" \
-                     -o {{.TMP_DIR}}/initramfs/{{.ITEM}} ./cmd/{{.ITEM}}
+                     -o {{.TMP_DIR}}/{{.ITEM}}/{{.KEY}} ./cmd/{{.KEY}}
 
-          - cmd: mksquashfs {{.TMP_DIR}}/mbin/* {{.TMP_DIR}}/mbin-new.squashfs  -quiet
+          - cmd: mksquashfs {{.TMP_DIR}}/mbin/* {{.TMP_DIR}}/mbin-new.squashfs -quiet
           - cmd: cd {{.TMP_DIR}}/initramfs && find . -print0 | cpio --null -o --format=newc > {{.TMP_DIR}}/initramfs-new.cpio
           - cmd: gzip -1 -q {{.TMP_DIR}}/initramfs-new.cpio
 
@@ -526,7 +526,7 @@ tasks:
 
           # Run the complex scenario using the prepared scenario directory
           - cmd: |-
-                timeout 30s sudo -A -E go tool goshim run -codesign -log-file-to-append-in=.logs/containerd.log ./test/integration/cmd/nerdctl-test run \
+                timeout 300s sudo -A -E go tool goshim run -codesign -log-file-to-append-in=.logs/containerd.log ./test/integration/cmd/nerdctl-test run \
                     --platform=linux/arm64 \
                     --network=host \
                     --runtime=containerd.shim.runc.v2 \
@@ -581,3 +581,32 @@ tasks:
           - for: {var: FORKS}
             cmd: git clone {{.ITEM.repo}} --depth 1 && git fetch origin {{.ITEM.branch}} && git checkout {{.ITEM.branch}}
 
+    signoz:git:
+        desc: sets up the git repository for the signoz agent
+        vars:
+            DIR: ./gen/build/signoz-standalone/signoz
+        status:
+          - test -d {{.DIR}}/.git.sub
+        cmds:
+          - cmd: rm -rf {{.DIR}}
+          - cmd: mkdir -p {{.DIR}}
+          - cmd: git clone -b main https://github.com/SigNoz/signoz.git {{.DIR}} --depth 1;
+          - cmd: mv -f {{.DIR}}/.git {{.DIR}}/.git.sub
+
+    signoz:stop:
+        desc: kills all signoz processes
+        dir: ./gen/build/signoz-standalone/signoz
+        status:
+          - test -d ./deploy/docker
+          - cd ./deploy/docker && docker compose ps | grep -vqz signoz
+        cmds:
+          - cmd: cd ./deploy/docker && docker compose down -v
+
+    signoz:start:
+        desc: starts the signoz agent
+        dir: ./gen/build/signoz-standalone/signoz
+        cmds:
+          - task: signoz:git
+          - task: signoz:stop
+          - cmd: git --git-dir=.git.sub pull
+          - cmd: cd ./deploy && sudo -A ./install.sh

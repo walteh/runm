@@ -1,8 +1,9 @@
+//go:build !windows
+
 package vmm
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"hash/fnv"
@@ -10,7 +11,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
@@ -18,7 +18,6 @@ import (
 
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containers/common/pkg/strongunits"
-	"github.com/opencontainers/runtime-spec/specs-go"
 	"gitlab.com/tozd/go/errors"
 
 	slogctx "github.com/veqryn/slog-context"
@@ -89,24 +88,12 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 		return nil, errors.Errorf("copying build directory: %w", err)
 	}
 
-	// bindMounts, mountDevices, err := PrepareContainerMounts(ctx, ctrconfig.Spec, ctrconfig.ID)
-	// if err != nil {
-	// 	return nil, errors.Errorf("preparing container mounts: %w", err)
-	// }
-
 	mbinDev, _, err := NewMbinBlockDevice(ctx, workingDir)
 	if err != nil {
 		return nil, errors.Errorf("creating mbin block device: %w", err)
 	}
 
 	devices = append(devices, mbinDev)
-
-	// ec1Dev, _, err := NewEc1BlockDevice(ctx, workingDir)
-	// if err != nil {
-	// 	return nil, errors.Errorf("creating ec1 block device: %w", err)
-	// }
-
-	// devices = append(devices, ec1Dev)
 
 	bundleDev, err := virtio.VirtioFsNew(ctrconfig.Bundle, constants.BundleVirtioTag)
 	if err != nil {
@@ -333,116 +320,6 @@ func findMbindDevices(ctx context.Context, spec *oci.Spec, rootfsMounts []proces
 	return devices, proxyDevices, nil
 }
 
-func bindMountToVirtioFs(ctx context.Context, mount specs.Mount, containerId string) (*specs.Mount, virtio.VirtioDevice, error) {
-	fi, err := os.Stat(mount.Source)
-	if err != nil {
-		return nil, nil, errors.Errorf("statting source: %w", err)
-	}
-
-	if fi.IsDir() {
-		hash := sha256.Sum256([]byte(mount.Source))
-		tag := "bind-" + hex.EncodeToString(hash[:8])
-		// create a new fs direcotry share
-		shareDev, err := virtio.VirtioFsNew(mount.Source, tag)
-		if err != nil {
-			return nil, nil, errors.Errorf("creating share device: %w", err)
-		}
-
-		mount.Type = "virtiofs"
-		mount.Source = tag
-		mount.Options = []string{}
-		mount.Destination = filepath.Dir(mount.Source)
-
-		return &mount, shareDev, nil
-
-	} else {
-
-		// run a quick ls -la in the dir for fun
-
-		dir := filepath.Dir(mount.Source)
-
-		hash := sha256.Sum256([]byte(dir))
-		tag := "bind-" + hex.EncodeToString(hash[:8])
-		// create a new fs direcotry share
-		shareDev, err := virtio.VirtioFsNew(dir, tag)
-		if err != nil {
-			return nil, nil, errors.Errorf("creating share device: %w", err)
-		}
-
-		mount.Destination = dir
-		mount.Type = "virtiofs"
-		mount.Source = tag
-		mount.Options = []string{}
-
-		return &mount, shareDev, nil
-
-		// return nil, nil, errors.Errorf("unsupported bind mount file: %s", mount.Source)
-
-		// this is probably a security issue, but for now d
-	}
-
-}
-
-func PrepareContainerMounts(ctx context.Context, spec *oci.Spec, containerId string) ([]specs.Mount, []virtio.VirtioDevice, error) {
-	bindMounts := []specs.Mount{}
-	devices := []virtio.VirtioDevice{}
-
-	// convertToCustomMount := false
-
-	// log all the mounts
-
-	for _, mount := range spec.Mounts {
-		if mount.Type == "" && slices.Contains(mount.Options, "rbind") {
-			mount.Type = "rbind"
-		}
-
-		switch mount.Type {
-		case "bind", "rbind":
-			// if convertToCustomMount {
-			// 	mnt, dev, err := bindMountToVirtioFs(ctx, mount, containerId)
-			// 	if err != nil {
-			// 		return nil, nil, errors.Errorf("binding mount to virtio fs: %w", err)
-			// 	}
-			// 	if mnt != nil {
-			// 		bindMounts = append(bindMounts, *mnt)
-			// 	}
-			// 	if dev != nil {
-			// 		devices = append(devices, dev)
-			// 	}
-			// } else {
-			bindMounts = append(bindMounts, mount)
-			mnt, dev, err := bindMountToVirtioFs(ctx, mount, containerId)
-			if err != nil {
-				return nil, nil, errors.Errorf("binding mount to virtio fs: %w", err)
-			}
-			if mnt != nil {
-				bindMounts = append(bindMounts, *mnt)
-			}
-			if dev != nil {
-				devices = append(devices, dev)
-			}
-			// }
-		case "tmpfs":
-			if mount.Destination == "/dev" {
-				bindMounts = append(bindMounts, specs.Mount{
-					Type:        "devtmpfs",
-					Source:      "devtmpfs",
-					Destination: mount.Destination,
-					Options:     mount.Options,
-					UIDMappings: mount.UIDMappings,
-					GIDMappings: mount.GIDMappings,
-				})
-			} else {
-				bindMounts = append(bindMounts, mount)
-			}
-		default:
-			bindMounts = append(bindMounts, mount)
-		}
-	}
-
-	return bindMounts, devices, nil
-}
-
 // PrepareContainerVirtioDevicesFromRootfs creates virtio devices using an existing rootfs directory
 func makeEc1BlockDevice(ctx context.Context, wrkdir string, ctrconfig *oci.Spec) (virtio.VirtioDevice, *proxyVirtioFs, error) {
 	ec1DataPath := filepath.Join(wrkdir, "harpoon-runtime-fs-device")
@@ -475,7 +352,7 @@ func makeEc1BlockDevice(ctx context.Context, wrkdir string, ctrconfig *oci.Spec)
 	}
 
 	return device, &proxyVirtioFs{
-		Target: ec1DataPath,
+		Target: constants.Ec1AbsPath,
 		Tag:    constants.Ec1VirtioTag,
 	}, nil
 }

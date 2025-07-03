@@ -18,21 +18,39 @@ func setSubreaper() error {
 	return nil
 }
 
-func waitByPidfd(pid int) error {
-	// 1) Open a pidfd (requires Linux ≥5.3)
+func getPidFd(pid int) (int, error) {
 	pidfd, err := unix.PidfdOpen(pid, unix.PIDFD_NONBLOCK)
 	if err != nil {
-		if err.Error() == "no such process" {
-			return nil
-		}
-		return err
+		return 0, err
 	}
+	return pidfd, nil
+}
+
+func pidfdWait(pidfd int) error {
 	defer unix.Close(pidfd)
 
 	// 2) Poll for readability (blocks until process exits)
 	pfd := []unix.PollFd{{Fd: int32(pidfd), Events: unix.POLLIN}}
-	_, err = unix.Poll(pfd, -1)
-	return err
+	_, err := unix.Poll(pfd, -1)
+
+	if err != nil {
+		return errors.Errorf("failed to poll for process: %w", err)
+	}
+
+	// var info unix.Siginfo
+	// // note: WAITID will not reap the child if you pass WNOWAIT
+	// _, _, errno := unix.Syscall6(
+	// 	unix.SYS_WAITID,
+	// 	uintptr(unix.P_PIDFD), // idtype
+	// 	uintptr(pidfd),        // id (the pidfd)
+	// 	uintptr(unsafe.Pointer(&info)),
+	// 	uintptr(unix.WEXITED), // options; drop WNOWAIT to reap
+	// 	0, 0,
+	// )
+	// if errno != 0 {
+	// 	return errors.Errorf("failed to wait for process: %w", errno)
+	// }
+	return nil
 }
 
 func waitForFdsToClose(pid int) {

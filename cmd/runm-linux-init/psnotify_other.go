@@ -9,3 +9,11 @@ func setSubreaper() error {
 func waitByPidfd(pid int) error {
 	return nil
 }
+
+func getPidFd(pid int) (int, error) {
+	return 0, nil
+}
+
+func pidfdWait(pidfd int) error {
+	return nil
+}

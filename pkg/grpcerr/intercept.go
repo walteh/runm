@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"runtime/debug"
 	"time"
 
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
@@ -27,11 +28,11 @@ func UnaryServerInterceptor(
 	start := time.Now()
 	operation := filepath.Base(info.FullMethod)
 	service := filepath.Base(filepath.Dir(info.FullMethod))
-	slog.DebugContext(ctx, fmt.Sprintf("SERVER:START[%s]", operation), "service", service)
+	slog.DebugContext(ctx, fmt.Sprintf("%s:SERVER:START[%s]", service, operation), "service", service)
 	var errz error
 	var resp interface{}
 	defer func() {
-		slog.DebugContext(ctx, fmt.Sprintf("SERVER:END  [%s]", operation), "service", service, "error", errz, "duration", time.Since(start))
+		slog.DebugContext(ctx, fmt.Sprintf("%s:SERVER:END  [%s]", service, operation), "service", service, "error", errz, "duration", time.Since(start))
 	}()
 	resp, errz = handler(ctx, req)
 	if errz == nil {
@@ -78,11 +79,16 @@ func UnaryClientInterceptor(
 	opts ...grpc.CallOption,
 ) (err error) {
 	start := time.Now()
-	operation := filepath.Base(method)
 	service := filepath.Base(filepath.Dir(method))
-	slog.DebugContext(ctx, fmt.Sprintf("CLIENT:START[%s]", operation), "service", service)
+	operation := filepath.Base(method)
+	event := fmt.Sprintf("%s:CLIENT:START[%s]", service, operation)
+	slog.DebugContext(ctx, event, "service", service)
+	if event == "containerd.services.tasks.v1.Tasks:CLIENT:START[Kill]" {
+		slog.InfoContext(ctx, string(debug.Stack()))
+	}
+
 	errd := invoker(ctx, method, req, reply, cc, opts...)
-	slog.DebugContext(ctx, fmt.Sprintf("CLIENT:END  [%s]", operation), "service", service, "error", errd, "duration", time.Since(start))
+	slog.DebugContext(ctx, fmt.Sprintf("%s:CLIENT:END  [%s]", service, operation), "service", service, "error", errd, "duration", time.Since(start))
 	return errd
 }
 

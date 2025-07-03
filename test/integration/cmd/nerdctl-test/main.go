@@ -24,6 +24,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/containerd/containerd/v2/client"
 	"github.com/containerd/log"
 	"github.com/containerd/nerdctl/v2/cmd/nerdctl/builder"
 	"github.com/containerd/nerdctl/v2/cmd/nerdctl/completion"
@@ -47,16 +48,18 @@ import (
 	"github.com/fatih/color"
 	"github.com/moby/sys/reexec"
 	"github.com/pelletier/go-toml/v2"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/walteh/runm/test/integration/cmd/nerdctl-test/internal"
+	"google.golang.org/grpc"
 
 	ncdefaults "github.com/containerd/nerdctl/v2/pkg/defaults"
 	slogctx "github.com/veqryn/slog-context"
 
 	"github.com/walteh/runm/test/integration/env"
 
-	ec1logging "github.com/walteh/runm/pkg/logging"
+	"github.com/walteh/runm/pkg/grpcerr"
 )
 
 func init() {
@@ -75,6 +78,8 @@ func init() {
 func init() {
 
 	os.Setenv("NERDCTL_TOML", env.NerdctlConfigTomlPath())
+
+	container.AddHackedClientOpts(client.WithExtraDialOpts([]grpc.DialOption{grpc.WithChainUnaryInterceptor(grpcerr.UnaryClientInterceptor)}))
 
 	// os.Args = append(os.Args, "run", "--platform=linux/arm64", "--runtime=containerd.shim.harpoon.v2", "--network=host", "--rm", "alpine:latest", "echo", "'hi'")
 }
@@ -167,6 +172,8 @@ func usage(c *cobra.Command) error {
 	return nil
 }
 
+var goodStdLogger *logrus.Logger
+
 func xmain() error {
 	if len(os.Args) == 3 && os.Args[1] == logging.MagicArgv1 {
 		// containerd runtime v2 logging plugin mode.
@@ -181,7 +188,20 @@ func xmain() error {
 
 	ctx := context.Background()
 
-	l := ec1logging.NewDefaultDevLogger("nerdctl", os.Stdout)
+	l, _, err := env.SetupOtelForNerdctl(ctx)
+	if err != nil {
+		return err
+	}
+
+	goodStdLogger = logrus.StandardLogger()
+
+	log.L = &logrus.Entry{
+		Logger: goodStdLogger,
+		Data:   make(log.Fields, 6),
+	}
+
+	ctx = log.WithLogger(ctx, log.L)
+
 	ctx = slogctx.NewCtx(ctx, l)
 
 	return app.ExecuteContext(ctx)
@@ -302,6 +322,14 @@ Config file ($NERDCTL_TOML): %s
 			// reexec /proc/self/exe with `nsenter` into RootlessKit namespaces
 			return rootlessutil.ParentMain(globalOptions.HostGatewayIP)
 		}
+
+		log.L = &logrus.Entry{
+			Logger: goodStdLogger,
+			Data:   make(log.Fields, 6),
+		}
+
+		cmd.SetContext(log.WithLogger(cmd.Context(), log.L))
+
 		return nil
 	}
 	rootCmd.RunE = helpers.UnknownSubcommandAction

@@ -1,3 +1,5 @@
+//go:build !windows
+
 package server
 
 import (
@@ -18,35 +20,22 @@ import (
 var _ runmv1.EventServiceServer = (*Server)(nil)
 
 func (s *Server) SubscribeToReaperExits(_ *emptypb.Empty, srv grpc.ServerStreamingServer[runmv1.ReaperExit]) error {
-	// gorunc.Monitor = reaper.Default
-	// rec := reaper.Default.Subscribe()
-	// defer reaper.Default.Unsubscribe(rec)
 
-	// for exit := range rec {
-	// 	payload := &runmv1.ReaperExit{}
-	// 	payload.SetStatus(int32(exit.Status))
-	// 	payload.SetPid(int32(exit.Pid))
-	// 	payload.SetTimestamp(timestamppb.New(exit.Timestamp))
-	// 	if err := srv.Send(payload); err != nil {
-	// 		return err
-	// 	}
+	// if s.customExitChan != nil {
+	// 	go func() {
+	// 		for exit := range s.customExitChan {
+	// 			go func() {
+	// 				payload := &runmv1.ReaperExit{}
+	// 				payload.SetStatus(int32(exit.Status))
+	// 				payload.SetPid(int32(exit.Pid))
+	// 				payload.SetTimestamp(timestamppb.New(exit.Timestamp))
+	// 				if err := srv.Send(payload); err != nil {
+	// 					slog.ErrorContext(srv.Context(), "failed to send reaper exit", "error", err)
+	// 				}
+	// 			}()
+	// 		}
+	// 	}()
 	// }
-	// return nil
-
-	if s.customExitChan != nil {
-		for exit := range s.customExitChan {
-			go func() {
-				payload := &runmv1.ReaperExit{}
-				payload.SetStatus(int32(exit.Status))
-				payload.SetPid(int32(exit.Pid))
-				payload.SetTimestamp(timestamppb.New(exit.Timestamp))
-				if err := srv.Send(payload); err != nil {
-					slog.ErrorContext(srv.Context(), "failed to send reaper exit", "error", err)
-				}
-			}()
-		}
-		return nil
-	}
 
 	slog.InfoContext(srv.Context(), "subscribing to reaper exits")
 

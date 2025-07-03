@@ -1,10 +1,16 @@
+//go:build !windows
+
 package goruncruntime
 
 import (
 	"context"
+	"io"
 	"log/slog"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"syscall"
 	"time"
 
 	gorunc "github.com/containerd/go-runc"
@@ -69,6 +75,96 @@ func (r *GoRuncRuntime) Create(ctx context.Context, id, bundle string, options *
 	// 		slog.InfoContext(ctx, "Timeout waiting for exec FIFO", "path", fifoPath)
 	// 	}
 	// }()
+
+	pidfilechan := make(chan string, 1)
+
+	defer close(pidfilechan)
+
+	go func() {
+		// watch for changes to the bundle/pid file
+
+		// when it updates, read the file and attempt to wait on the file
+
+		// when waiting is done, send a signal to the container
+
+		slog.InfoContext(ctx, "watching for pid file changes", "path", options.PidFile)
+
+		<-pidfilechan
+
+		fle, err := os.Open(options.PidFile)
+		if err != nil {
+			slog.ErrorContext(ctx, "failed to open pid file", "error", err)
+			return
+		}
+		defer fle.Close()
+
+		pid, err := io.ReadAll(fle)
+		if err != nil {
+			slog.ErrorContext(ctx, "failed to read pid file", "error", err)
+			return
+		}
+
+		pidint, err := strconv.Atoi(string(pid))
+		if err != nil {
+			slog.ErrorContext(ctx, "failed to convert pid to int", "error", err)
+			return
+		}
+
+		// wtch, err := fsnotify.NewWatcher()
+		// if err != nil {
+		// 	slog.ErrorContext(ctx, "failed to create fsnotify watcher", "error", err)
+		// 	return
+		// }
+		// defer wtch.Close()
+
+		// err = wtch.AddWith(options.PidFile)
+		// if err != nil {
+		// 	slog.ErrorContext(ctx, "failed to add pid file to fsnotify watcher", "error", err)
+		// 	return
+		// }
+
+		// pidchan := make(chan int, 1)
+		// go func() {
+		// 	for event := range wtch.Events {
+		// 		slog.InfoContext(ctx, "fsnotify event", "event", event)
+		// 		if event.Op&fsnotify.Write == fsnotify.Write {
+		// 			slog.InfoContext(ctx, "pid file updated", "path", event.Name)
+		// 			pid, err := os.ReadFile(event.Name)
+		// 			if err != nil {
+		// 				slog.ErrorContext(ctx, "failed to read pid file", "error", err)
+		// 				return
+		// 			}
+		// 			pidint, err := strconv.Atoi(string(pid))
+		// 			if err != nil {
+		// 				slog.ErrorContext(ctx, "failed to convert pid to int", "error", err)
+		// 				return
+		// 			}
+		// 			pidchan <- pidint
+		// 			return
+		// 		}
+		// 	}
+		// }()
+
+		// pid := <-pidchan
+		sys, err := os.FindProcess(pidint)
+		if err != nil {
+			slog.ErrorContext(ctx, "failed to find process", "error", err)
+			return
+		}
+		slog.InfoContext(ctx, "found process", "pid", pid)
+		waiter, err := sys.Wait()
+		if err != nil {
+			slog.ErrorContext(ctx, "failed to wait on pid", "error", err)
+			return
+		}
+		slog.InfoContext(ctx, "waiter done", "waiter", waiter)
+
+		r.reaperCh <- gorunc.Exit{
+			Timestamp: time.Now(),
+			Pid:       pidint,
+			Status:    int(waiter.Sys().(syscall.WaitStatus).ExitStatus()),
+		}
+	}()
 
 	done := false
 	defer func() {

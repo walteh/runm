@@ -1,4 +1,4 @@
-// File: runm/core/runc/runtime/gorunc/pid1_reaper.go
+//go:build !windows
 
 package goruncruntime
 

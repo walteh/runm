@@ -1,3 +1,5 @@
+//go:build !windows
+
 package main
 
 import (
@@ -114,6 +116,7 @@ func init() {
 	flag.StringVar(&runmModeFlag, "runm-mode", "", "the runm mode")
 	flag.StringVar(&bundleSource, "bundle-source", "", "the bundle source")
 	flag.StringVar(&rawMbindsString, "mbinds", "", "the mbinds")
+	flag.BoolVar(&enableOtel, "enable-otlp", false, "enable otel")
 	flag.Parse()
 
 	mbinds = make(map[string]string)

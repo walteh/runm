@@ -95,6 +95,13 @@
 		},
 		"go.testExplorer.showOutput": true,
 
+		"gopls": {
+			// "build.buildFlags": ["-tags=!windows"]
+		},
+		"go.buildTags": "!windows",
+		"go.testTags": "!windows",
+		"go.useLanguageServer": true,
+		// "go.languageServerFlags": ["-tags=!windows"],
 		// "[go]": {
 		// 	"editor.formatOnSave": false
 		// },

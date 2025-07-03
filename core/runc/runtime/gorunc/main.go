@@ -1,3 +1,5 @@
+//go:build !windows
+
 package goruncruntime
 
 import (
@@ -29,7 +31,9 @@ var _ runtime.Runtime = (*GoRuncRuntime)(nil)
 var _ runtime.RuntimeExtras = (*GoRuncRuntime)(nil)
 
 type GoRuncRuntime struct {
-	internal *gorunc.Runc
+	internal          *gorunc.Runc
+	reaperCh          chan gorunc.Exit
+	reaperSubscribers map[chan gorunc.Exit]struct{}
 	// sharedDirPathPrefix string
 }
 
@@ -41,7 +45,9 @@ type GoRuncRuntime struct {
 
 func WrapdGoRuncRuntime(rt *gorunc.Runc) *GoRuncRuntime {
 	return &GoRuncRuntime{
-		internal: rt,
+		internal:          rt,
+		reaperCh:          make(chan gorunc.Exit, 1),
+		reaperSubscribers: make(map[chan gorunc.Exit]struct{}),
 	}
 }
 
@@ -58,6 +64,21 @@ type MonitorWithSubscribers interface {
 var customMonitor MonitorWithSubscribers
 
 func (r *GoRuncRuntime) SubscribeToReaperExits(ctx context.Context) (<-chan gorunc.Exit, error) {
+	ch := make(chan gorunc.Exit, 1)
+	r.reaperSubscribers[ch] = struct{}{}
+	go func() {
+		for exit := range r.reaperCh {
+			for subscriber := range r.reaperSubscribers {
+				go func() {
+					subscriber <- exit
+				}()
+			}
+		}
+	}()
+	return r.reaperCh, nil
+}
+
+func (r *GoRuncRuntime) SubscribeToReaperExits2(ctx context.Context) (<-chan gorunc.Exit, error) {
 	slog.InfoContext(ctx, "subscribing to custom monitor exits")
 
 	initOnce.Do(func() {

@@ -1,3 +1,5 @@
+//go:build !windows
+
 package main
 
 import (
@@ -53,11 +55,13 @@ const (
 )
 
 func init() {
+	fmt.Println("initializing runm-linux-init")
+	fmt.Println("args", os.Args)
 	flag.StringVar(&containerId, "container-id", "", "the container id")
 	flag.StringVar(&runmMode, "runm-mode", "", "the runm mode")
 	flag.StringVar(&bundleSource, "bundle-source", "", "the bundle source")
-	flag.BoolVar(&enableOtel, "enable-otel", false, "enable otel")
-	flag.StringVar(&mbinds, "mbinds", "", "the mbinds")
+	flag.BoolVar(&enableOtel, "enable-otlp", false, "enable otlp")
+	flag.StringVar(&mbinds, "mbinds", "", "the mbinds") // this errors for some reason
 	flag.Parse()
 }
 

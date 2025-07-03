@@ -4,6 +4,7 @@ import (
 	"net"
 
 	_ "github.com/containerd/containerd/v2/cmd/containerd/builtins"
+	"github.com/sirupsen/logrus"
 
 	"context"
 	"flag"
@@ -15,6 +16,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/containerd/log"
 	"github.com/moby/sys/reexec"
 
 	slogctx "github.com/veqryn/slog-context"
@@ -79,6 +81,13 @@ func main() {
 		logger := logging.NewDefaultDevLogger("containerd", os.Stdout)
 		ctx = slogctx.NewCtx(context.Background(), logger)
 	}
+
+	log.L = &logrus.Entry{
+		Logger: logrus.StandardLogger(),
+		Data:   make(log.Fields, 6),
+	}
+
+	ctx = log.WithLogger(ctx, log.L)
 
 	ctx = slogctx.Append(ctx, slog.String("process", "containerd"), slog.String("pid", strconv.Itoa(os.Getpid())))
 

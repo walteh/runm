@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/cmd/containerd/command"
+	"github.com/containerd/log"
+	"github.com/sirupsen/logrus"
 	"gitlab.com/tozd/go/errors"
 )
 
@@ -104,6 +106,11 @@ func (s *DevContainerdServer) Start(ctx context.Context) error {
 	slog.InfoContext(ctx, "Starting containerd with args", "args", args)
 
 	app := command.App()
+
+	log.L = &logrus.Entry{
+		Logger: logrus.StandardLogger(),
+		Data:   make(log.Fields, 6),
+	}
 
 	return app.RunContext(ctx, args)
 }

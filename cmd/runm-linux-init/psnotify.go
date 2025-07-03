@@ -1,3 +1,5 @@
+//go:build !windows
+
 package main
 
 import (
@@ -23,6 +25,7 @@ func init() {
 
 type pidInfo struct {
 	pid      int
+	pidfd    int
 	cgroup   string
 	argv     []string
 	argc     string
@@ -57,15 +60,6 @@ func (r *runmLinuxInit) runPsnotify(ctx context.Context, exitChan chan gorunc.Ex
 			parentInfo := pidToCgroup.m[parent]
 			pidToCgroup.RUnlock()
 
-			// if parent was in a tracked group, or child itself belongs there, watch it:
-			// if grp := lookupCgroup(child); grp != "" {
-			// 	pidToCgroup.Lock()
-			// 	pidToCgroup.m[child] = grp
-			// 	pidToCgroup.Unlock()
-			// 	if err := watcher.Watch(child, psnotify.PROC_EVENT_EXIT|psnotify.PROC_EVENT_EXEC|psnotify.PROC_EVENT_FORK); err != nil {
-			// 		slog.ErrorContext(ctx, "failed to watch child", "error", err)
-			// 	}
-			// } else {
 			info, err := r.getPidInfo(child)
 			if err != nil {
 				slog.ErrorContext(ctx, "failed to get cgroup from proc", "error", err)
@@ -89,7 +83,24 @@ func (r *runmLinuxInit) runPsnotify(ctx context.Context, exitChan chan gorunc.Ex
 			if err := watcher.Watch(child, psnotify.PROC_EVENT_EXIT); err != nil {
 				slog.ErrorContext(ctx, "failed to watch child", "error", err)
 			}
-			// }
+
+		// case status := <-watcher.Exec:
+		// 	pid := int(status.Pid)
+		// 	pidToCgroup.RLock()
+		// 	info := pidToCgroup.m[pid]
+		// 	pidToCgroup.RUnlock()
+
+		// 	slog.DebugContext(ctx, "PSNOTIFY[EXEC]", "pid", pid)
+
+		// 	if info.pidfd == 0 {
+		// 		info.pidfd, err = getPidFd(pid)
+		// 		if err != nil {
+		// 			slog.ErrorContext(ctx, "failed to get pidfd in exec", "error", err)
+		// 		} else {
+		// 			slog.InfoContext(ctx, "got pidfd in exec", "pid", pid)
+		// 		}
+		// 	}
+
 		case status := <-watcher.Exit:
 			pid := int(status.Pid)
 			pidToCgroup.RLock()
@@ -123,13 +134,17 @@ func (r *runmLinuxInit) runPsnotify(ctx context.Context, exitChan chan gorunc.Ex
 			slog.LogAttrs(ctx, slog.LevelDebug, "PSNOTIFY[EXIT]", attrs...)
 
 			go func() {
-				err := waitByPidfd(pid)
-				if err != nil {
-					attrs = append(attrs, slog.String("error", err.Error()))
-					slog.LogAttrs(ctx, slog.LevelError, "failed to wait for process", attrs...)
-					return
+
+				exitFd, err := getPidFd(pid)
+				if err == nil {
+					err := pidfdWait(exitFd)
+					if err != nil {
+						attrs = append(attrs, slog.String("error", err.Error()))
+						slog.LogAttrs(ctx, slog.LevelError, "failed to wait for process", attrs...)
+					}
 				}
-				slog.LogAttrs(ctx, slog.LevelDebug, "PSNOTIFY[IO_CLOSED]", attrs...)
+
+				slog.LogAttrs(ctx, slog.LevelDebug, "PSNOTIFY[REAP]", attrs...)
 
 				exitChan <- gorunc.Exit{
 					Pid:       pid,
@@ -157,6 +172,13 @@ func (r *runmLinuxInit) runPsnotify(ctx context.Context, exitChan chan gorunc.Ex
 
 func (r *runmLinuxInit) getPidInfo(pid int) (*pidInfo, error) {
 	info := &pidInfo{pid: pid}
+	// pidfd, err := getPidFd(pid)
+	// if err != nil {
+	// 	slog.Warn("failed to get pidfd in fork", "pid", pid, "error", err)
+	// } else {
+	// 	slog.Info("got pidfd in fork", "pid", pid)
+	// }
+	// info.pidfd = pidfd
 	info.cgroup, _ = getCgroupFromProc(pid)
 	info.argv = getArgvFromProc(pid)
 	info.argc, _ = getExePath(pid)
@@ -206,21 +228,4 @@ func getCgroupFromProc(pid int) (string, error) {
 		return parts[2], nil
 	}
 	return "", nil
-}
-
-// grpInList returns true if grp is one of our trackedGroups
-// func grpInList(grp string) bool {
-// 	for _, g := range trackedGroups {
-// 		if g == grp {
-// 			return true
-// 		}
-// 	}
-// 	return false
-// }
-
-// parseInt is a tiny helper to convert a string PID to int (returns 0 on error)
-func parseInt(s string) int {
-	var n int
-	fmt.Sscanf(s, "%d", &n)
-	return n
 }

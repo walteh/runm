@@ -8,27 +8,7 @@ package psnotify
 import (
 	"errors"
 	"fmt"
-	"syscall"
-	"time"
 )
-
-type ProcEventFork struct {
-	ParentPid int       // Pid of the process that called fork()
-	ChildPid  int       // Child process pid created by fork()
-	Timestamp time.Time // Timestamp of the fork event
-}
-
-type ProcEventExec struct {
-	Pid       int       // Pid of the process that called exec()
-	Timestamp time.Time // Timestamp of the exec event
-}
-
-type ProcEventExit struct {
-	Pid        int            // Pid of the process that called exit()
-	ExitCode   int            // Exit code of the process that called exit()
-	ExitSignal syscall.Signal // Exit signal of the process that called exit()
-	Timestamp  time.Time      // Timestamp of the exit event
-}
 
 type watch struct {
 	flags uint32 // Saved value of Watch() flags param
