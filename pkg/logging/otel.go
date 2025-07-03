@@ -105,13 +105,15 @@ func NewGRPCOtelInstances(ctx context.Context, conn net.Conn, serviceName string
 		}
 	}()
 
+	// resolve the link of os.Args[0]
+	executable, err := filepath.EvalSymlinks(os.Args[0])
+	if err != nil {
+		return nil, errors.Errorf("resolving executable: %w", err)
+	}
+
 	instances.Conn, err = initConnFromConn(ctx, conn)
 	if err != nil {
 		return nil, errors.Errorf("initializing gRPC connection: %w", err)
-	}
-	executable, err := os.Executable()
-	if err != nil {
-		return nil, errors.Errorf("getting executable: %w", err)
 	}
 
 	arch := semconv.HostArchARM64

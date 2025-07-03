@@ -44,7 +44,7 @@ func PullPolicy() string             { return pullPolicy }
 func Snapshotter() string            { return snapshotter }
 
 func MagicHostOtlpGRPCPort() uint32 {
-	return 5909
+	return 4317
 }
 
 func LinuxRuntimeBuildDir() string {
