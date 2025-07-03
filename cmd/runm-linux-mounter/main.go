@@ -36,6 +36,9 @@ var (
 	runmModeFlag    string
 	bundleSource    string
 	enableOtel      bool
+	rawMbindsString string
+
+	mbinds map[string]string
 )
 
 type runmLinuxMounter struct {
@@ -110,7 +113,15 @@ func init() {
 	flag.StringVar(&containerIdFlag, "container-id", "", "the container id")
 	flag.StringVar(&runmModeFlag, "runm-mode", "", "the runm mode")
 	flag.StringVar(&bundleSource, "bundle-source", "", "the bundle source")
+	flag.StringVar(&rawMbindsString, "mbinds", "", "the mbinds")
 	flag.Parse()
+
+	mbinds = make(map[string]string)
+
+	for _, mbind := range strings.Split(rawMbindsString, ",") {
+		parts := strings.Split(mbind, ":")
+		mbinds[parts[0]] = parts[1]
+	}
 }
 
 func main() {
@@ -177,25 +188,6 @@ func mount(ctx context.Context) error {
 	os.MkdirAll("/proc", 0755)
 	os.MkdirAll(constants.NewRootAbsPath, 0755)
 	var err error
-	// {
-	// 	"destination": "/sys/fs/cgroup",
-	// 	"type": "cgroup",
-	// 	"source": "cgroup",
-	// 	"options": [
-	// 		"nosuid",
-	// 		"noexec",
-	// 		"nodev",
-	// 		"relatime",
-	// 		"ro"
-	// 	]
-	// }
-
-	// parse the args to get the container-id flag
-
-	// mount newroot onto itself
-	// if err := ExecCmdForwardingStdio(ctx, "mount", "-n", "-o", "remount,private", "/", "/"); err != nil {
-	// 	return errors.Errorf("mounting newroot onto itself: %w", err)
-	// }
 
 	// mount newroot onto itself - mount -t tmpfs tmpfs /newroot
 	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "tmpfs", "tmpfs", constants.NewRootAbsPath); err != nil {
@@ -244,9 +236,9 @@ func mount(ctx context.Context) error {
 	}
 
 	// mkdir ec1
-	if err := os.MkdirAll(filepath.Join(constants.NewRootAbsPath, constants.Ec1AbsPath), 0755); err != nil {
-		return errors.Errorf("failed to create ec1: %w", err)
-	}
+	// if err := os.MkdirAll(filepath.Join(constants.NewRootAbsPath, constants.Ec1AbsPath), 0755); err != nil {
+	// 	return errors.Errorf("failed to create ec1: %w", err)
+	// }
 
 	// mkdir mbin
 	if err := os.MkdirAll(filepath.Join(constants.NewRootAbsPath, constants.MbinAbsPath), 0755); err != nil {
@@ -262,31 +254,42 @@ func mount(ctx context.Context) error {
 	// cmds = append(cmds, []string{"mount", "-t", "devpts", "devpts", prefix + "/dev/pts", "-o", "gid=5,mode=620,ptmxmode=666"})
 
 	// mount the ec1 virtiofs
-	err = ExecCmdForwardingStdio(ctx, "mount", "-t", "virtiofs", constants.Ec1VirtioTag, filepath.Join(constants.NewRootAbsPath, constants.Ec1AbsPath))
-	if err != nil {
-		return errors.Errorf("problem mounting ec1 virtiofs: %w", err)
-	}
+	// err = ExecCmdForwardingStdio(ctx, "mount", "-t", "virtiofs", constants.Ec1VirtioTag, filepath.Join(constants.NewRootAbsPath, constants.Ec1AbsPath))
+	// if err != nil {
+	// 	return errors.Errorf("problem mounting ec1 virtiofs: %w", err)
+	// }
 
 	// Add debugging for ec1 mount
-	slog.InfoContext(ctx, "DEBUG: EC1 virtiofs mount completed", "tag", constants.Ec1VirtioTag, "path", filepath.Join(constants.NewRootAbsPath, constants.Ec1AbsPath))
-	ExecCmdForwardingStdio(ctx, "ls", "-la", filepath.Join(constants.NewRootAbsPath, constants.Ec1AbsPath))
-	ExecCmdForwardingStdio(ctx, "cat", "/proc/mounts", "|", "grep", "virtiofs")
-	ExecCmdForwardingStdio(ctx, "df", "-h")
+	// slog.InfoContext(ctx, "DEBUG: EC1 virtiofs mount completed", "tag", constants.Ec1VirtioTag, "path", filepath.Join(constants.NewRootAbsPath, constants.Ec1AbsPath))
+	// ExecCmdForwardingStdio(ctx, "ls", "-la", filepath.Join(constants.NewRootAbsPath, constants.Ec1AbsPath))
+	// ExecCmdForwardingStdio(ctx, "cat", "/proc/mounts")
+	// ExecCmdForwardingStdio(ctx, "df", "-h")
 
-	if bundleSource != "" {
-		if err = os.MkdirAll(filepath.Join(constants.NewRootAbsPath, bundleSource), 0755); err != nil {
-			return errors.Errorf("problem creating bundle source: %w", err)
+	for tag, target := range mbinds {
+		out := filepath.Join(constants.NewRootAbsPath, target)
+		if _, err := os.Stat(out); os.IsNotExist(err) {
+			os.MkdirAll(out, 0755)
 		}
 
-		err = ExecCmdForwardingStdio(ctx, "mount", "-t", "virtiofs", constants.BundleVirtioTag, filepath.Join(constants.NewRootAbsPath, bundleSource))
-		if err != nil {
-			return errors.Errorf("problem mounting ec1 virtiofs: %w", err)
+		if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "virtiofs", tag, out); err != nil {
+			return errors.Errorf("problem mounting mbind: %w", err)
 		}
-
-		// Add debugging for bundle mount
-		slog.InfoContext(ctx, "DEBUG: Bundle virtiofs mount completed", "tag", constants.BundleVirtioTag, "path", filepath.Join(constants.NewRootAbsPath, bundleSource))
-		ExecCmdForwardingStdio(ctx, "ls", "-la", bundleSource)
 	}
+
+	// if bundleSource != "" {
+	// 	if err = os.MkdirAll(filepath.Join(constants.NewRootAbsPath, bundleSource), 0755); err != nil {
+	// 		return errors.Errorf("problem creating bundle source: %w", err)
+	// 	}
+
+	// 	err = ExecCmdForwardingStdio(ctx, "mount", "-t", "virtiofs", constants.BundleVirtioTag, filepath.Join(constants.NewRootAbsPath, bundleSource))
+	// 	if err != nil {
+	// 		return errors.Errorf("problem mounting ec1 virtiofs: %w", err)
+	// 	}
+
+	// 	// Add debugging for bundle mount
+	// 	slog.InfoContext(ctx, "DEBUG: Bundle virtiofs mount completed", "tag", constants.BundleVirtioTag, "path", filepath.Join(constants.NewRootAbsPath, bundleSource))
+	// 	ExecCmdForwardingStdio(ctx, "ls", "-la", bundleSource)
+	// }
 
 	// disableNewRoot := true
 
@@ -342,14 +345,14 @@ func mount(ctx context.Context) error {
 
 	// mount the rootfs virtiofs
 
-	bindMounts, exists, err := loadBindMounts(ctx)
-	if err != nil {
-		return errors.Errorf("problem loading bind mounts: %w", err)
-	}
+	// bindMounts, exists, err := loadBindMounts(ctx)
+	// if err != nil {
+	// 	return errors.Errorf("problem loading bind mounts: %w", err)
+	// }
 
-	if !exists {
-		return errors.Errorf("no bind mounts found")
-	}
+	// if !exists {
+	// 	return errors.Errorf("no bind mounts found")
+	// }
 
 	// spec, exists, err := loadSpec(ctx)
 	// if err != nil {
@@ -360,14 +363,14 @@ func mount(ctx context.Context) error {
 	// 	return errors.Errorf("no spec found")
 	// }
 
-	if err := mountRootfsSecondary(ctx, constants.NewRootAbsPath, bindMounts); err != nil {
-		return errors.Errorf("problem mounting rootfs secondary: %w", err)
-	}
+	// if err := mountRootfsSecondary(ctx, constants.NewRootAbsPath, bindMounts); err != nil {
+	// 	return errors.Errorf("problem mounting rootfs secondary: %w", err)
+	// }
 
-	err = mountRootfsPrimary(ctx)
-	if err != nil {
-		return errors.Errorf("problem mounting rootfs: %w", err)
-	}
+	// err = mountRootfsPrimary(ctx)
+	// if err != nil {
+	// 	return errors.Errorf("problem mounting rootfs: %w", err)
+	// }
 
 	os.MkdirAll(filepath.Join(constants.NewRootAbsPath, bundleSource, "rootfs"), 0755)
 
@@ -377,7 +380,11 @@ func mount(ctx context.Context) error {
 	}
 
 	// ls -larh /var/lib/runm/ec1
-	ExecCmdForwardingStdio(ctx, "ls", "-larh", "/var")
+	procMounts, err := exec.CommandContext(ctx, "/bin/busybox", "cat", "/proc/mounts").CombinedOutput()
+	if err != nil {
+		return errors.Errorf("problem listing proc mounts: %w", err)
+	}
+	slog.InfoContext(ctx, "cat /proc/mounts: "+string(procMounts))
 
 	err = switchRoot(ctx)
 	if err != nil {

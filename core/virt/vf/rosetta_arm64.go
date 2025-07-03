@@ -71,7 +71,6 @@ func (vmConfig *vzVirtioDeviceApplier) applyRosettaShare(dev *virtio.RosettaShar
 	if err != nil {
 		return err
 	}
-	slog.Info("adding virtio-fs device")
 	vmConfig.directorySharingDevicesToSet = append(vmConfig.directorySharingDevicesToSet, fileSystemDeviceConfig)
 	return nil
 }

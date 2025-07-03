@@ -44,6 +44,7 @@ var (
 	containerId  string
 	runmMode     string
 	bundleSource string
+	mbinds       string
 	enableOtel   bool
 )
 
@@ -56,8 +57,8 @@ func init() {
 	flag.StringVar(&runmMode, "runm-mode", "", "the runm mode")
 	flag.StringVar(&bundleSource, "bundle-source", "", "the bundle source")
 	flag.BoolVar(&enableOtel, "enable-otel", false, "enable otel")
+	flag.StringVar(&mbinds, "mbinds", "", "the mbinds")
 	flag.Parse()
-
 }
 
 type runmLinuxInit struct {

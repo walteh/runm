@@ -189,7 +189,6 @@ func (vmConfig *vzVirtioDeviceApplier) applyVirtioFs(dev *virtio.VirtioFs) error
 	if err != nil {
 		return err
 	}
-	slog.Info("Adding virtio-fs device")
 	vmConfig.directorySharingDevicesToSet = append(vmConfig.directorySharingDevicesToSet, fileSystemDeviceConfig)
 	return nil
 }
