@@ -233,26 +233,6 @@ func (cfg *GoShimConfig) execSafegoshimithTail(ctx context.Context, args ...stri
 			}
 		}()
 
-		// tailCmd = exec.CommandContext(ctx, "tail", "-n", "0", "-F", file)
-		// tailOut, err := tailCmd.StdoutPipe()
-		// if err != nil {
-		// 	return fmt.Errorf("failed to pipe tail stdout: %w", err)
-		// }
-		// if err := tailCmd.Start(); err != nil {
-		// 	return fmt.Errorf("failed to start tail: %w", err)
-		// }
-		// // Merge tail output into ours
-		// go func() {
-		// 	io.Copy(stdout, tailOut)
-		// }()
-
-		// go func() {
-		// 	err := tailCmd.Wait()
-		// 	if err != nil {
-		// 		fmt.Printf("error waiting for tail: %s\n", err)
-		// 	}
-		// }()
-
 	}
 
 	// Prepare the real `go` command
@@ -263,7 +243,15 @@ func (cfg *GoShimConfig) execSafegoshimithTail(ctx context.Context, args ...stri
 	cmd.Stderr = stderr
 	cmd.Stdin = stdin
 
-	return cmd.Run()
+	err = cmd.Run()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			fmt.Fprintf(os.Stderr, "Error running go run: %v\n", exitErr.ExitCode())
+			os.Exit(exitErr.ExitCode())
+		}
+	}
+
+	return nil
 }
 
 // execSafeGo executes the real go command with given arguments using exec.Command
@@ -681,7 +669,11 @@ func main() {
 
 	case "run":
 		if err := cfg.handleRun(args); err != nil {
-			fmt.Fprintf(os.Stderr, "Error running go run: %v\n", err)
+			// fmt.Fprintf(os.Stderr, "Error running go run: %v\n", err)
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				fmt.Fprintf(os.Stderr, "Error running go run: %v\n", exitErr.ExitCode())
+				os.Exit(exitErr.ExitCode())
+			}
 			os.Exit(1)
 		}
 

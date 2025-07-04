@@ -16,23 +16,21 @@ import (
 
 	"github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/plugin/registry"
-	"github.com/moby/sys/reexec"
 	"github.com/sirupsen/logrus"
 
 	slogctx "github.com/veqryn/slog-context"
 
-	"github.com/containerd/log"
 	"github.com/walteh/runm/cmd/containerd-shim-runm-v2/manager"
-	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/logging"
 	"github.com/walteh/runm/pkg/logging/sloglogrus"
+	"github.com/walteh/runm/test/integration/env"
 
 	taskplugin "github.com/walteh/runm/cmd/containerd-shim-runm-v2/task/plugin"
 	vfruntimeplugin "github.com/walteh/runm/core/runc/runtime/virt/plugins/vf"
 )
 
-func ShimReexecInit() {
-	reexec.Register(ShimSimlinkPath(), ShimMain)
+func main() {
+	ShimMain()
 }
 
 type simpleOtelDialer struct {
@@ -46,84 +44,11 @@ func (d *simpleOtelDialer) DialContext(ctx context.Context, _, _ string) (net.Co
 
 var mode = guessShimMode()
 
-func SetupOtelForNerdctl(ctx context.Context) (*slog.Logger, func() error, error) {
-	return setupOtelForShim(ctx, "nerdctl")
-}
-
-func setupOtelForShim(ctx context.Context, shimName string) (*slog.Logger, func() error, error) {
-
-	opts := []logging.OptLoggerOptsSetter{
-		logging.WithDelimiter(constants.VsockDelimitedLogProxyDelimiter),
-		logging.WithEnableDelimiter(true),
-	}
-
-	rawWriterSock, err := net.Dial("unix", ShimRawWriterSockPath())
-	if err != nil {
-		slog.Error("Failed to dial log proxy socket", "error", err, "path", ShimRawWriterSockPath())
-		return nil, nil, err
-	}
-
-	opts = append(opts, logging.WithRawWriter(rawWriterSock))
-
-	logProxySockDelim, err := net.Dial("unix", ShimDelimitedWriterSockPath())
-	if err != nil {
-		slog.Error("Failed to dial log proxy socket", "error", err, "path", ShimDelimitedWriterSockPath())
-		return nil, nil, err
-	}
-
-	// opts = append(opts, logging.WithDelimitedLogWriter(logProxySockDelim))
-
-	// attempt to listen on the port 5909
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", MagicHostOtlpGRPCPort()))
-	if err == nil {
-		listener.Close()
-		l := logging.NewDefaultDevLogger(shimName, logProxySockDelim, opts...)
-		l.Debug("logger created without otel, the host otel grpc port is free", "port", MagicHostOtlpGRPCPort())
-		return l, func() error {
-			rawWriterSock.Close()
-			logProxySockDelim.Close()
-			return nil
-		}, nil
-	}
-
-	otlpConn, err := net.Dial("tcp", fmt.Sprintf("localhost:%d", MagicHostOtlpGRPCPort()))
-	if err != nil {
-		return nil, nil, err
-	}
-
-	otelInstances, err := logging.NewGRPCOtelInstances(ctx, otlpConn, shimName)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	log.L = &logrus.Entry{
-		Logger: logrus.StandardLogger(),
-		Data:   make(log.Fields, 6),
-	}
-
-	return logging.NewDefaultDevLoggerWithOtel(ctx, shimName, logProxySockDelim, otelInstances, opts...), func() error {
-		rawWriterSock.Close()
-		logProxySockDelim.Close()
-		return otelInstances.Shutdown(ctx)
-	}, nil
-}
-
 func ShimMain() {
 
 	ctx := context.Background()
 
-	// slog.Info("dialed log proxy socket", "conn", logProxySock)
-
-	// otelProxySock, err := net.Dial("unix", ShimOtelProxySockPath())
-	// if err != nil {
-	// 	slog.Error("Failed to dial otel proxy socket", "error", err, "path", ShimOtelProxySockPath())
-	// 	return
-	// }
-	// defer otelProxySock.Close()
-
-	// slog.Info("dialed otel proxy socket", "conn", otelProxySock)
-
-	logger, sd, err := setupOtelForShim(ctx, fmt.Sprintf("shim[%s]", mode))
+	logger, sd, err := env.SetupLogForwardingToContainerd(ctx, fmt.Sprintf("shim[%s]", mode))
 	if err != nil {
 		slog.Error("Failed to setup otel", "error", err)
 		os.Exit(1)
@@ -235,10 +160,10 @@ func RunShim(ctx context.Context) error {
 	vfruntimeplugin.Reregister()
 
 	if logging.GetGlobalOtelInstances() != nil {
-		os.Setenv("RUNM_SHIM_HOST_OTLP_PORT", strconv.Itoa(int(MagicHostOtlpGRPCPort())))
+		os.Setenv("RUNM_SHIM_HOST_OTLP_PORT", strconv.Itoa(int(env.MagicHostOtlpGRPCPort())))
 	}
 
-	os.Setenv("LINUX_RUNTIME_BUILD_DIR", LinuxRuntimeBuildDir())
+	os.Setenv("LINUX_RUNTIME_BUILD_DIR", env.LinuxRuntimeBuildDir())
 
 	shim.Run(ctx, manager.NewDebugManager(manager.NewShimManager("io.containerd.runc.v2")), func(c *shim.Config) {
 		c.NoReaper = true

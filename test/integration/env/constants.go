@@ -9,12 +9,13 @@ import (
 var (
 	globalWorkDir           = "/tmp/tcontainerd"
 	globalPersistentWorkDir = "/tmp/tcontainerd-persistent"
-	namespace               = "default"
-	shimRuntimeID           = "io.containerd.runc.v2"
-	shimName                = "containerd-shim-runc-v2"
-	timeout                 = 10 * time.Second
-	pullPolicy              = "missing"
-	snapshotter             = "native"
+
+	namespace     = "default"
+	shimRuntimeID = "io.containerd.runc.v2"
+	shimName      = "containerd-shim-runc-v2"
+	timeout       = 10 * time.Second
+	pullPolicy    = "missing"
+	snapshotter   = "native"
 )
 
 func WorkDir() string                  { return globalWorkDir }
@@ -55,5 +56,10 @@ func LinuxRuntimeBuildDir() string {
 	}
 
 	return filepath.Join(filepath.Dir(filename), "..", "..", "..", "gen", "build", "linux_vf_offline_arm64")
+}
 
+func ShimBuildBinaryPath() string {
+	// get this file's directory
+	_, c, _, _ := runtime.Caller(0)
+	return filepath.Join(filepath.Dir(c), "..", "..", "..", "gen", "build", "linux_binaries_arm64", "containerd-shim-runm-v2-test")
 }

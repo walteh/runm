@@ -17,7 +17,6 @@ import (
 	"syscall"
 
 	"github.com/containerd/log"
-	"github.com/moby/sys/reexec"
 
 	slogctx "github.com/veqryn/slog-context"
 
@@ -41,12 +40,6 @@ func (d simpleDialer) DialContext(ctx context.Context, network, address string) 
 }
 
 func main() {
-
-	env.ShimReexecInit()
-
-	if reexec.Init() {
-		os.Exit(0)
-	}
 
 	background := false
 	debug := true

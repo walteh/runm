@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"runtime"
 	"strings"
@@ -46,7 +47,6 @@ import (
 	"github.com/containerd/nerdctl/v2/pkg/store"
 	"github.com/containerd/nerdctl/v2/pkg/version"
 	"github.com/fatih/color"
-	"github.com/moby/sys/reexec"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -90,17 +90,13 @@ var (
 )
 
 func main() {
-	env.ShimReexecInit()
 
-	if reexec.Init() {
-		os.Exit(0)
-	}
-
-	err := env.SetupReexec(context.Background(), true)
-	if err != nil {
-		log.L.Fatal("Failed to setup reexec", "error", err)
-	}
+	// err := env.SetupReexec(context.Background(), true)
+	// if err != nil {
+	// 	log.L.Fatal("Failed to setup reexec", "error", err)
+	// }
 	if err := xmain(); err != nil {
+		slog.InfoContext(context.Background(), "AHHHHHHHH", "error", err)
 		errutil.HandleExitCoder(err)
 		log.L.Fatal(err)
 	}

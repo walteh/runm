@@ -232,6 +232,147 @@ tasks:
           - cmd: mkdir -p {{.OUT_DIR}}
           - cmd: mv -f {{.TMP_DIR}}/* {{.OUT_DIR}}
 
+    go-build:*:*:*:
+        label: 'go-build:{{.NAME}}:{{.OS}}:{{.ARCH}}'
+        desc: builds a binary
+        vars:
+            OS: '{{index .MATCH 1}}'
+            ARCH: '{{index .MATCH 2}}'
+            NAME: '{{index .MATCH 0}}'
+            SYMLINK: '{{.SYMLINK | default ""}}'
+            EXTLDFLAGS: '{{.STATIC | eq "1" | ternary "-static" ""}} {{.EXTLDFLAGS}}'
+            TAGS: '{{.TAGS}}'
+            CMD_DIR:
+                sh: test -d ./cmd/{{.NAME}} && echo "./cmd" || echo "./test/integration/cmd"
+            LD_FLAGS: |-
+                -extldflags={{.EXTLDFLAGS}} {{.DEBUG | eq "1" | ternary "-compressdwarf=false" "-s -w"}} {{.LD_FLAGS}}
+            GC_FLAGS: '{{.DEBUG | eq "1" | ternary "all=-N -l" ""}}'
+            OUT_DIR: ./gen/build/{{.OS}}_{{.ARCH}}_binaries
+            BUILDMODE: '{{.BUILDMODE | default "default"}}'
+            BUILD_FLAGS: |-
+                -tags="{{.TAGS}}" -ldflags="{{.LD_FLAGS}}" -gcflags="{{.GC_FLAGS}}"  -o {{.OUT_DIR}}/{{.NAME}}
+        env:
+            CC: '{{.CC | default "clang"}}'
+            CGO_ENABLED: '{{.CGO_ENABLED | default "0"}}'
+            GOOS: '{{.OS}}'
+            GOARCH: '{{.ARCH}}'
+            CGO_LDFLAGS: '{{.CC | empty | ternary "-Wl,-no_warn_duplicate_libraries" ""}}' # https://stackoverflow.com/a/78585264/11025621
+        generates:
+          - '{{.OUT_DIR}}/{{.NAME}}'
+        cmds:
+          - cmd: go build {{.BUILD_FLAGS}} {{.CMD_DIR}}/{{.NAME}}
+          - cmd: if [ "{{.DEBUG}}" != "1" ]; then strip {{.OUT_DIR}}/{{.NAME}}; fi
+          - cmd: if [ "{{.CODESIGN}}" = "1" ]; then go tool codesign -target {{.OUT_DIR}}/{{.NAME}} -mode=sign; fi
+          - cmd: if [ "{{.SYMLINK}}" != "" ]; then ln -laf {{.OUT_DIR}}/{{.NAME}} {{.OUT_DIR}}/{{.SYMLINK}}; fi
+
+    test:binary:nerdctl-test:
+        desc: builds the nerdctl test
+        sources:
+          - ./test/integration/**/*.go
+          - ./../nerdctl/**/*.go
+          - ./pkg/**/*.go
+        cmds:
+          - task: go-build:nerdctl-test:darwin:arm64
+            vars:
+                DEBUG: '1'
+
+    test:binary:containerd-test:
+        desc: builds the containerd test
+        sources:
+          - ./test/integration/**/*.go
+          - ./../containerd/**/*.go
+          - ./pkg/**/*.go
+        cmds:
+          - task: go-build:containerd-test:darwin:arm64
+            vars:
+                DEBUG: '1'
+
+    test:binary:containerd-shim-runm-v2:
+        desc: builds the containerd shim
+        sources:
+          - "**/*.go"
+          - "../containerd/**/*.go"
+          - "../go-runc/**/*.go"
+        cmds:
+          - task: go-build:containerd-shim-runm-v2:darwin:arm64
+            vars:
+                DEBUG: '1'
+                CGO_ENABLED: '1'
+
+    test:binary:containerd-shim-runm-v2-test:
+        desc: builds the containerd shim test
+        sources:
+          - "**/*.go"
+          - "../containerd/**/*.go"
+          - "../go-runc/**/*.go"
+        cmds:
+          - task: go-build:containerd-shim-runm-v2-test:darwin:arm64
+            vars:
+                DEBUG: '1'
+                CGO_ENABLED: '1'
+
+    test:binary:runm-linux-init:
+        desc: builds the runm-linux-init binary
+        sources:
+          - "**/*.go"
+          - "../containerd/**/*.go"
+          - "../go-runc/**/*.go"
+        cmds:
+          - task: go-build:runm-linux-init:linux:arm64
+            vars:
+                DEBUG: '1'
+                STATIC: '1'
+
+    test:binary:runm-linux-host-fork-exec-proxy:
+        desc: builds the runm-linux-host-fork-exec-proxy binary
+        sources:
+          - "**/*.go"
+        cmds:
+          - task: go-build:runm-linux-host-fork-exec-proxy:linux:arm64
+            vars:
+                DEBUG: '1'
+                STATIC: '1'
+
+    test:binary:runm-linux-mounter:
+        desc: builds the runm-linux-mounter binary
+        sources:
+          - "**/*.go"
+        cmds:
+          - task: go-build:runm-linux-mounter:linux:arm64
+            vars:
+                DEBUG: '1'
+                STATIC: '1'
+
+    test:binary:runc-test:
+        desc: builds the runc binary
+        sources:
+          - "../runc/**/*.go"
+          - "pkg/**/*.go"
+          - "test/integration/**/*.go"
+        vars:
+            GIT_COMMIT:
+                sh: git rev-parse HEAD
+        cmds:
+          - task: go-build:runc-test:linux:arm64
+            vars:
+                DEBUG: '1'
+                STATIC: '1'
+                LD_FLAGS: -X main.gitCommit={{.GIT_COMMIT}}
+                TAGS: netgo osusergo
+                CC: aarch64-linux-gnu-gcc
+                CGO_ENABLED: 1
+
+    test:binaries:
+        deps:
+          - test:binary:containerd-test
+          - test:binary:nerdctl-test
+          - test:binary:runc-test
+          - test:binary:containerd-shim-runm-v2-test
+          - test:binary:runm-linux-init
+          - test:binary:runm-linux-host-fork-exec-proxy
+          - test:binary:runm-linux-mounter
+        desc: builds all test binaries
+
     linux:kernel:
         desc: builds the kernel
         cmds:
@@ -316,6 +457,9 @@ tasks:
         label: 'linux:vf-offline:{{.ARCH}}'
         requires: {vars: [ARCH]}
         desc: builds the vf-offline
+        deps:
+          - linux:binaries:{{.ARCH}}
+          - darwin:binaries:{{.ARCH}}
         sources:
           - ./gen/build/linux_vf_{{ .ARCH }}/**
           - '**/*.go'
@@ -327,11 +471,6 @@ tasks:
             OUT_DIR: "{{.BUILD_OUT_DIR}}/linux_vf_offline_{{ .ARCH }}"
             TMP_DIR:
                 sh: mktemp -d
-            GO_BINARIES_TO_BUILD:
-                map:
-                    runm-linux-mounter: initramfs
-                    runm-linux-init: mbin
-                    runm-linux-host-fork-exec-proxy: mbin
         cmds:
           - defer: rm -rf {{.TMP_DIR}}
           - cmd: mkdir -p {{.TMP_DIR}} {{.TMP_DIR}}/initramfs {{.TMP_DIR}}/mbin {{.OUT_DIR}}
@@ -342,12 +481,6 @@ tasks:
 
           - cmd: cp {{.VF_DIR}}/mbin.squashfs {{.TMP_DIR}}/mbin.squashfs
           - cmd: unsquashfs  -d {{.TMP_DIR}}/mbin {{.TMP_DIR}}/mbin.squashfs
-
-          - for: {var: GO_BINARIES_TO_BUILD}
-            cmd: |-
-                GOOS=linux GOARCH=${ARCH} go build \
-                    -ldflags="-s -w -extldflags=-static" \
-                     -o {{.TMP_DIR}}/{{.ITEM}}/{{.KEY}} ./cmd/{{.KEY}}
 
           - cmd: mksquashfs {{.TMP_DIR}}/mbin/* {{.TMP_DIR}}/mbin-new.squashfs -quiet
           - cmd: cd {{.TMP_DIR}}/initramfs && find . -print0 | cpio --null -o --format=newc > {{.TMP_DIR}}/initramfs-new.cpio
@@ -363,136 +496,36 @@ tasks:
           - task: linux:kernel
           - task: linux:initramfs
 
-    oci:cache:*:
-        label: 'oci:cache:{{.IMAGE}}'
-        requires: {vars: [LAYOUTS_DIR, GO_FILE, WRK_DIR, FMT_IMAGE, IMAGE]}
-        desc: pulls an oci image and archives it
-        vars:
-            IMAGE: "{{ index .MATCH 0 }}"
-            VAR_NAME: "{{.FMT_IMAGE | upper }}"
-            OUT_FILE: "{{.LAYOUTS_DIR}}/{{.FMT_IMAGE}}.tar.gz"
-            PLATFORMS:
-              - linux/arm64
-              - linux/amd64
-
-        cmds:
-          - for: {var: PLATFORMS}
-            cmd: ./gow tool crane pull --format=oci {{.IMAGE}} {{.WRK_DIR}} --platform {{.ITEM}} --annotate-ref
-
-          - cmd: cd {{.WRK_DIR}} && tar -czf {{.OUT_FILE}} .
-            #   - cmd: ./gow run ./cmd/manifest-prune -oci-layout {{.WRK_DIR}}
-            #   - cmd: ./gow tool arc archive -f 'tar' -c 'gz' -f '{{.OUT_FILE}}' {{.WRK_DIR}}/*
-          - cmd: sha256sum {{.OUT_FILE}} > {{.OUT_FILE}}.sha256
-          - cmd: rm -rf {{.WRK_DIR}}
-          - cmd: |-
-                echo -e "const {{.VAR_NAME }}_TAR_GZ_CHECKSUM = \"$(cat {{.OUT_FILE}}.sha256 | awk '{print $1}')\"" >> {{.GO_FILE}}
-                echo -e "const {{.VAR_NAME }} OCICachedImage = \"{{.IMAGE}}\"" >> {{.GO_FILE}}
-                echo -e "const {{.VAR_NAME }}_SIZE = \"$(ls -S -lh {{.OUT_FILE}} | awk '{print $5}')\"" >> {{.GO_FILE}}
-                echo -e "func init() { register({{.VAR_NAME }}.String(), \"{{.FMT_IMAGE}}.tar.gz\") }\n" >> {{.GO_FILE}}
-
-    oci:cache:
-        desc: pulls all oci images and archives them
-        vars:
-            DIRECTORY: 'gen/oci-image-cache'
-            GO_FILE: '{{.DIRECTORY}}/oci_image_cache.gen.go'
-            IMAGES:
-              - docker.io/library/alpine:latest
-              - docker.io/library/busybox:glibc
-              - docker.io/library/debian:bookworm-slim
-              - docker.io/oven/bun:alpine
-              - docker.io/alpine/socat:latest
-        cmds:
-          - cmd: rm -rf {{.DIRECTORY}}
-          - cmd: mkdir -p {{.DIRECTORY}}/layouts
-          - cmd: |-
-                echo -e "package oci_image_cache\n\n" > {{.GO_FILE}}
-                echo -e "import (\n\t\"embed\"\n\t\"github.com/walteh/runm/pkg/testing/toci\"\n)\n" >> {{.GO_FILE}}
-                echo -e "type OCICachedImage string\n" >> {{.GO_FILE}}
-                echo -e "func (me OCICachedImage) String() string {\n\treturn string(me)\n}\n" >> {{.GO_FILE}}
-                echo -e "//go:embed layouts/*\nvar s embed.FS\n\n" >> {{.GO_FILE}}
-                echo -e "func register(imageName string, fileName string) {\n\ttoci.MustRegisterImage(imageName, \"layouts/\" + fileName, s)\n}\n" >> {{.GO_FILE}}
-          - for: {var: IMAGES}
-            task: oci:cache:{{.ITEM}}
-            vars:
-                LAYOUTS_DIR: {sh: "echo \"$(pwd)/{{.DIRECTORY}}/layouts\""}
-                GO_FILE: "{{.GO_FILE}}"
-                WRK_DIR: {sh: 'mktemp -d'}
-                FMT_IMAGE: |-
-                    {{.ITEM | trimPrefix "docker.io/library/" | trimPrefix "docker.io/" | replace "/" "_" | replace ":" "_" | lower | replace "-" "_" | replace "." "_" | replace "+" "_" }}
-          - cmd: go fmt {{.DIRECTORY}}/oci_image_cache.gen.go
-
-    dev:shim:killall:
+    dev:kill-existing-processes:
         desc: kills all running containers
-        cmds:
-          - cmd: sudo -A pkill -f containerd-shim-runm-v2 || true
-          - cmd: sudo -A pkill -f containerd-shim-runc-v2 || true
-          - cmd: sudo -A pkill -f nerdctl-test || true
-          - cmd: sudo -A killall -9 containerd-shim-runc-v2 || true
-          - cmd: sudo -A killall -9 containerd-shim-runm-v2 || true
-          - cmd: sudo -A killall -9 nerdctl-test || true
-
-    dev:2025-06-08:01:
-        desc: runs the shim for 2025-06-08
-        cmds:
-          - task: dev:shim:killall
-          - task: harpoon:initramfs:arm64
-          - task: harpoon:kernel:arm64
-          - cmd: |-
-                timeout 20s ./gow -root run -codesign -log-file-to-append-in=.logs/containerd.log ./cmd/nerdctl-dev run \
-                    --platform=linux/arm64 \
-                    --network=host \
-                    --runtime=containerd.shim.harpoon.v2 \
-                    --pull=missing \
-                    --rm \
-                    docker.io/library/alpine:latest \
-                    "echo" "-e" "\n\nhi\n\n"
-    dev:2025-06-10:01:
-        desc: runs the shim for 2025-06-08
-        cmds:
-          - task: dev:shim:killall
-          - task: harpoon:initramfs:arm64
-          - task: harpoon:kernel:arm64
-          - cmd: |-
-                timeout 20s ./gow -root run -codesign -log-file-to-append-in=.logs/containerd.log ./cmd/nerdctl-dev run \
-                    --platform=linux/arm64 \
-                    --network=host \
-                    --runtime=containerd.shim.harpoon.v2 \
-                    --pull=missing \
-                    --rm \
-                    docker.io/oven/bun:alpine \
-                    --version
-
-    dev:2025-06-10:02:
-        desc: runs the shim for 2025-06-08
         vars:
-            TMP_DIR:
-                sh: mktemp -d
+            NAMES:
+              - containerd-shim-runm-v2
+              - containerd-shim-runc-v2
+              - nerdctl-test
         cmds:
-          - task: dev:shim:killall
-          - task: harpoon:initramfs:arm64
-          - task: harpoon:kernel:arm64
-          - cmd: mkdir -p {{.TMP_DIR}}
-          - defer: rm -rf {{.TMP_DIR}}
-          - cmd: echo "console.log(new Date().toISOString()); console.log('hi from bun!');" > {{.TMP_DIR}}/script.ts
+          - for: {var: NAMES}
+            cmd: (sudo -A pkill -f {{.ITEM}} || true) && (sudo -A killall -9 {{.ITEM}} || true)
+
+    dev:nerdctl-test:run:
+        desc: runs the nerdctl test
+        vars:
+            TIMEOUT: '{{.TIMEOUT | empty | ternary "" "timeout {{.TIMEOUT}}"}}'
+            IMAGE: '{{.IMAGE | default "docker.io/library/alpine:latest"}}'
+            ARGS: '{{.ARGS | default "echo ''hello world!''"}}'
+            DETACHED: '{{.DETACHED | default ""}}'
+        cmds:
+          - task: dev:kill-existing-processes
+          - task: darwin:binaries:arm64
           - cmd: |-
-                timeout 20s ./gow -root run -codesign -log-file-to-append-in=.logs/containerd.log ./cmd/nerdctl-dev run \
+                {{.TIMEOUT}} sudo -A -E ./gen/build/darwin_binaries_arm64/nerdctl-test run \
                     --platform=linux/arm64 \
                     --network=host \
-                    --runtime=containerd.shim.harpoon.v2 \
+                    --runtime=containerd.shim.runc.v2 \
                     --pull=missing \
-                    --rm \
-                    --mount=type=bind,src={{.TMP_DIR}},dst=/app/scripts \
-                    docker.io/oven/bun:alpine \
-                    run /app/scripts/script.ts
-
-    dev:2025-06-08:*:
-        label: 'dev:2025-06-08:{{.ARG}}'
-        desc: runs the shim for 2025-06-08
-        vars:
-            ARG: "{{index .MATCH 0}}"
-        cmds:
-          - cmd: CGO_ENABLED=1 go build -buildmode=plugin -o /tmp/proc-demo/vz-plugin.so ./cmd/plugin-demo/plugin/main.go
-          - cmd: ./gow run -codesign ./cmd/proc-demo -{{.ARG}}
+                    {{.DETACHED | empty | ternary "--rm" "-d"}} \
+                    {{.IMAGE}} \
+                    {{.ARGS}}
 
     dev:2025-06-18:01:
         desc: runs the shim for 2025-06-18
@@ -500,7 +533,7 @@ tasks:
             LINUX_RUNTIME_BUILD_DIR:
                 sh: realpath ./gen/build/linux_vf_arm64
         cmds:
-          - task: dev:shim:killall
+          - task: dev:kill-existing-processes
           - task: linux:vf-offline:arm64
           - cmd: |-
                 timeout 20s sudo -A -E go tool goshim run -codesign -log-file-to-append-in=.logs/containerd.log ./test/integration/cmd/nerdctl-test run \
@@ -521,7 +554,7 @@ tasks:
             SCENARIO_DIR:
                 sh: realpath ./test/integration/scenarios/2025-07-02
         cmds:
-          - task: dev:shim:killall
+          - task: dev:kill-existing-processes
           - task: linux:vf-offline:arm64
 
           # Run the complex scenario using the prepared scenario directory
@@ -536,12 +569,40 @@ tasks:
                     --mount=type=bind,src={{.SCENARIO_DIR}},dst=/app \
                     docker.io/oven/bun:alpine \
                     sh -c "echo '📦 Installing dependencies...' && bun install && echo '🧪 Running tests...' && bun test && echo '🔨 Building project...' && bun run build && echo '🏃 Running compiled app...' && bun run start"
+    dev:2025-07-03:01:
+        desc: runs the shim for 2025-07-03 - simple error return
+        env:
+            LINUX_RUNTIME_BUILD_DIR:
+                sh: realpath ./gen/build/linux_vf_arm64
+        vars:
+            SCENARIO_DIR:
+                sh: realpath ./test/integration/scenarios/2025-07-02
+        cmds:
+          - task: dev:kill-existing-processes
+          - task: linux:vf-offline:arm64
+
+          # Run the complex scenario using the prepared scenario directory
+          - cmd: |-
+                timeout 300s sudo -A -E go tool goshim run -codesign -log-file-to-append-in=.logs/containerd.log ./test/integration/cmd/nerdctl-test run \
+                    --platform=linux/arm64 \
+                    --network=host \
+                    --runtime=containerd.shim.runc.v2 \
+                    --pull=missing \
+                    --rm \
+                    docker.io/alpine:latest \
+                    sh -c "echo 'hi' && exit 42"
 
     containerd:2025-07-01:01:
         desc: runs the shim for 2025-07-01
         cmds:
-          - task: dev:shim:killall
-          - cmd: sudo -A go tool goshim run ./test/integration/cmd/containerd-test
+          - task: dev:kill-existing-processes
+          - task: test:binary:containerd-test
+          - cmd: sudo -A ./gen/build/darwin_binaries_arm64/containerd-test
+
+    claude:
+        desc: runs the claude agent
+        cmds:
+          - cmd: bunx --bun @anthropic-ai/claude-code
 
     setup:
         desc: sets up the environment
@@ -610,3 +671,5 @@ tasks:
           - task: signoz:stop
           - cmd: git --git-dir=.git.sub pull
           - cmd: cd ./deploy && sudo -A ./install.sh
+            # go build -tags="netgo osusergo" -ldflags="-extldflags=-static -X main.gitCommit=81e1ea710f323d9310dfd85b731e894184e1bcbd" -o ./gen/build/linux_binaries_arm64/runc-test ./test/integration/cmd/runc-test
+            #  go build -tags="netgo osusergo" -ldflags="-compressdwarf=false -X main.gitCommit=81e1ea710f323d9310dfd85b731e894184e1bcbd -extldflags=-static " -gcflags="all=-N -l" -buildmode=default -o ./gen/build/linux_arm64_binaries/runc-test ./test/integration/cmd/runc-test

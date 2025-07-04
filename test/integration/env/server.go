@@ -32,8 +32,12 @@ func NewDevContainerdServer(ctx context.Context, debug bool) (*DevContainerdServ
 		return nil, errors.Errorf("ensuring only one instance is running: %w", err)
 	}
 
-	if err := SetupReexec(ctx, false); err != nil {
+	if err := SetupContainerdLogReceiver(ctx); err != nil {
 		return nil, errors.Errorf("setting up shim: %w", err)
+	}
+
+	if err := server.setupShimSymlink(ctx); err != nil {
+		return nil, errors.Errorf("setting up shim symlink: %w", err)
 	}
 
 	if err := server.setupDirectories(ctx); err != nil {
@@ -49,6 +53,14 @@ func NewDevContainerdServer(ctx context.Context, debug bool) (*DevContainerdServ
 	}
 
 	return server, nil
+}
+
+func (s *DevContainerdServer) setupShimSymlink(ctx context.Context) error {
+	os.Symlink(ShimBuildBinaryPath(), ShimSimlinkPath())
+	oldPath := os.Getenv("PATH")
+	newPath := filepath.Dir(ShimSimlinkPath()) + string(os.PathListSeparator) + oldPath
+	os.Setenv("PATH", newPath)
+	return nil
 }
 
 func (s *DevContainerdServer) setupDirectories(ctx context.Context) error {
