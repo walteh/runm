@@ -1,0 +1,186 @@
+edition = "2023";
+
+package runm.dapmux.v1;
+
+import "google/protobuf/go_features.proto";
+import "google/protobuf/timestamp.proto";
+
+option features.(pb.go).api_level = API_OPAQUE;
+option features.field_presence = IMPLICIT;  // makes everything by default required, for optional set to EXPLICIT
+
+// DAP Multiplexer service for managing debug targets
+service DAPMuxService {
+	// Register a new debug target
+	rpc RegisterTarget(RegisterTargetRequest) returns (RegisterTargetResponse);
+
+
+	// Unregister a debug target
+	rpc UnregisterTarget(UnregisterTargetRequest) returns (UnregisterTargetResponse);
+
+
+	// List all registered targets
+	rpc ListTargets(ListTargetsRequest) returns (ListTargetsResponse);
+
+
+	// Set the active target for debugging
+	rpc SetActiveTarget(SetActiveTargetRequest) returns (SetActiveTargetResponse);
+
+
+	// Stream target events (additions, removals, status changes)
+	rpc StreamTargetEvents(StreamTargetEventsRequest) returns (stream TargetEvent);
+
+
+	// Forward DAP messages to targets
+	rpc ForwardDAPMessage(ForwardDAPMessageRequest) returns (ForwardDAPMessageResponse);
+}
+
+// Target registration request
+message RegisterTargetRequest {
+	string              process_name = 1;
+	string              delve_addr   = 2;
+	string              location     = 3;
+	int32               process_id   = 4;
+	repeated string     args         = 5;
+	map<string, string> metadata     = 6;
+}
+
+// Target registration response
+message RegisterTargetResponse {
+	string target_id = 1;
+	Target target    = 2;
+}
+
+// Target unregistration request
+message UnregisterTargetRequest {
+	string target_id = 1;
+}
+
+// Target unregistration response
+message UnregisterTargetResponse {}
+
+// List targets request
+message ListTargetsRequest {
+	// Optional filters
+	repeated TargetStatus status_filter   = 1;
+	string                location_filter = 2;
+}
+
+// List targets response
+message ListTargetsResponse {
+	repeated Target targets          = 1;
+	string          active_target_id = 2;
+}
+
+// Set active target request
+message SetActiveTargetRequest {
+	string target_id = 1;
+}
+
+// Set active target response
+message SetActiveTargetResponse {
+	Target target = 1;
+}
+
+// Stream target events request
+message StreamTargetEventsRequest {
+	// Optional filters for events
+	repeated TargetEventType event_types = 1;
+}
+
+// Forward DAP message request
+message ForwardDAPMessageRequest {
+	string target_id       = 1;
+	bytes  dap_message     = 2;
+	int64  sequence_number = 3;
+}
+
+// Forward DAP message response
+message ForwardDAPMessageResponse {
+	bytes response_message = 1;
+}
+
+// Debug target representation
+message Target {
+	string                    id              = 1;
+	string                    name            = 2;
+	string                    addr            = 3;
+	string                    process         = 4;
+	string                    location        = 5;
+	google.protobuf.Timestamp registered_at   = 6;
+	TargetStatus              status          = 7;
+	int32                     process_id      = 8;
+	repeated string           args            = 9;
+	map<string, string>       metadata        = 10;
+	ConnectionInfo            connection_info = 11;
+}
+
+// Target status enumeration
+enum TargetStatus {
+	TARGET_STATUS_UNSPECIFIED  = 0;
+	TARGET_STATUS_ACTIVE       = 1;
+	TARGET_STATUS_DISCONNECTED = 2;
+	TARGET_STATUS_ERROR        = 3;
+	TARGET_STATUS_CONNECTING   = 4;
+	TARGET_STATUS_RECONNECTING = 5;
+}
+
+// Connection information
+message ConnectionInfo {
+	string                    remote_addr       = 1;
+	string                    local_addr        = 2;
+	string                    protocol          = 3;
+	google.protobuf.Timestamp connected_at      = 4;
+	int64                     bytes_sent        = 5;
+	int64                     bytes_received    = 6;
+	int64                     messages_sent     = 7;
+	int64                     messages_received = 8;
+}
+
+// Target event for streaming updates
+message TargetEvent {
+	TargetEventType           type      = 1;
+	Target                    target    = 2;
+	google.protobuf.Timestamp timestamp = 3;
+	string                    details   = 4;
+}
+
+// Target event types
+enum TargetEventType {
+	TARGET_EVENT_TYPE_UNSPECIFIED            = 0;
+	TARGET_EVENT_TYPE_ADDED                  = 1;
+	TARGET_EVENT_TYPE_REMOVED                = 2;
+	TARGET_EVENT_TYPE_STATUS_CHANGED         = 3;
+	TARGET_EVENT_TYPE_METADATA_UPDATED       = 4;
+	TARGET_EVENT_TYPE_CONNECTION_ESTABLISHED = 5;
+	TARGET_EVENT_TYPE_CONNECTION_LOST        = 6;
+}
+
+// Health check service
+service HealthService {
+	// Check the health of the DAP multiplexer
+	rpc Check(HealthCheckRequest) returns (HealthCheckResponse);
+
+
+	// Watch for health status changes
+	rpc Watch(HealthCheckRequest) returns (stream HealthCheckResponse);
+}
+
+// Health check request
+message HealthCheckRequest {
+	string service = 1;
+}
+
+// Health check response
+message HealthCheckResponse {
+	HealthStatus        status  = 1;
+	string              message = 2;
+	map<string, string> details = 3;
+}
+
+// Health status enumeration
+enum HealthStatus {
+	HEALTH_STATUS_UNKNOWN         = 0;
+	HEALTH_STATUS_SERVING         = 1;
+	HEALTH_STATUS_NOT_SERVING     = 2;
+	HEALTH_STATUS_SERVICE_UNKNOWN = 3;
+}
