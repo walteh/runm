@@ -426,3 +426,7 @@ RUN mksquashfs /rootfs /dist/mbin.squashfs
 FROM scratch AS export
 COPY --from=initramfs-cpio-builder /dist/initramfs.cpio.gz /initramfs.cpio.gz
 COPY --from=mbin-squashfs-builder /dist/mbin.squashfs /mbin.squashfs
+
+
+FROM scratch AS busybox-export
+COPY --from=busybox-static-builder /rootfs/bin/busybox /busybox

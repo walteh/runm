@@ -79,6 +79,7 @@ __debug*
 gen/build
 
 .task/checksum/linux-*
+.task/checksum/test-binary*
 
 tempo-data
 loki-data

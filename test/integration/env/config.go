@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 
-	// sup s
 	"github.com/containerd/containerd/v2/client"
 	"gitlab.com/tozd/go/errors"
 )

@@ -32,12 +32,12 @@ func NewDevContainerdServer(ctx context.Context, debug bool) (*DevContainerdServ
 		return nil, errors.Errorf("ensuring only one instance is running: %w", err)
 	}
 
-	if err := SetupContainerdLogReceiver(ctx); err != nil {
-		return nil, errors.Errorf("setting up shim: %w", err)
-	}
-
 	if err := server.setupShimSymlink(ctx); err != nil {
 		return nil, errors.Errorf("setting up shim symlink: %w", err)
+	}
+
+	if err := SetupContainerdLogReceiver(ctx); err != nil {
+		return nil, errors.Errorf("setting up shim: %w", err)
 	}
 
 	if err := server.setupDirectories(ctx); err != nil {
@@ -56,10 +56,17 @@ func NewDevContainerdServer(ctx context.Context, debug bool) (*DevContainerdServ
 }
 
 func (s *DevContainerdServer) setupShimSymlink(ctx context.Context) error {
-	os.Symlink(ShimBuildBinaryPath(), ShimSimlinkPath())
+	if err := os.MkdirAll(filepath.Dir(ShimSimlinkPath()), 0755); err != nil {
+		return errors.Errorf("creating shim symlink directory: %w", err)
+	}
+	if err := os.Symlink(ShimBinaryPath(), ShimSimlinkPath()); err != nil {
+		return errors.Errorf("symlinking shim binary: %w", err)
+	}
 	oldPath := os.Getenv("PATH")
 	newPath := filepath.Dir(ShimSimlinkPath()) + string(os.PathListSeparator) + oldPath
 	os.Setenv("PATH", newPath)
+
+	slog.InfoContext(ctx, "shim symlink created YEEEEEHHEHEHEH", "shim_binary_path", ShimBinaryPath(), "shim_simlink_path", ShimSimlinkPath())
 	return nil
 }
 

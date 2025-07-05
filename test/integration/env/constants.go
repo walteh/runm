@@ -1,8 +1,8 @@
 package env
 
 import (
+	"os"
 	"path/filepath"
-	"runtime"
 	"time"
 )
 
@@ -49,17 +49,17 @@ func MagicHostOtlpGRPCPort() uint32 {
 }
 
 func LinuxRuntimeBuildDir() string {
-	// get abs path of current go file (not working directory)
-	_, filename, _, ok := runtime.Caller(1)
-	if !ok {
-		panic("failed to get caller")
+	val := os.Getenv("LINUX_RUNTIME_DIR")
+	if val == "" {
+		panic("LINUX_RUNTIME_DIR is not set")
 	}
-
-	return filepath.Join(filepath.Dir(filename), "..", "..", "..", "gen", "build", "linux_vf_offline_arm64")
+	return val
 }
 
-func ShimBuildBinaryPath() string {
-	// get this file's directory
-	_, c, _, _ := runtime.Caller(0)
-	return filepath.Join(filepath.Dir(c), "..", "..", "..", "gen", "build", "linux_binaries_arm64", "containerd-shim-runm-v2-test")
+func ShimBinaryPath() string {
+	val := os.Getenv("SHIM_BINARY_PATH")
+	if val == "" {
+		panic("SHIM_BINARY_PATH is not set")
+	}
+	return val
 }

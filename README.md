@@ -2,6 +2,17 @@
 
 experimental vm adaptor for runc, run containers natively on macOS
 
+## supported `nerdctl run` features
+
+-   [x] exit status returned to the host
+-   [] `-d` detached mode
+-   [] `-it` interactive mode
+-   [] `-e` environment variables
+-   [] `-w` working directory
+-   [] `-v` volumes
+-   [] `-p` ports
+-   [] `-u` user
+
 ## background
 
 instead of creating containers directly on the host, we use a hypervisor to create a guest vm and run the container inside it.
