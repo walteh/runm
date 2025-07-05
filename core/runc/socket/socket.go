@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/walteh/runm/core/runc/runtime"
+	"github.com/walteh/runm/pkg/conn"
 	"gitlab.com/tozd/go/errors"
 )
 
@@ -31,15 +32,21 @@ func debugReader(ctx context.Context, name string, r io.Reader) io.Reader {
 	return tr
 }
 
+func simpleUnixProxyConn(ctx context.Context, sock runtime.AllocatedSocket) (*net.UnixConn, error) {
+	if sockConn, ok := sock.Conn().(*net.UnixConn); ok {
+		return sockConn, nil
+	}
+	// create a socketpair
+	return conn.CreateUnixConnProxy(ctx, sock.Conn())
+}
+
 // runc.ConsoleSocket -> console.Console -> my.Socket
 // BindConsoleToSocket implements runtime.SocketAllocator.
-func BindConsoleToSocket(ctx context.Context, cons runtime.ConsoleSocket, sock runtime.AllocatedSocket) error {
+func BindRuncConsoleToSocket(ctx context.Context, cons runtime.ConsoleSocket, sock runtime.AllocatedSocket) error {
 
 	// // open up the console socket path, and create a pipe to it
-	consConn, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: cons.Path(), Net: "unix"})
-	if err != nil {
-		return errors.Errorf("failed to dial console socket: %w", err)
-	}
+
+	consConn := cons.UnixConn()
 	sockConn := sock.Conn()
 
 	wg := sync.WaitGroup{}
@@ -63,7 +70,6 @@ func BindConsoleToSocket(ctx context.Context, cons runtime.ConsoleSocket, sock r
 		sockConn.Close()
 	}()
 
-	// return the pipe
 	return nil
 }
 
@@ -183,3 +189,35 @@ func BindIOToSockets(ctx context.Context, ios runtime.IO, stdin, stdout, stderr 
 
 	return nil
 }
+
+// type allocatedSocketWithUnixConn struct {
+// 	runtime.AllocatedSocket
+// 	unixConn *net.UnixConn
+// }
+
+// func NewAllocatedSocketWithUnixConn(socket runtime.AllocatedSocket) runtime.AllocatedSocketWithUnixConn {
+// 	if unixConn, ok := socket.(runtime.AllocatedSocketWithUnixConn); ok {
+// 		return unixConn
+// 	}
+// 	if unixConn, ok := socket.(*SimpleVsockProxyConn); ok {
+// 		return &allocatedSocketWithUnixConn{socket: socket, unixConn: unixConn.UnixConn()}
+// 	}
+// 	return nil
+// }
+
+// func (a *allocatedSocketWithUnixConn) forward() (*net.UnixConn, error) {
+// 	// create a socketpair
+// 	fds, err := syscall.Socketpair(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
+// 	if err != nil {
+// 		return nil, errors.Errorf("creating socketpair: %w", err)
+// 	}
+// 	unixConn, err := net.FileConn(os.NewFile(uintptr(fds[0]), "external.socket"))
+// 	if err != nil {
+// 		return nil, errors.Errorf("converting file to UnixConn: %w", err)
+// 	}
+// 	proxyConn, err := net.FileConn(os.NewFile(uintptr(fds[1]), "internal.socket"))
+// 	if err != nil {
+// 		return nil, errors.Errorf("converting file to UnixConn: %w", err)
+// 	}
+// 	return proxyConn, nil
+// }

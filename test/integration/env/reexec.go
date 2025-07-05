@@ -83,5 +83,9 @@ func SetupContainerdLogReceiver(ctx context.Context) error {
 		}
 	}()
 
+	// drop the privileges of the two sockets
+	os.Chmod(ShimRawWriterSockPath(), 0666)
+	os.Chmod(ShimDelimitedWriterSockPath(), 0666)
+
 	return nil
 }

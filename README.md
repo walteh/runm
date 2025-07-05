@@ -6,7 +6,7 @@ experimental vm adaptor for runc, run containers natively on macOS
 
 -   [x] exit status returned to the host
 -   [x] bind mounts
--   [] read-only mounts (via `ro=true`)
+-   [x] read-only mounts (via `ro=true`)
 -   [] `-d` detached mode
 -   [] internal internet access (ability to see google.com)
 -   [] `-it` interactive mode

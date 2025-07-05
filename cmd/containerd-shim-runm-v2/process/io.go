@@ -35,6 +35,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/stdio"
 	"github.com/containerd/fifo"
+	gorunc "github.com/containerd/go-runc"
 	"github.com/containerd/log"
 	"gitlab.com/tozd/go/errors"
 
@@ -91,7 +92,7 @@ func createIO(ctx context.Context, id string, ioUID, ioGID int, stdio stdio.Stdi
 	if stdio.IsNull() {
 		i, err := runtime.NewNullIO()
 		if err != nil {
-			return nil, err
+			return nil, errors.Errorf("failed to create null IO: %w", err)
 		}
 		pio.io = i
 		return pio, nil
@@ -110,7 +111,15 @@ func createIO(ctx context.Context, id string, ioUID, ioGID int, stdio stdio.Stdi
 		slog.InfoContext(ctx, "creating pipe IO", "ioUID", ioUID, "ioGID", ioGID, "stdin", stdio.Stdin, "stdout", stdio.Stdout, "stderr", stdio.Stderr)
 		pio.io, err = runtime.NewPipeIO(ctx, ioUID, ioGID, withConditionalIO(stdio))
 	case "binary":
-		pio.io, err = NewBinaryIO(ctx, id, u)
+		slog.InfoContext(ctx, "creating binary IO", "uri", u.String(), "ioUID", ioUID, "ioGID", ioGID, "stdin", stdio.Stdin, "stdout", stdio.Stdout, "stderr", stdio.Stderr)
+		bi, err := NewBinaryIO(ctx, id, u)
+		if err != nil {
+			return nil, errors.Errorf("failed to create binary IO: %w", err)
+		}
+		pio.io, err = wrapBinaryIO(ctx, runtime, bi, ioUID, ioGID)
+		if err != nil {
+			return nil, errors.Errorf("failed to wrap binary IO: %w", err)
+		}
 	case "file":
 		filePath := u.Path
 		if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
@@ -285,7 +294,7 @@ func (c *countingWriteCloser) Close() error {
 }
 
 // NewBinaryIO runs a custom binary process for pluggable shim logging
-func NewBinaryIO(ctx context.Context, id string, uri *url.URL) (_ runtime.IO, err error) {
+func NewBinaryIO(ctx context.Context, id string, uri *url.URL) (_ *binaryIO, err error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
@@ -472,4 +481,35 @@ func (p *pipe) Close() error {
 	}
 
 	return errors.Join(result...)
+}
+
+func wrapBinaryIO(ctx context.Context, run runtime.Runtime, binIO *binaryIO, u, g int) (runtime.IO, error) {
+	// create the pipeio from the runtime
+	pipeIO, err := run.NewPipeIO(ctx, u, g, withRawIOOpt(func(o *gorunc.IOOption) {
+		o.OpenStdin = false
+		o.OpenStdout = true
+		o.OpenStderr = true
+	}))
+	if err != nil {
+		return nil, errors.Errorf("failed to create pipeIO: %w", err)
+	}
+
+	go func() {
+		if _, err := io.Copy(binIO.err.w, pipeIO.Stderr()); err != nil {
+			if err == io.EOF {
+				return
+			}
+			slog.ErrorContext(ctx, "error copying", "error", err)
+		}
+	}()
+	go func() {
+		if _, err := io.Copy(binIO.out.w, pipeIO.Stdout()); err != nil {
+			if err == io.EOF {
+				return
+			}
+			slog.ErrorContext(ctx, "error copying", "error", err)
+		}
+	}()
+
+	return pipeIO, nil
 }

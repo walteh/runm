@@ -528,6 +528,7 @@ func (s *service) State(ctx context.Context, r *taskv3.StateRequest) (*taskv3.St
 		status = task.Status_PAUSING
 	}
 	sio := p.Stdio()
+	slog.InfoContext(ctx, "current container state", "id", p.ID(), "status", status, "stdin", sio.Stdin, "stdout", sio.Stdout, "stderr", sio.Stderr, "terminal", sio.Terminal)
 	return &taskv3.StateResponse{
 		ID:         p.ID(),
 		Bundle:     container.Bundle,

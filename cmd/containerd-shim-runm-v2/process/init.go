@@ -594,3 +594,9 @@ func withConditionalIO(c stdio.Stdio) gorunc.IOOpt {
 		o.OpenStderr = c.Stderr != ""
 	}
 }
+
+func withRawIOOpt(c func(o *gorunc.IOOption)) gorunc.IOOpt {
+	return func(o *gorunc.IOOption) {
+		c(o)
+	}
+}

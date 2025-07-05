@@ -4,9 +4,11 @@ package socket
 
 import (
 	"context"
+	"io"
 	"log/slog"
 	"net"
 	"os"
+	"sync"
 
 	"github.com/containerd/console"
 	gorunc "github.com/containerd/go-runc"
@@ -19,68 +21,96 @@ import (
 var _ runtime.ConsoleSocket = &HostConsoleSocket{}
 
 type HostConsoleSocket struct {
-	socket runtime.AllocatedSocket
-	path   string
-	conn   *net.UnixConn
-	// unusedfd uintptr
+	socket      runtime.AllocatedSocketWithUnixConn
+	referenceId string
 }
 
 func (h *HostConsoleSocket) FileConn() file.FileConn {
-	return h.conn
+	return h.socket.Conn()
 }
 
 func (h *HostConsoleSocket) Close() error {
-	return h.conn.Close()
+	return h.socket.Conn().Close() // TODO: close the other end of the socket
+}
+
+func (h *HostConsoleSocket) UnixConn() *net.UnixConn {
+	return h.socket.UnixConn()
+}
+
+func (h *HostConsoleSocket) GetReferenceId() string {
+	return h.referenceId
 }
 
 func (h *HostConsoleSocket) Path() string {
-	return h.path
+	return h.socket.UnixConn().LocalAddr().String()
 }
 
 func (h *HostConsoleSocket) ReceiveMaster() (console.Console, error) {
-
-	f, err := RecvFd(h.conn)
+	f, err := RecvFd(h.socket.UnixConn())
 	if err != nil {
 		return nil, err
 	}
 	return console.ConsoleFromFile(f)
 }
 
-func NewHostUnixConsoleSocket(ctx context.Context, socket runtime.UnixAllocatedSocket) (runtime.ConsoleSocket, error) {
+func NewHostUnixConsoleSocket(ctx context.Context, referenceId string, socket runtime.AllocatedSocketWithUnixConn) (*HostConsoleSocket, error) {
 	tmp, err := gorunc.NewTempConsoleSocket()
 	if err != nil {
 		return nil, err
 	}
 
-	// bind the two together
-	err = BindConsoleToSocket(ctx, tmp, socket)
+	// connect to the unix socket
+	runcUnixConn, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: tmp.Path(), Net: "unix"})
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("failed to dial unix socket: %w", err)
 	}
 
-	return tmp, nil
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		io.Copy(runcUnixConn, socket.UnixConn())
+	}()
+
+	go func() {
+		defer wg.Done()
+		io.Copy(socket.UnixConn(), runcUnixConn)
+	}()
+
+	go func() {
+		wg.Wait()
+		runcUnixConn.Close()
+		tmp.Close()
+	}()
+
+	return &HostConsoleSocket{
+		socket:      socket,
+		referenceId: referenceId,
+	}, nil
 
 	// return &HostConsoleSocket{socket: socket, path: tmp.Path(), conn: tmp.Conn().(*net.UnixConn)}, nil
 }
 
-func NewHostVsockFdConsoleSocket(ctx context.Context, socket runtime.VsockAllocatedSocket, proxier runtime.VsockProxier) (*HostConsoleSocket, error) {
-	conn, path, err := proxier.ProxyVsock(ctx, socket.Port())
-	if err != nil {
-		return nil, err
-	}
-	return &HostConsoleSocket{socket: socket, path: path, conn: conn}, nil
-}
+// func NewHostVsockFdConsoleSocket(ctx context.Context, socket runtime.VsockAllocatedSocket, proxier runtime.VsockProxier) (*HostConsoleSocket, error) {
+// 	if
+// 	return &HostConsoleSocket{socket: socket, path: path, conn: conn}, nil
+// }
 
-func NewHostConsoleSocket(ctx context.Context, socket runtime.AllocatedSocket, proxier runtime.VsockProxier) (runtime.ConsoleSocket, error) {
-	switch v := socket.(type) {
-	case runtime.UnixAllocatedSocket:
-		return NewHostUnixConsoleSocket(ctx, v)
-	case runtime.VsockAllocatedSocket:
-		return NewHostVsockFdConsoleSocket(ctx, v, proxier)
-	default:
-		return nil, errors.Errorf("invalid socket type: %T", socket)
-	}
-}
+// func NewHostConsoleSocket(ctx context.Context, socket ) (*HostConsoleSocket, error) {
+// 	switch v := socket.(type) {
+// 	case *SimpleVsockConn:
+// 		proxy, err := CreateLocalVsockProxyConn(ctx, v)
+// 		if err != nil {
+// 			return nil, errors.Errorf("creating local vsock proxy: %w", err)
+// 		}
+// 		return NewHostUnixConsoleSocket(ctx, proxy)
+// 	case *SimpleVsockProxyConn:
+// 		return NewHostUnixConsoleSocket(ctx, v)
+// 	default:
+// 		return nil, errors.Errorf("invalid socket type: %T", socket)
+// 	}
+// }
 
 func RecvFd(socket *net.UnixConn) (*os.File, error) {
 	const MaxNameLen = 4096

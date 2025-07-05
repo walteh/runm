@@ -234,11 +234,11 @@ func formatNSError(err error) error {
 func (vm *VirtualMachine) VSockConnect(ctx context.Context, port uint32) (net.Conn, error) {
 	vsockDev, err := vm.GetVSockDevice()
 	if err != nil {
-		return nil, errors.Errorf("getting vsock device: %w", err)
+		return nil, errors.Errorf("getting vsock device port[%d]: %w", port, err)
 	}
 	conn, err := vsockDev.Connect(port)
 	if err != nil {
-		return nil, errors.Errorf("connecting to vsock device: %w", formatNSError(err))
+		return nil, errors.Errorf("connecting to vsock device port[%d]: %w", port, formatNSError(err))
 	}
 	return conn, nil
 }
@@ -247,11 +247,11 @@ func (vm *VirtualMachine) VSockConnect(ctx context.Context, port uint32) (net.Co
 func (vm *VirtualMachine) VSockListen(ctx context.Context, port uint32) (net.Listener, error) {
 	vsockDev, err := vm.GetVSockDevice()
 	if err != nil {
-		return nil, errors.Errorf("getting vsock device: %w", err)
+		return nil, errors.Errorf("getting vsock device port[%d]: %w", port, err)
 	}
 	lstn, err := vsockDev.Listen(port)
 	if err != nil {
-		return nil, errors.Errorf("listening to vsock device: %w", err)
+		return nil, errors.Errorf("listening to vsock device port[%d]: %w", port, err)
 	}
 	return lstn, nil
 }

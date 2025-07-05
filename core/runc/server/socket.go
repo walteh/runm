@@ -180,12 +180,12 @@ func (s *Server) BindConsoleToSocket(ctx context.Context, req *runmv1.BindConsol
 
 	as, err := loadSocket(s.state, req.GetSocketType())
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("cannot bind console to socket: socket not found: %w", err)
 	}
 
-	err = socket.BindConsoleToSocket(ctx, cs, as)
+	err = socket.BindRuncConsoleToSocket(ctx, cs, as)
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("cannot bind console to socket: %w", err)
 	}
 
 	return &runmv1.BindConsoleToSocketResponse{}, nil

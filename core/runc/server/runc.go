@@ -66,7 +66,7 @@ func (s *Server) NewTempConsoleSocket(ctx context.Context, req *runmv1.RuncNewTe
 	referenceId := runtime.NewConsoleReferenceId()
 	s.state.StoreOpenConsole(referenceId, socket)
 
-	go simulatePty(ctx, socket.Path())
+	// go simulatePty(ctx, socket.Path())
 
 	resp := &runmv1.RuncNewTempConsoleSocketResponse{}
 	resp.SetConsoleReferenceId(referenceId)

@@ -50,24 +50,15 @@ func (c *GRPCClientRuntime) vsockDialer(ctx context.Context, port uint32) error 
 // NewTempConsoleSocket implements runtime.Runtime.
 func (c *GRPCClientRuntime) NewTempConsoleSocket(ctx context.Context) (runtime.ConsoleSocket, error) {
 
-	port := vsockPortCounter.Add(1) + 3300
-
-	conn, err := c.listenToVsockWithDialerCallback(ctx, port)
+	allocatedSock, sockTyp, err := c.allocateVsockSocket(ctx)
 	if err != nil {
-		return nil, errors.Errorf("listening to vsock: %w", err)
+		return nil, errors.Errorf("allocating vsock socket: %w", err)
 	}
-
-	allocatedSock := runmsocket.NewSimpleVsockProxyConn(ctx, conn, port)
-
-	sockTyp := newVsockSocketType(port)
 
 	cons, err := c.runtimeGrpcService.NewTempConsoleSocket(ctx, &runmv1.RuncNewTempConsoleSocketRequest{})
 	if err != nil {
 		return nil, errors.Errorf("creating temp console socket: %w", err)
 	}
-	// if cons.GetGoError() != "" {
-	// 	return nil, errors.New(cons.GetGoError())
-	// }
 
 	slog.InfoContext(ctx, "creating console - A")
 
@@ -81,18 +72,18 @@ func (c *GRPCClientRuntime) NewTempConsoleSocket(ctx context.Context) (runtime.C
 
 	_, err = c.socketAllocatorGrpcService.BindConsoleToSocket(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("binding console to socket: %w", err)
 	}
 
 	slog.InfoContext(ctx, "binding console to socket - B")
 
-	consock, err := runmsocket.NewHostConsoleSocket(ctx, allocatedSock, c.vsockProxier)
+	consock, err := runmsocket.NewHostUnixConsoleSocket(ctx, cons.GetConsoleReferenceId(), allocatedSock)
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("creating host console socket: %w", err)
 	}
 
 	c.state.StoreOpenConsole(cons.GetConsoleReferenceId(), consock)
-	c.state.StoreOpenVsockConnection(port, allocatedSock)
+	c.state.StoreOpenVsockConnection(sockTyp.GetVsockPort().GetPort(), allocatedSock)
 
 	slog.InfoContext(ctx, "binding console to socket - C")
 
@@ -152,6 +143,21 @@ func newVsockSocketType(port uint32) *runmv1.SocketType {
 	return typ
 }
 
+func (c *GRPCClientRuntime) allocateVsockSocket(ctx context.Context) (*runmsocket.SimpleVsockProxyConn, *runmv1.SocketType, error) {
+	port := vsockPortCounter.Add(1) + 3300
+
+	conn, err := c.listenToVsockWithDialerCallback(ctx, port)
+	if err != nil {
+		return nil, nil, errors.Errorf("listening to vsock: %w", err)
+	}
+
+	typ := newVsockSocketType(port)
+
+	allocatedSock := runmsocket.NewSimpleVsockProxyConn(ctx, conn, port)
+
+	return allocatedSock, typ, nil
+}
+
 // NewPipeIO implements runtime.Runtime.
 func (c *GRPCClientRuntime) NewPipeIO(ctx context.Context, ioUID, ioGID int, opts ...gorunc.IOOpt) (runtime.IO, error) {
 
@@ -180,15 +186,13 @@ func (c *GRPCClientRuntime) NewPipeIO(ctx context.Context, ioUID, ioGID int, opt
 
 	for i := 0; i < count; i++ {
 
-		port := vsockPortCounter.Add(1) + 3300
-
-		conn, err := c.listenToVsockWithDialerCallback(ctx, port)
+		allocatedSock, typ, err := c.allocateVsockSocket(ctx)
 		if err != nil {
-			return nil, errors.Errorf("listening to vsock: %w", err)
+			return nil, errors.Errorf("allocating vsock socket: %w", err)
 		}
 
-		refs[i] = newVsockSocketType(port)
-		allocatedSockets[port] = runmsocket.NewSimpleVsockProxyConn(ctx, conn, port)
+		refs[i] = typ
+		allocatedSockets[typ.GetVsockPort().GetPort()] = allocatedSock
 	}
 
 	ioReq := &runmv1.AllocateIORequest{}
@@ -403,7 +407,11 @@ func (c *GRPCClientRuntime) Exec(ctx context.Context, id string, spec specs.Proc
 	}
 	req.SetSpec(specOut)
 
-	req.SetOptions(conversion.ConvertExecOptsToProto(options))
+	execOpts, err := conversion.ConvertExecOptsToProto(options)
+	if err != nil {
+		return errors.Errorf("converting exec opts to proto: %w", err)
+	}
+	req.SetOptions(execOpts)
 
 	_, err = c.runtimeGrpcService.Exec(ctx, req)
 	if err != nil {

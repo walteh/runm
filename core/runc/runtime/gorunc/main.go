@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -110,8 +111,34 @@ func (r *GoRuncRuntime) SubscribeToReaperExits2(ctx context.Context) (<-chan gor
 	return customMonitor.Subscribe(ctx), nil
 }
 
+type wrappedConsoleSocket struct {
+	*gorunc.Socket
+	unixConn *net.UnixConn
+}
+
+func (w *wrappedConsoleSocket) UnixConn() *net.UnixConn {
+	return w.unixConn
+}
+
+func NewWrappedConsoleSocket(ctx context.Context) (runtime.ConsoleSocket, error) {
+	sock, err := gorunc.NewTempConsoleSocket()
+	if err != nil {
+		return nil, errors.Errorf("creating temp console socket: %w", err)
+	}
+
+	unixConn, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: sock.Path(), Net: "unix"})
+	if err != nil {
+		return nil, errors.Errorf("dialing unix socket: %w", err)
+	}
+
+	return &wrappedConsoleSocket{
+		Socket:   sock,
+		unixConn: unixConn,
+	}, nil
+}
+
 func (r *GoRuncRuntime) NewTempConsoleSocket(ctx context.Context) (runtime.ConsoleSocket, error) {
-	return gorunc.NewTempConsoleSocket()
+	return NewWrappedConsoleSocket(ctx)
 }
 
 func (r *GoRuncRuntime) NewNullIO() (runtime.IO, error) {

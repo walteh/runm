@@ -120,6 +120,7 @@ type Runtime interface {
 type ConsoleSocket interface {
 	ReceiveMaster() (console.Console, error)
 	Path() string
+	UnixConn() *net.UnixConn
 	Close() error
 }
 
@@ -203,6 +204,11 @@ type AllocatedSocket interface {
 	io.Closer
 	Conn() FileConn
 	Ready() error
+}
+
+type AllocatedSocketWithUnixConn interface {
+	AllocatedSocket
+	UnixConn() *net.UnixConn
 }
 
 type VsockAllocatedSocket interface {
