@@ -108,7 +108,7 @@ tasks:
         vars:
             OPTION_GEN_DATA:
                 sh: |-
-                    grep -rl "//go:opts" --include="*.go" . | xargs -I{} bash -c 'd=$(dirname {}); d=${d#./}; awk -v d="$d {}" '\''/\/\/go:opts/ {getline; if($1=="type") print d, $2}'\'' {}' || true
+                    go tool findcodetag . --tag=//go:opts --type=struct
             OPTION_GEN_SOURCE_FILES:
                 sh: |-
                     grep -rl "//go:opts" --include="*.go" . || true
@@ -138,12 +138,7 @@ tasks:
                 sh: mktemp -d
             MOCKERY_INTERFACE_DATA:
                 sh: |-
-                    grep -rl "//go:mock" --include="*.go" . | xargs -I{} sh -c '
-                        f="{}"
-                        d=$(dirname "$f"); d=${d#./}
-                        raw=$(awk "/\/\/go:mock/{getline; if(\$1==\"type\") print \$2}" "$f")
-                        name=${raw%%\[*}
-                        for i in $name; do echo "$d $f $i"; done' || true
+                    go tool findcodetag . --tag=//go:mock --type=interface
             MOCKERY_SOURCE_FILES:
                 sh: |-
                     grep -rl "//go:mock" --include="*.go" . || true
@@ -539,9 +534,9 @@ tasks:
             vars:
                 DETACHED: ''
                 IMAGE: 'docker.io/oven/bun:alpine'
-                FLAGS: '--workdir=/app --mount=type=bind,src={{.TEST_SCENARIO_DIR}},dst=/app'
+                FLAGS: '--workdir=/app --mount=type=bind,src={{.TEST_SCENARIO_DIR}},dst=/app,ro=true'
                 ARGS: |-
-                    sh -c "echo '📦 Installing dependencies...' && \
+                    sh -c "cat '/proc/self/mountinfo' && echo '📦 Installing dependencies...' && \
                     bun install --verbose && echo '🧪 Running tests...' && \
                     bun test && echo '🔨 Building project...' && \
                     bun run build && echo '🏃 Running compiled app...' && \
