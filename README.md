@@ -5,7 +5,10 @@ experimental vm adaptor for runc, run containers natively on macOS
 ## supported `nerdctl run` features
 
 -   [x] exit status returned to the host
+-   [x] bind mounts
+-   [] read-only mounts (via `ro=true`)
 -   [] `-d` detached mode
+-   [] internal internet access (ability to see google.com)
 -   [] `-it` interactive mode
 -   [] `-e` environment variables
 -   [] `-w` working directory

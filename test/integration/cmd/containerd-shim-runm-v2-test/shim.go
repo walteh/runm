@@ -106,7 +106,6 @@ func ShimMain() {
 				}
 			}
 		}()
-
 	}
 
 	// Monitor for unexpected signals and OS-level events

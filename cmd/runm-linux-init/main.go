@@ -508,9 +508,7 @@ func mount(ctx context.Context) error {
 		panic(errors.Errorf("problem reading mountinfo: %w", err))
 	}
 
-	fmt.Println("mountinfo contents:")
-
-	fmt.Println(string(mountinfo))
+	slog.InfoContext(ctx, "/proc/self/mountinfo contents: "+string(mountinfo))
 
 	return nil
 }

@@ -84,3 +84,4 @@ gen/build
 tempo-data
 loki-data
 grafana-data
+.claude
