@@ -11,9 +11,11 @@ import (
 	"strings"
 	"sync"
 
-	gorunc "github.com/containerd/go-runc"
-	"github.com/walteh/runm/pkg/psnotify"
 	"gitlab.com/tozd/go/errors"
+
+	gorunc "github.com/containerd/go-runc"
+
+	"github.com/walteh/runm/pkg/psnotify"
 )
 
 func init() {
@@ -31,6 +33,60 @@ type pidInfo struct {
 	argc     string
 	parent   *pidInfo
 	children []*pidInfo
+
+	exitEvent *psnotify.ProcEventExit
+	execEvent *psnotify.ProcEventExec
+	forkEvent *psnotify.ProcEventFork
+}
+
+var _ slog.LogValuer = (*pidInfo)(nil)
+
+func (p *pidInfo) LogValue() slog.Value {
+	attrs := []slog.Attr{}
+
+	if p.parent != nil {
+		attrs = append(attrs, slog.Group("parent",
+			slog.Int("pid", p.parent.pid),
+			slog.String("cgroup", p.parent.cgroup),
+			slog.String("argc", p.parent.argc),
+		))
+	}
+
+	attrs = append(attrs, slog.Group("children",
+		slog.Int("count", len(p.children)),
+	))
+
+	attrs = append(attrs, slog.Int("pid", p.pid),
+		slog.String("cgroup", p.cgroup),
+		slog.String("argc", p.argc),
+	)
+
+	if p.exitEvent != nil {
+		exitGroup := slog.Group("exit",
+			slog.Time("timestamp", p.exitEvent.Timestamp),
+			slog.Int("exitCode", p.exitEvent.ExitCode),
+			slog.Int("exitSignal", int(p.exitEvent.ExitSignal)),
+		)
+		attrs = append(attrs, exitGroup)
+	}
+
+	if p.execEvent != nil {
+		execGroup := slog.Group("exec",
+			slog.Time("timestamp", p.execEvent.Timestamp),
+		)
+		attrs = append(attrs, execGroup)
+	}
+
+	if p.forkEvent != nil {
+		forkGroup := slog.Group("fork",
+			slog.Time("timestamp", p.forkEvent.Timestamp),
+			slog.Int("parentPid", int(p.forkEvent.ParentPid)),
+			slog.Int("childPid", int(p.forkEvent.ChildPid)),
+		)
+		attrs = append(attrs, forkGroup)
+	}
+
+	return slog.GroupValue(attrs...)
 }
 
 var pidToCgroup = struct {
@@ -48,7 +104,9 @@ func (r *runmLinuxInit) runPsnotify(ctx context.Context, exitChan chan gorunc.Ex
 		return errors.Errorf("failed to create psnotify watcher: %w", err)
 	}
 
-	watcher.Watch(os.Getpid(), psnotify.PROC_EVENT_FORK|psnotify.PROC_EVENT_EXEC|psnotify.PROC_EVENT_EXIT)
+	if err := watcher.Watch(os.Getpid(), psnotify.PROC_EVENT_FORK|psnotify.PROC_EVENT_EXEC|psnotify.PROC_EVENT_EXIT); err != nil {
+		return errors.Errorf("failed to watch self: %w", err)
+	}
 
 	for {
 		select {
@@ -66,6 +124,7 @@ func (r *runmLinuxInit) runPsnotify(ctx context.Context, exitChan chan gorunc.Ex
 				continue
 			}
 			pidToCgroup.Lock()
+			_, exists := pidToCgroup.m[child]
 			info.parent = parentInfo
 			pidToCgroup.m[child] = info
 			if parentInfo != nil {
@@ -73,12 +132,16 @@ func (r *runmLinuxInit) runPsnotify(ctx context.Context, exitChan chan gorunc.Ex
 			}
 			pidToCgroup.Unlock()
 
-			parentArgc := ""
-			if parentInfo != nil {
-				parentArgc = parentInfo.argc
+			// parentArgc := ""
+			// if parentInfo != nil {
+			// 	parentArgc = parentInfo.argc
+			// }
+
+			if !exists {
+				slog.InfoContext(ctx, fmt.Sprintf("PSNOTIFY:FORK[%d]", child), "info", info)
 			}
 
-			slog.DebugContext(ctx, "PSNOTIFY[FORK]", "parent", parent, "child", child, "parent_argc", parentArgc, "child_argc", info.argc)
+			// slog.DebugContext(ctx, "PSNOTIFY[FORK]", "parent", parent, "child", child, "parent_argc", parentArgc, "child_argc", info.argc)
 
 			if err := watcher.Watch(child, psnotify.PROC_EVENT_EXIT); err != nil {
 				slog.ErrorContext(ctx, "failed to watch child", "error", err)
@@ -107,31 +170,7 @@ func (r *runmLinuxInit) runPsnotify(ctx context.Context, exitChan chan gorunc.Ex
 			grp := pidToCgroup.m[pid]
 			pidToCgroup.RUnlock()
 
-			attrs := []slog.Attr{}
-
-			if grp.parent != nil {
-				attrs = append(attrs, slog.Group("parent",
-					slog.Int("pid", grp.parent.pid),
-					slog.String("cgroup", grp.parent.cgroup),
-					// slog.String("argv", strings.Join(grp.parent.argv, " ")),
-					slog.String("argc", grp.parent.argc),
-				))
-			}
-
-			attrs = append(attrs, slog.Group("children",
-				slog.Int("count", len(grp.children)),
-			))
-
-			attrs = append(attrs, slog.Int("pid", pid),
-				slog.String("cgroup", grp.cgroup),
-				// slog.String("argv", strings.Join(grp.argv, " ")),
-				slog.String("argc", grp.argc),
-				slog.Time("timestamp", status.Timestamp),
-				slog.Int("exitCode", status.ExitCode),
-				slog.Int("exitSignal", int(status.ExitSignal)),
-			)
-
-			slog.LogAttrs(ctx, slog.LevelDebug, "PSNOTIFY[EXIT]", attrs...)
+			// slog.Log(ctx, slog.LevelDebug, "PSNOTIFY[EXIT]", "info", grp)
 
 			go func() {
 
@@ -139,12 +178,11 @@ func (r *runmLinuxInit) runPsnotify(ctx context.Context, exitChan chan gorunc.Ex
 				if err == nil {
 					err := pidfdWait(exitFd)
 					if err != nil {
-						attrs = append(attrs, slog.String("error", err.Error()))
-						slog.LogAttrs(ctx, slog.LevelError, "failed to wait for process", attrs...)
+						slog.ErrorContext(ctx, "failed to wait for process", "error", err, "info", grp)
 					}
 				}
 
-				slog.LogAttrs(ctx, slog.LevelDebug, "PSNOTIFY[REAP]", attrs...)
+				slog.Log(ctx, slog.LevelDebug, fmt.Sprintf("PSNOTIFY:REAP[%d]", pid), "info", grp)
 
 				exitChan <- gorunc.Exit{
 					Pid:       pid,
@@ -160,7 +198,15 @@ func (r *runmLinuxInit) runPsnotify(ctx context.Context, exitChan chan gorunc.Ex
 			pidToCgroup.Unlock()
 		case execEv := <-watcher.Exec:
 			pid := int(execEv.Pid)
-			slog.DebugContext(ctx, "PSNOTIFY[EXEC]", "pid", pid)
+			pidToCgroup.RLock()
+			grp := pidToCgroup.m[pid]
+			pidToCgroup.RUnlock()
+
+			if grp != nil {
+				slog.Log(ctx, slog.LevelDebug, fmt.Sprintf("PSNOTIFY:FORK-EXEC[%d]", pid), "info", grp)
+			} else {
+				slog.InfoContext(ctx, fmt.Sprintf("PSNOTIFY:EXEC[%d]", pid), "info", grp)
+			}
 			// TODO: your gRPC call here, e.g. reportExec(pid)
 		case err := <-watcher.Error:
 			slog.ErrorContext(ctx, "PSNOTIFY[ERROR]", "error", err)

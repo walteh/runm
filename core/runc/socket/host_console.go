@@ -10,12 +10,15 @@ import (
 	"os"
 	"sync"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/containerd/console"
+	"gitlab.com/tozd/go/errors"
+
 	gorunc "github.com/containerd/go-runc"
+
 	"github.com/walteh/runm/core/runc/file"
 	"github.com/walteh/runm/core/runc/runtime"
-	"gitlab.com/tozd/go/errors"
-	"golang.org/x/sys/unix"
 )
 
 var _ runtime.ConsoleSocket = &HostConsoleSocket{}

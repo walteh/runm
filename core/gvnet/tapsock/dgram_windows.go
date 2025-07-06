@@ -5,8 +5,9 @@ package tapsock
 import (
 	"context"
 
-	"github.com/walteh/runm/core/virt/virtio"
 	"gitlab.com/tozd/go/errors"
+
+	"github.com/walteh/runm/core/virt/virtio"
 )
 
 func NewDgramVirtioNet(ctx context.Context, macstr string) (*virtio.VirtioNet, *VirtualNetworkRunner, error) {

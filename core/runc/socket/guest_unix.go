@@ -8,8 +8,9 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
-	"github.com/walteh/runm/core/runc/runtime"
 	"gitlab.com/tozd/go/errors"
+
+	"github.com/walteh/runm/core/runc/runtime"
 )
 
 var _ runtime.SocketAllocator = (*GuestUnixSocketAllocator)(nil)

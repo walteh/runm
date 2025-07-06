@@ -12,6 +12,15 @@ func NewMap[K comparable, V any]() *Map[K, V] {
 	}
 }
 
+func (m *Map[K, V]) Len() int {
+	count := 0
+	m.m.Range(func(key, value any) bool {
+		count++
+		return true
+	})
+	return count
+}
+
 func (m *Map[K, V]) Delete(key K) {
 	m.m.Delete(key)
 }

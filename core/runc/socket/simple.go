@@ -7,8 +7,9 @@ import (
 	"net"
 
 	"github.com/mdlayher/vsock"
-	"github.com/walteh/runm/core/runc/runtime"
 	"gitlab.com/tozd/go/errors"
+
+	"github.com/walteh/runm/core/runc/runtime"
 )
 
 var _ runtime.VsockAllocatedSocket = (*SimpleVsockConn)(nil)

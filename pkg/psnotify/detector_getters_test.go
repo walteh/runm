@@ -6,8 +6,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	mockpsnotify "github.com/walteh/runm/gen/mocks/pkg/psnotify"
+
 	"github.com/walteh/runm/pkg/psnotify"
+
+	mockpsnotify "github.com/walteh/runm/gen/mocks/pkg/psnotify"
 )
 
 // TestDetectorGetters tests the getter methods of the detector

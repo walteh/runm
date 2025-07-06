@@ -4,6 +4,8 @@ package main
 
 import (
 	_ "embed"
+	_ "github.com/opencontainers/cgroups/devices"
+
 	"errors"
 	"fmt"
 	"io"
@@ -16,16 +18,14 @@ import (
 	"strings"
 	"time"
 
-	//nolint:revive // Enable cgroup manager to manage devices
 	"github.com/mdlayher/vsock"
-	_ "github.com/opencontainers/cgroups/devices"
 	"github.com/opencontainers/runc/libcontainer/seccomp"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/walteh/runm/linux/constants"
-	"github.com/walteh/runm/pkg/logging"
-
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
+
+	"github.com/walteh/runm/linux/constants"
+	"github.com/walteh/runm/pkg/logging"
 )
 
 // version is set from the contents of VERSION file.

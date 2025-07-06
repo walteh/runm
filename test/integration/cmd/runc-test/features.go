@@ -10,10 +10,11 @@ import (
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/seccomp"
 	"github.com/opencontainers/runc/libcontainer/specconv"
-	runcfeatures "github.com/opencontainers/runc/types/features"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-spec/specs-go/features"
 	"github.com/urfave/cli"
+
+	runcfeatures "github.com/opencontainers/runc/types/features"
 )
 
 var featuresCommand = cli.Command{

@@ -7,8 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/walteh/runm/core/runc/runtime"
 	"gitlab.com/tozd/go/errors"
+
+	"github.com/walteh/runm/core/runc/runtime"
 )
 
 type HostAllocatedSocket struct {

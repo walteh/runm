@@ -3,6 +3,8 @@
 package main
 
 import (
+	_ "github.com/opencontainers/runc/libcontainer/nsenter"
+
 	"fmt"
 	"log/slog"
 	"os"
@@ -10,7 +12,7 @@ import (
 
 	"github.com/mdlayher/vsock"
 	"github.com/opencontainers/runc/libcontainer"
-	_ "github.com/opencontainers/runc/libcontainer/nsenter"
+
 	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/logging"
 )

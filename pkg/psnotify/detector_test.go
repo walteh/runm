@@ -4,6 +4,7 @@
 package psnotify_test
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"errors"
+	"github.com/stretchr/testify/assert"
 
 	gorunc "github.com/containerd/go-runc"
-	"github.com/stretchr/testify/assert"
+
 	"github.com/walteh/runm/pkg/psnotify"
 )
 

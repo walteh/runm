@@ -6,9 +6,9 @@ import (
 	"context"
 	"net"
 
+	"github.com/mdlayher/vsock"
 	"gitlab.com/tozd/go/errors"
 
-	"github.com/mdlayher/vsock"
 	"github.com/walteh/runm/core/runc/runtime"
 	"github.com/walteh/runm/core/runc/socket"
 	"github.com/walteh/runm/core/runc/state"

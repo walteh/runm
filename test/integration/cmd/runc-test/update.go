@@ -9,13 +9,12 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/opencontainers/cgroups"
-	"github.com/sirupsen/logrus"
-
 	"github.com/docker/go-units"
+	"github.com/opencontainers/cgroups"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/intelrdt"
 	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 

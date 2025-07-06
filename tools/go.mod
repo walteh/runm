@@ -16,8 +16,8 @@ exclude google.golang.org/grpc/stats/opentelemetry v0.0.0-20240907200651-3ffb98b
 
 tool (
 	github.com/walteh/runm/tools/cmd/codesign
-	github.com/walteh/runm/tools/cmd/goshim
 	github.com/walteh/runm/tools/cmd/findcodetag
+	github.com/walteh/runm/tools/cmd/goshim
 )
 
 tool (

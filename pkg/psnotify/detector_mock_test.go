@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	mockpsnotify "github.com/walteh/runm/gen/mocks/pkg/psnotify"
+
 	"github.com/walteh/runm/pkg/psnotify"
+
+	mockpsnotify "github.com/walteh/runm/gen/mocks/pkg/psnotify"
 )
 
 func TestDetectorWithMocks(t *testing.T) {

@@ -9,12 +9,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	dapmuxv1 "github.com/walteh/runm/proto/dapmux/v1"
 	"gitlab.com/tozd/go/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	dapmuxv1 "github.com/walteh/runm/proto/dapmux/v1"
 )
 
 type Server struct {

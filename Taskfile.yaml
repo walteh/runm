@@ -487,6 +487,14 @@ tasks:
         desc: builds the linux runtime
         deps: ['test:binaries', 'linux:runtime:kernel', 'linux:runtime:initramfs', 'linux:runtime:mbins']
 
+    dev:nerdctl-test:kill-all-running-containers:
+        desc: kills all running containers
+        run: once
+        vars:
+            BIN: "{{.TEST_BIN_DIR}}/nerdctl-test"
+        cmds:
+          - cmd: sudo -A -E {{.BIN}} ps -q | xargs -I {} sudo -A -E {{.BIN}} kill {}
+
     dev:nerdctl-test:run:
         desc: runs the nerdctl test
         deps: ['test:binary:nerdctl-test', 'test:binary:containerd-shim-runm-v2-test']
@@ -576,12 +584,13 @@ tasks:
 
     dev:2025-07-05:01:
         desc: runs the shim for 2025-07-05 - detached mode
-        deps: ['test:cleanup-running-shims', 'test:linux:runtime', 'test:binaries']
+        deps: ['test:linux:runtime', 'test:binaries']
         vars:
             TMP_DIR:
                 sh: mktemp -d -t runm-2025-07-05-XXXXXX
         cmds:
           - defer: rm -rf {{.TMP_DIR}}
+          - task: dev:nerdctl-test:kill-all-running-containers
           - task: dev:nerdctl-test:run
             vars:
                 FLAGS: '-d'

@@ -9,10 +9,12 @@ import (
 	"sync"
 
 	"github.com/mdlayher/vsock"
-	"github.com/walteh/runm/linux/constants"
-	runmv1 "github.com/walteh/runm/proto/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+
+	"github.com/walteh/runm/linux/constants"
+
+	runmv1 "github.com/walteh/runm/proto/v1"
 )
 
 func main() {

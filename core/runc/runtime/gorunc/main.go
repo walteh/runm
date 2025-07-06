@@ -17,10 +17,10 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.com/tozd/go/errors"
 	"golang.org/x/sys/unix"
 
 	"github.com/opencontainers/runtime-spec/specs-go/features"
+	"gitlab.com/tozd/go/errors"
 
 	gorunc "github.com/containerd/go-runc"
 

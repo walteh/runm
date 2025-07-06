@@ -8,9 +8,10 @@ import (
 	"net"
 	"sync"
 
+	"gitlab.com/tozd/go/errors"
+
 	"github.com/walteh/runm/core/runc/runtime"
 	"github.com/walteh/runm/pkg/conn"
-	"gitlab.com/tozd/go/errors"
 )
 
 func debugReader(ctx context.Context, name string, r io.Reader) io.Reader {

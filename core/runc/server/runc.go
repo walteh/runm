@@ -197,6 +197,20 @@ func (s *Server) Ps(ctx context.Context, req *runmv1.RuncPsRequest) (*runmv1.Run
 func (s *Server) Exec(ctx context.Context, req *runmv1.RuncExecRequest) (*runmv1.RuncExecResponse, error) {
 	resp := &runmv1.RuncExecResponse{}
 
+	// d := false
+	// defer func() {
+	// 	d = true
+	// }()
+	// go func() {
+	// 	for {
+	// 		time.Sleep(10 * time.Second)
+	// 		if d {
+	// 			return
+	// 		}
+	// 		s.state.LogCurrentStateReport(ctx)
+	// 	}
+	// }()
+
 	if req.GetSpec() == nil {
 		return nil, errors.Errorf("spec is required")
 	}

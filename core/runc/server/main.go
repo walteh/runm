@@ -9,12 +9,12 @@ import (
 
 	"google.golang.org/grpc"
 
+	gorunc "github.com/containerd/go-runc"
+
 	"github.com/walteh/runm/core/runc/runtime"
 	"github.com/walteh/runm/core/runc/state"
 
 	runmv1 "github.com/walteh/runm/proto/v1"
-
-	gorunc "github.com/containerd/go-runc"
 )
 
 type Server struct {

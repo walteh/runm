@@ -12,8 +12,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/walteh/runm/pkg/logging"
 	"gitlab.com/tozd/go/errors"
+
+	"github.com/walteh/runm/pkg/logging"
 )
 
 func CopyLoggingErrors(ctx context.Context, dst io.Writer, src io.Reader) error {

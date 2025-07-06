@@ -6,20 +6,27 @@ import (
 )
 
 type State struct {
-	openIOs *syncmap.Map[string, runtime.IO]
-	// openSockets          *syncmap.Map[string, runtime.AllocatedSocket]
+	openIOs              *syncmap.Map[string, runtime.IO]
 	openConsoles         *syncmap.Map[string, runtime.ConsoleSocket]
 	openVsockConnections *syncmap.Map[uint32, runtime.VsockAllocatedSocket]
 	openUnixConnections  *syncmap.Map[string, runtime.UnixAllocatedSocket]
+
+	closedIOs              *syncmap.Map[string, runtime.IO]
+	closedConsoles         *syncmap.Map[string, runtime.ConsoleSocket]
+	closedVsockConnections *syncmap.Map[uint32, runtime.VsockAllocatedSocket]
+	closedUnixConnections  *syncmap.Map[string, runtime.UnixAllocatedSocket]
 }
 
 func NewState() *State {
 	return &State{
-		openIOs: syncmap.NewMap[string, runtime.IO](),
-		// openSockets:          syncmap.NewMap[string, runtime.AllocatedSocket](),
-		openConsoles:         syncmap.NewMap[string, runtime.ConsoleSocket](),
-		openVsockConnections: syncmap.NewMap[uint32, runtime.VsockAllocatedSocket](),
-		openUnixConnections:  syncmap.NewMap[string, runtime.UnixAllocatedSocket](),
+		openIOs:                syncmap.NewMap[string, runtime.IO](),
+		openConsoles:           syncmap.NewMap[string, runtime.ConsoleSocket](),
+		openVsockConnections:   syncmap.NewMap[uint32, runtime.VsockAllocatedSocket](),
+		openUnixConnections:    syncmap.NewMap[string, runtime.UnixAllocatedSocket](),
+		closedIOs:              syncmap.NewMap[string, runtime.IO](),
+		closedConsoles:         syncmap.NewMap[string, runtime.ConsoleSocket](),
+		closedVsockConnections: syncmap.NewMap[uint32, runtime.VsockAllocatedSocket](),
+		closedUnixConnections:  syncmap.NewMap[string, runtime.UnixAllocatedSocket](),
 	}
 }
 
@@ -48,7 +55,10 @@ func (s *State) StoreOpenConsole(referenceId string, console runtime.ConsoleSock
 }
 
 func (s *State) DeleteOpenIO(referenceId string) {
-	s.openIOs.Delete(referenceId)
+	io, ok := s.openIOs.LoadAndDelete(referenceId)
+	if ok {
+		s.closedIOs.Store(referenceId, io)
+	}
 }
 
 // func (s *State) DeleteOpenSocket(referenceId string) {
@@ -56,11 +66,13 @@ func (s *State) DeleteOpenIO(referenceId string) {
 // }
 
 func (s *State) DeleteOpenConsole(referenceId string) {
-	s.openConsoles.Delete(referenceId)
+	console, ok := s.openConsoles.LoadAndDelete(referenceId)
+	if ok {
+		s.closedConsoles.Store(referenceId, console)
+	}
 }
 
 func (s *State) StoreOpenVsockConnection(port uint32, conn runtime.VsockAllocatedSocket) {
-
 	s.openVsockConnections.Store(port, conn)
 }
 
@@ -69,11 +81,13 @@ func (s *State) GetOpenVsockConnection(port uint32) (runtime.VsockAllocatedSocke
 }
 
 func (s *State) DeleteOpenVsockConnection(port uint32) {
-	s.openVsockConnections.Delete(port)
+	conn, ok := s.openVsockConnections.LoadAndDelete(port)
+	if ok {
+		s.closedVsockConnections.Store(port, conn)
+	}
 }
 
 func (s *State) StoreOpenUnixConnection(path string, conn runtime.UnixAllocatedSocket) {
-
 	s.openUnixConnections.Store(path, conn)
 }
 
@@ -82,5 +96,8 @@ func (s *State) GetOpenUnixConnection(path string) (runtime.UnixAllocatedSocket,
 }
 
 func (s *State) DeleteOpenUnixConnection(path string) {
-	s.openUnixConnections.Delete(path)
+	conn, ok := s.openUnixConnections.LoadAndDelete(path)
+	if ok {
+		s.closedUnixConnections.Store(path, conn)
+	}
 }

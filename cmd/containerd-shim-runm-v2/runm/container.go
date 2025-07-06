@@ -36,12 +36,13 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/stdio"
 	"github.com/containerd/errdefs"
-	gorunc "github.com/containerd/go-runc"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/walteh/run"
 	"gitlab.com/tozd/go/errors"
+
+	gorunc "github.com/containerd/go-runc"
 
 	"github.com/walteh/runm/cmd/containerd-shim-runm-v2/process"
 	"github.com/walteh/runm/core/runc/runtime"

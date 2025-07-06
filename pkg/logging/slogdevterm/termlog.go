@@ -527,7 +527,7 @@ func (l *TermLogger) Handle(ctx context.Context, r slog.Record) error {
 			if !ok {
 				valStyle = l.styles.Value
 			}
-			l.processAttribute(attr, keyStyle, valStyle, &attrBuilder)
+			l.processAttribute(attr, keyStyle, valStyle, &attrBuilder, &appendageBuilder)
 		}
 
 		// Then process record attributes
@@ -564,7 +564,7 @@ func (l *TermLogger) Handle(ctx context.Context, r slog.Record) error {
 			if !ok {
 				valStyle = l.styles.Value
 			}
-			l.processAttribute(a, keyStyle, valStyle, &attrBuilder)
+			l.processAttribute(a, keyStyle, valStyle, &attrBuilder, &appendageBuilder)
 			return true
 		})
 
@@ -708,7 +708,7 @@ func (l *TermLogger) buildDottedKey(attrKey string) string {
 }
 
 // processAttribute processes a single attribute, handling groups and nested structures
-func (l *TermLogger) processAttribute(a slog.Attr, keyStyle lipgloss.Style, valStyle lipgloss.Style, result *strings.Builder) {
+func (l *TermLogger) processAttribute(a slog.Attr, keyStyle lipgloss.Style, valStyle lipgloss.Style, result *strings.Builder, appendage *strings.Builder) {
 	// Resolve the attribute value
 	a.Value = a.Value.Resolve()
 
@@ -735,7 +735,7 @@ func (l *TermLogger) processAttribute(a slog.Attr, keyStyle lipgloss.Style, valS
 
 		// Process each attribute in the group
 		for _, groupAttr := range groupAttrs {
-			tempLogger.processAttribute(groupAttr, keyStyle, valStyle, result)
+			tempLogger.processAttribute(groupAttr, keyStyle, valStyle, result, appendage)
 		}
 		return
 	}
@@ -743,17 +743,56 @@ func (l *TermLogger) processAttribute(a slog.Attr, keyStyle lipgloss.Style, valS
 	// Create the dotted key for this attribute
 	dottedKey := l.buildDottedKey(a.Key)
 
-	// Render the key-value pair
+	// Render the key
 	key := l.render(keyStyle, dottedKey)
 
 	var valColored string
 
-	// Regular value handling - no special global error storage
+	// Get the string representation of the value
 	val := fmt.Sprint(a.Value)
-	valColored = l.render(valStyle, val)
+
+	// Check if the value has newlines and should be rendered in a box
+	if HasNewlines(val) && l.enableMultilineBoxes {
+		// Add the boxed content to the appendage
+		appendage.WriteString(ValueToBox(val, dottedKey, l.styles, l.renderFunc))
+		appendage.WriteString("\n")
+
+		// Add a placeholder in the main log line
+		valColored = l.render(l.styles.ValueAppendage, "[multiline value below]")
+	} else {
+		// Regular value handling
+		valColored = l.render(valStyle, val)
+	}
 
 	result.WriteString(key)
 	result.WriteByte('=')
 	result.WriteString(valColored)
 	result.WriteByte(' ')
+}
+
+// ValueToBox renders a multiline value in a box with the attribute key as title
+func ValueToBox(value string, keyName string, styles *Styles, render renderFunc) string {
+	// Preserve any existing coloring in the content
+	content := value
+
+	// If the value doesn't have existing styling, apply moderate styling for readability
+	if !strings.Contains(value, "\x1b[") {
+		content = render(lipgloss.NewStyle().Foreground(MessageColor), value)
+	}
+
+	// Create the box style with wrapping and max width like error boxes
+	boxStyle := styles.Error.Container.Copy().
+		BorderForeground(TreeBorderColor).
+		MaxWidth(160). // Same max width as error boxes
+		Width(0)       // Let it size naturally up to max width
+
+	// Create the title header
+	titleStyle := lipgloss.NewStyle().
+		Foreground(styles.Tree.Root.GetForeground()).
+		Bold(true)
+
+	header := titleStyle.Render(keyName)
+	fullContent := header + "\n" + content
+
+	return render(boxStyle, fullContent)
 }

@@ -6,8 +6,9 @@ import (
 	"sync/atomic"
 
 	"github.com/mdlayher/vsock"
-	"github.com/walteh/runm/core/runc/runtime"
 	"gitlab.com/tozd/go/errors"
+
+	"github.com/walteh/runm/core/runc/runtime"
 )
 
 var _ runtime.SocketAllocator = (*GuestVsockSocketAllocator)(nil)

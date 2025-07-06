@@ -13,12 +13,14 @@ import (
 	"strconv"
 	"time"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/opencontainers/runc/libcontainer"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
+
 	"github.com/walteh/runm/test/integration/cmd/runc-test/internal/linux"
-	"golang.org/x/sys/unix"
 )
 
 type notifySocket struct {

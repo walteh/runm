@@ -22,10 +22,9 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sys/unix"
 
-	"github.com/opencontainers/runtime-spec/specs-go"
-
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/mdlayher/vsock"
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"gitlab.com/tozd/go/errors"
 	"google.golang.org/grpc"
 
@@ -232,6 +231,11 @@ func errGroupGoWithLogging(ctx context.Context, name string, egroup *errgroup.Gr
 	egroup.Go(func() (err error) {
 		slog.DebugContext(ctx, "starting goroutine", "name", name)
 		defer func() {
+			if r := recover(); r != nil {
+				slog.ErrorContext(ctx, "panic in goroutine", "name", name, "error", r)
+				debug.PrintStack()
+				err = errors.Errorf("panic in goroutine: %v", r)
+			}
 			if err != nil {
 				slog.DebugContext(ctx, "goroutine finished", "name", name, "error", err)
 			} else {

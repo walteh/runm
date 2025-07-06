@@ -10,16 +10,17 @@ import (
 	"sync/atomic"
 	"time"
 
-	taskv3 "github.com/containerd/containerd/api/runtime/task/v3"
+	"github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/otelttrpc"
 	"github.com/containerd/ttrpc"
-	"github.com/walteh/runm/pkg/logging"
 	"gitlab.com/tozd/go/errors"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	taskv3 "github.com/containerd/containerd/api/runtime/task/v3"
 	cruntime "github.com/containerd/containerd/v2/core/runtime/v2"
-	"github.com/containerd/containerd/v2/pkg/shim"
 	slogctx "github.com/veqryn/slog-context"
+
+	"github.com/walteh/runm/pkg/logging"
 )
 
 var _ taskv3.TTRPCTaskService = &errTaskService{}

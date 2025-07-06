@@ -12,9 +12,10 @@ import (
 	"syscall"
 	"time"
 
-	dapmuxv1 "github.com/walteh/runm/proto/dapmux/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+
+	dapmuxv1 "github.com/walteh/runm/proto/dapmux/v1"
 )
 
 type Client struct {

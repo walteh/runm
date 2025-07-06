@@ -35,9 +35,10 @@ import (
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/stdio"
 	"github.com/containerd/fifo"
-	gorunc "github.com/containerd/go-runc"
 	"github.com/containerd/log"
 	"gitlab.com/tozd/go/errors"
+
+	gorunc "github.com/containerd/go-runc"
 
 	"github.com/walteh/runm/core/runc/runtime"
 )

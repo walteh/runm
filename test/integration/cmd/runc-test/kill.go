@@ -9,9 +9,10 @@ import (
 	"strconv"
 	"strings"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/opencontainers/runc/libcontainer"
 	"github.com/urfave/cli"
-	"golang.org/x/sys/unix"
 )
 
 var killCommand = cli.Command{

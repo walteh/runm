@@ -1,15 +1,13 @@
 package main
 
 import (
-	"net"
-
 	_ "github.com/containerd/containerd/v2/cmd/containerd/builtins"
-	"github.com/sirupsen/logrus"
 
 	"context"
 	"flag"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"os/signal"
 	"strconv"
@@ -17,6 +15,7 @@ import (
 	"syscall"
 
 	"github.com/containerd/log"
+	"github.com/sirupsen/logrus"
 
 	slogctx "github.com/veqryn/slog-context"
 

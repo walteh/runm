@@ -5,8 +5,9 @@ import (
 	"os"
 	"time"
 
-	"gitlab.com/tozd/go/errors"
 	"golang.org/x/sys/unix"
+
+	"gitlab.com/tozd/go/errors"
 )
 
 func setSubreaper() error {

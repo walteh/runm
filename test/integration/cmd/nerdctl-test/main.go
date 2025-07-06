@@ -51,15 +51,14 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/walteh/runm/test/integration/cmd/nerdctl-test/internal"
 	"google.golang.org/grpc"
 
 	ncdefaults "github.com/containerd/nerdctl/v2/pkg/defaults"
 	slogctx "github.com/veqryn/slog-context"
 
-	"github.com/walteh/runm/test/integration/env"
-
 	"github.com/walteh/runm/pkg/grpcerr"
+	"github.com/walteh/runm/test/integration/cmd/nerdctl-test/internal"
+	"github.com/walteh/runm/test/integration/env"
 )
 
 func init() {

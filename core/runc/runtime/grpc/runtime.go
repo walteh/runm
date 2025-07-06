@@ -22,8 +22,8 @@ import (
 
 	"github.com/walteh/runm/core/runc/conversion"
 	"github.com/walteh/runm/core/runc/runtime"
-	runmsocket "github.com/walteh/runm/core/runc/socket"
 
+	runmsocket "github.com/walteh/runm/core/runc/socket"
 	runmv1 "github.com/walteh/runm/proto/v1"
 )
 

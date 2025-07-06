@@ -6,10 +6,9 @@ import (
 	"os"
 
 	"github.com/moby/sys/userns"
+	"github.com/opencontainers/cgroups/systemd"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
-
-	"github.com/opencontainers/cgroups/systemd"
 )
 
 func shouldUseRootlessCgroupManager(context *cli.Context) (bool, error) {
