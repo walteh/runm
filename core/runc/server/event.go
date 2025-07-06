@@ -21,21 +21,21 @@ var _ runmv1.EventServiceServer = (*Server)(nil)
 
 func (s *Server) SubscribeToReaperExits(_ *emptypb.Empty, srv grpc.ServerStreamingServer[runmv1.ReaperExit]) error {
 
-	// if s.customExitChan != nil {
-	// 	go func() {
-	// 		for exit := range s.customExitChan {
-	// 			go func() {
-	// 				payload := &runmv1.ReaperExit{}
-	// 				payload.SetStatus(int32(exit.Status))
-	// 				payload.SetPid(int32(exit.Pid))
-	// 				payload.SetTimestamp(timestamppb.New(exit.Timestamp))
-	// 				if err := srv.Send(payload); err != nil {
-	// 					slog.ErrorContext(srv.Context(), "failed to send reaper exit", "error", err)
-	// 				}
-	// 			}()
-	// 		}
-	// 	}()
-	// }
+	if s.customExitChan != nil {
+		go func() {
+			for exit := range s.customExitChan {
+				go func() {
+					payload := &runmv1.ReaperExit{}
+					payload.SetStatus(int32(exit.Status))
+					payload.SetPid(int32(exit.Pid))
+					payload.SetTimestamp(timestamppb.New(exit.Timestamp))
+					if err := srv.Send(payload); err != nil {
+						slog.ErrorContext(srv.Context(), "failed to send reaper exit", "error", err)
+					}
+				}()
+			}
+		}()
+	}
 
 	slog.InfoContext(srv.Context(), "subscribing to reaper exits")
 

@@ -138,7 +138,7 @@ func (r *runmLinuxInit) runPsnotify(ctx context.Context, exitChan chan gorunc.Ex
 			// }
 
 			if !exists {
-				slog.InfoContext(ctx, fmt.Sprintf("PSNOTIFY:FORK[%d]", child), "info", info)
+				slog.DebugContext(ctx, fmt.Sprintf("PSNOTIFY:FORK[%d]", child), "info", info)
 			}
 
 			// slog.DebugContext(ctx, "PSNOTIFY[FORK]", "parent", parent, "child", child, "parent_argc", parentArgc, "child_argc", info.argc)
@@ -182,7 +182,7 @@ func (r *runmLinuxInit) runPsnotify(ctx context.Context, exitChan chan gorunc.Ex
 					}
 				}
 
-				slog.Log(ctx, slog.LevelDebug, fmt.Sprintf("PSNOTIFY:REAP[%d]", pid), "info", grp)
+				slog.DebugContext(ctx, fmt.Sprintf("PSNOTIFY:REAP[%d]", pid), "info", grp)
 
 				exitChan <- gorunc.Exit{
 					Pid:       pid,

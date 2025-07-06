@@ -7,10 +7,10 @@ import (
 	"log/slog"
 )
 
-type OptLoggerOptsSetter func(o *LoggerOpts)
+type LoggerOpt func(o *LoggerOpts)
 
-func NewLoggerOpts(
-	options ...OptLoggerOptsSetter,
+func newLoggerOpts(
+	options ...LoggerOpt,
 ) LoggerOpts {
 	var o LoggerOpts
 
@@ -22,67 +22,92 @@ func NewLoggerOpts(
 	return o
 }
 
-func WithHandlerOptions(opt *slog.HandlerOptions) OptLoggerOptsSetter {
+func WithHandlerOptions(opt *slog.HandlerOptions) LoggerOpt {
 	return func(o *LoggerOpts) { o.handlerOptions = opt }
 }
 
-func WithFallbackWriter(opt io.Writer) OptLoggerOptsSetter {
+func WithFallbackWriter(opt io.Writer) LoggerOpt {
 	return func(o *LoggerOpts) { o.fallbackWriter = opt }
 }
 
-func WithProcessName(opt string) OptLoggerOptsSetter {
+func WithProcessName(opt string) LoggerOpt {
 	return func(o *LoggerOpts) { o.processName = opt }
 }
 
-func WithReplacers(opt []SlogReplacer) OptLoggerOptsSetter {
-	return func(o *LoggerOpts) { o.replacers = opt }
+func WithReplacers(opt ...SlogReplacer) LoggerOpt {
+	return func(o *LoggerOpts) { o.replacers = append(o.replacers, opt...) }
 }
 
-func WithHandlers(opt []slog.Handler) OptLoggerOptsSetter {
-	return func(o *LoggerOpts) { o.handlers = opt }
+func WithHandlers(opt ...slog.Handler) LoggerOpt {
+	return func(o *LoggerOpts) { o.handlers = append(o.handlers, opt...) }
 }
 
-func WithMakeDefaultLogger(opt bool) OptLoggerOptsSetter {
+func WithMakeDefaultLogger(opt bool) LoggerOpt {
 	return func(o *LoggerOpts) { o.makeDefaultLogger = opt }
 }
 
-func WithInterceptLogrus(opt bool) OptLoggerOptsSetter {
+func WithInterceptLogrus(opt bool) LoggerOpt {
 	return func(o *LoggerOpts) { o.interceptLogrus = opt }
 }
 
-func WithRawWriter(opt io.Writer) OptLoggerOptsSetter {
+func WithRawWriter(opt io.Writer) LoggerOpt {
 	return func(o *LoggerOpts) { o.rawWriter = opt }
 }
 
-// delimitedLogWriter io.Writer
-func WithEnableDelimiter(opt bool) OptLoggerOptsSetter {
+func WithEnableDelimiter(opt bool) LoggerOpt {
 	return func(o *LoggerOpts) { o.enableDelimiter = opt }
 }
 
-func WithDelimiter(opt rune) OptLoggerOptsSetter {
+func WithDelimiter(opt rune) LoggerOpt {
 	return func(o *LoggerOpts) { o.delimiter = opt }
 }
 
-func WithInterceptHclog(opt bool) OptLoggerOptsSetter {
+func WithInterceptHclog(opt bool) LoggerOpt {
 	return func(o *LoggerOpts) { o.interceptHclog = opt }
 }
 
-func WithValues(opt []slog.Attr) OptLoggerOptsSetter {
-	return func(o *LoggerOpts) { o.values = opt }
+func WithValues(opt ...slog.Attr) LoggerOpt {
+	return func(o *LoggerOpts) { o.values = append(o.values, opt...) }
 }
 
-func WithGlobalLogWriter(opt io.Writer) OptLoggerOptsSetter {
+func WithGlobalLogWriter(opt io.Writer) LoggerOpt {
 	return func(o *LoggerOpts) { o.globalLogWriter = opt }
 }
 
-func WithOtlpInstances(opt *OTelInstances) OptLoggerOptsSetter {
+func WithOtlpInstances(opt *OTelInstances) LoggerOpt {
 	return func(o *LoggerOpts) { o.otlpInstances = opt }
-}
-
-func WithDelayedHandlerCreatorOpts(opt []OptLoggerOptsSetter) OptLoggerOptsSetter {
-	return func(o *LoggerOpts) { o.delayedHandlerCreatorOpts = opt }
 }
 
 func (o *LoggerOpts) Validate() error {
 	return nil
 }
+
+// Public getter methods for private fields
+
+func (o LoggerOpts) HandlerOptions() *slog.HandlerOptions { return o.handlerOptions }
+
+func (o LoggerOpts) FallbackWriter() io.Writer { return o.fallbackWriter }
+
+func (o LoggerOpts) ProcessName() string { return o.processName }
+
+func (o LoggerOpts) Replacers() []SlogReplacer { return o.replacers }
+
+func (o LoggerOpts) Handlers() []slog.Handler { return o.handlers }
+
+func (o LoggerOpts) MakeDefaultLogger() bool { return o.makeDefaultLogger }
+
+func (o LoggerOpts) InterceptLogrus() bool { return o.interceptLogrus }
+
+func (o LoggerOpts) RawWriter() io.Writer { return o.rawWriter }
+
+func (o LoggerOpts) EnableDelimiter() bool { return o.enableDelimiter }
+
+func (o LoggerOpts) Delimiter() rune { return o.delimiter }
+
+func (o LoggerOpts) InterceptHclog() bool { return o.interceptHclog }
+
+func (o LoggerOpts) Values() []slog.Attr { return o.values }
+
+func (o LoggerOpts) GlobalLogWriter() io.Writer { return o.globalLogWriter }
+
+func (o LoggerOpts) OtlpInstances() *OTelInstances { return o.otlpInstances }

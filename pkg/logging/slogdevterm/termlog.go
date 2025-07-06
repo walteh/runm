@@ -707,6 +707,118 @@ func (l *TermLogger) buildDottedKey(attrKey string) string {
 	return groupPrefix + "." + attrKey
 }
 
+// isSimpleMap checks if a value is a simple map that should be flattened
+func (l *TermLogger) isSimpleMap(v interface{}) bool {
+	if v == nil {
+		return false
+	}
+
+	val := reflect.ValueOf(v)
+
+	// Dereference pointers
+	for val.Kind() == reflect.Ptr {
+		if val.IsNil() {
+			return false
+		}
+		val = val.Elem()
+	}
+
+	// Check if it's a map with string keys and simple values
+	if val.Kind() == reflect.Map {
+		keyType := val.Type().Key()
+		valueType := val.Type().Elem()
+
+		// Only handle maps with string keys
+		if keyType.Kind() != reflect.String {
+			return false
+		}
+
+		// Check if all values are simple types (string, numbers, bool)
+		switch valueType.Kind() {
+		case reflect.String, reflect.Bool,
+			reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+			reflect.Float32, reflect.Float64:
+			return true
+		case reflect.Interface:
+			// For interface{} values, we need to check each value individually
+			// We'll be conservative and allow it, checking in processMapAttribute
+			return true
+		}
+	}
+
+	return false
+}
+
+// processMapAttribute processes a map by flattening it into dotted notation
+func (l *TermLogger) processMapAttribute(a slog.Attr, keyStyle lipgloss.Style, valStyle lipgloss.Style, result *strings.Builder, appendage *strings.Builder) {
+	val := reflect.ValueOf(a.Value.Any())
+
+	// Dereference pointers
+	for val.Kind() == reflect.Ptr {
+		if val.IsNil() {
+			return
+		}
+		val = val.Elem()
+	}
+
+	if val.Kind() != reflect.Map {
+		return
+	}
+
+	// Create a temporary logger with the extended group path
+	tempLogger := *l
+	if a.Key != "" {
+		// Add this map key to the group stack
+		tempLogger.groups = make([]string, len(l.groups)+1)
+		copy(tempLogger.groups, l.groups)
+		tempLogger.groups[len(l.groups)] = a.Key
+	}
+
+	// Process each key-value pair in the map
+	for _, key := range val.MapKeys() {
+		mapValue := val.MapIndex(key)
+		keyStr := key.String()
+
+		// Check if the value is a simple type
+		if l.isSimpleValue(mapValue.Interface()) {
+			// Create an attribute for this key-value pair
+			attr := slog.Attr{
+				Key:   keyStr,
+				Value: slog.AnyValue(mapValue.Interface()),
+			}
+			tempLogger.processAttribute(attr, keyStyle, valStyle, result, appendage)
+		}
+	}
+}
+
+// isSimpleValue checks if a value is a simple type that can be displayed inline
+func (l *TermLogger) isSimpleValue(v interface{}) bool {
+	if v == nil {
+		return true
+	}
+
+	val := reflect.ValueOf(v)
+
+	// Dereference pointers
+	for val.Kind() == reflect.Ptr {
+		if val.IsNil() {
+			return true
+		}
+		val = val.Elem()
+	}
+
+	switch val.Kind() {
+	case reflect.String, reflect.Bool,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64:
+		return true
+	}
+
+	return false
+}
+
 // processAttribute processes a single attribute, handling groups and nested structures
 func (l *TermLogger) processAttribute(a slog.Attr, keyStyle lipgloss.Style, valStyle lipgloss.Style, result *strings.Builder, appendage *strings.Builder) {
 	// Resolve the attribute value
@@ -737,6 +849,12 @@ func (l *TermLogger) processAttribute(a slog.Attr, keyStyle lipgloss.Style, valS
 		for _, groupAttr := range groupAttrs {
 			tempLogger.processAttribute(groupAttr, keyStyle, valStyle, result, appendage)
 		}
+		return
+	}
+
+	// Handle map attributes by flattening them into dotted notation
+	if l.isSimpleMap(a.Value.Any()) {
+		l.processMapAttribute(a, keyStyle, valStyle, result, appendage)
 		return
 	}
 

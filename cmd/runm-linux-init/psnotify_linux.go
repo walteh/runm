@@ -35,7 +35,7 @@ func pidfdWait(pidfd int) error {
 	_, err := unix.Poll(pfd, -1)
 
 	if err != nil {
-		return errors.Errorf("failed to poll for process: %w", err)
+		return errors.Errorf("failed to poll for process id '%d': %w", pidfd, err)
 	}
 
 	// var info unix.Siginfo

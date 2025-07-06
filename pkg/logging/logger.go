@@ -37,20 +37,19 @@ type LoggerOpts struct {
 	makeDefaultLogger bool
 	interceptLogrus   bool
 	rawWriter         io.Writer
-	// delimitedLogWriter io.Writer
-	enableDelimiter bool
-	delimiter       rune
-	interceptHclog  bool
-	values          []slog.Attr
-	globalLogWriter io.Writer
-	otlpInstances   *OTelInstances
+	enableDelimiter   bool
+	delimiter         rune
+	interceptHclog    bool
+	values            []slog.Attr
+	globalLogWriter   io.Writer
+	otlpInstances     *OTelInstances
 
-	delayedHandlerCreatorOpts []OptLoggerOptsSetter `opts:"-"`
+	delayedHandlerCreatorOpts []LoggerOpt `option:"-"`
 }
 
-func NewDefaultDevLogger(name string, writer io.Writer, opts ...OptLoggerOptsSetter) *slog.Logger {
+func NewDefaultDevLogger(name string, writer io.Writer, opts ...LoggerOpt) *slog.Logger {
 
-	defaults := []OptLoggerOptsSetter{
+	defaults := []LoggerOpt{
 		WithDevTermHanlder(writer),
 		WithProcessName(name),
 		WithGlobalRedactor(),
@@ -68,13 +67,13 @@ func NewDefaultDevLogger(name string, writer io.Writer, opts ...OptLoggerOptsSet
 	return NewLogger(opts...)
 }
 
-func NewDefaultDevLoggerWithDelimiter(name string, writer io.Writer, delimiter rune, opts ...OptLoggerOptsSetter) *slog.Logger {
+func NewDefaultDevLoggerWithDelimiter(name string, writer io.Writer, delimiter rune, opts ...LoggerOpt) *slog.Logger {
 	opts = append(opts, WithDelimiter(delimiter), WithEnableDelimiter(true))
 	return NewDefaultDevLogger(name, writer, opts...)
 }
 
-func NewDefaultDevLoggerWithOtel(ctx context.Context, name string, rawLogWriter io.Writer, instances *OTelInstances, opts ...OptLoggerOptsSetter) *slog.Logger {
-	defaults := []OptLoggerOptsSetter{
+func NewDefaultDevLoggerWithOtel(ctx context.Context, name string, rawLogWriter io.Writer, instances *OTelInstances, opts ...LoggerOpt) *slog.Logger {
+	defaults := []LoggerOpt{
 		WithDevTermHanlder(rawLogWriter),
 		WithProcessName(name),
 		WithGlobalRedactor(),
@@ -94,8 +93,8 @@ func NewDefaultDevLoggerWithOtel(ctx context.Context, name string, rawLogWriter 
 	return NewLogger(opts...)
 }
 
-func NewDefaultJSONLogger(name string, writer io.Writer, opts ...OptLoggerOptsSetter) *slog.Logger {
-	defaults := []OptLoggerOptsSetter{
+func NewDefaultJSONLogger(name string, writer io.Writer, opts ...LoggerOpt) *slog.Logger {
+	defaults := []LoggerOpt{
 		WithProcessName(name),
 		WithGlobalRedactor(),
 		WithErrorStackTracer(),
@@ -113,8 +112,8 @@ func NewDefaultJSONLogger(name string, writer io.Writer, opts ...OptLoggerOptsSe
 	return NewLogger(opts...)
 }
 
-func NewLogger(opts ...OptLoggerOptsSetter) *slog.Logger {
-	copts := NewLoggerOpts(opts...)
+func NewLogger(opts ...LoggerOpt) *slog.Logger {
+	copts := newLoggerOpts(opts...)
 
 	if copts.handlerOptions == nil {
 		copts.handlerOptions = &slog.HandlerOptions{
@@ -219,13 +218,13 @@ func NewLogger(opts ...OptLoggerOptsSetter) *slog.Logger {
 	return l
 }
 
-func WithValue(v slog.Attr) OptLoggerOptsSetter {
+func WithValue(v slog.Attr) LoggerOpt {
 	return func(o *LoggerOpts) {
 		o.values = append(o.values, v)
 	}
 }
 
-func WithDevTermHanlder(writer io.Writer) OptLoggerOptsSetter {
+func WithDevTermHanlder(writer io.Writer) LoggerOpt {
 	return func(o *LoggerOpts) {
 		o.delayedHandlerCreatorOpts = append(o.delayedHandlerCreatorOpts, func(o *LoggerOpts) {
 
@@ -248,7 +247,7 @@ func WithDevTermHanlder(writer io.Writer) OptLoggerOptsSetter {
 	}
 }
 
-func WithOtelHandler() OptLoggerOptsSetter {
+func WithOtelHandler() LoggerOpt {
 	return func(o *LoggerOpts) {
 		o.delayedHandlerCreatorOpts = append(o.delayedHandlerCreatorOpts, func(o *LoggerOpts) {
 			if o.otlpInstances == nil {
@@ -263,7 +262,7 @@ func WithOtelHandler() OptLoggerOptsSetter {
 	}
 }
 
-func WithJSONHandler(writer io.Writer) OptLoggerOptsSetter {
+func WithJSONHandler(writer io.Writer) LoggerOpt {
 	return func(o *LoggerOpts) {
 		o.delayedHandlerCreatorOpts = append(o.delayedHandlerCreatorOpts, func(o *LoggerOpts) {
 			o.handlers = append(o.handlers, slog.NewJSONHandler(writer, o.handlerOptions))
@@ -271,7 +270,7 @@ func WithJSONHandler(writer io.Writer) OptLoggerOptsSetter {
 	}
 }
 
-func WithFileHandler(filename string) OptLoggerOptsSetter {
+func WithFileHandler(filename string) LoggerOpt {
 	return func(o *LoggerOpts) {
 		o.delayedHandlerCreatorOpts = append(o.delayedHandlerCreatorOpts, func(o *LoggerOpts) {
 			o.handlers = append(o.handlers, slog.NewJSONHandler(&lumberjack.Logger{
@@ -285,7 +284,7 @@ func WithFileHandler(filename string) OptLoggerOptsSetter {
 	}
 }
 
-func WithDiscardHandler() OptLoggerOptsSetter {
+func WithDiscardHandler() LoggerOpt {
 	return func(o *LoggerOpts) {
 		o.delayedHandlerCreatorOpts = append(o.delayedHandlerCreatorOpts, func(o *LoggerOpts) {
 			o.handlers = append(o.handlers, slog.NewTextHandler(io.Discard, o.handlerOptions))
@@ -293,13 +292,13 @@ func WithDiscardHandler() OptLoggerOptsSetter {
 	}
 }
 
-func WithGlobalRedactor() OptLoggerOptsSetter {
+func WithGlobalRedactor() LoggerOpt {
 	return func(o *LoggerOpts) {
 		o.replacers = append(o.replacers, SlogReplacerFunc(Redact))
 	}
 }
 
-func WithErrorStackTracer() OptLoggerOptsSetter {
+func WithErrorStackTracer() LoggerOpt {
 	return func(o *LoggerOpts) {
 		o.replacers = append(o.replacers, SlogReplacerFunc(formatErrorStacks))
 	}

@@ -2,6 +2,7 @@ package task
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"path/filepath"
 	"runtime"
@@ -21,6 +22,7 @@ import (
 	slogctx "github.com/veqryn/slog-context"
 
 	"github.com/walteh/runm/pkg/logging"
+	"github.com/walteh/runm/pkg/ticker"
 )
 
 var _ taskv3.TTRPCTaskService = &errTaskService{}
@@ -99,6 +101,16 @@ func wrap[I, O any](e *errTaskService, f func(context.Context, I) (O, error)) fu
 		}()
 
 		ctx = slogctx.Append(ctx, slog.String("ttrpc_method", realName))
+
+		tickd := ticker.NewTicker(
+			ticker.WithInterval(1*time.Second),
+			ticker.WithStartBurst(5),
+			ticker.WithFrequency(60),
+			ticker.WithMessage(fmt.Sprintf("TICK:SHIM:TTRPC:RUNNING[%s]", realName)),
+			ticker.WithDoneMessage(fmt.Sprintf("TICK:SHIM:TTRPC:DONE  :[%s]", realName)),
+		)
+		go tickd.Run(ctx)
+		defer tickd.Stop()
 
 		resp, retErr = f(ctx, req)
 

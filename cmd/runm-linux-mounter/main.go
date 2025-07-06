@@ -69,7 +69,7 @@ func (r *runmLinuxMounter) setupLogger(ctx context.Context) (context.Context, er
 		return nil, errors.Errorf("problem dialing vsock for log proxy: %w", err)
 	}
 
-	opts := []logging.OptLoggerOptsSetter{
+	opts := []logging.LoggerOpt{
 		logging.WithDelimiter(constants.VsockDelimitedLogProxyDelimiter),
 		logging.WithEnableDelimiter(true),
 		logging.WithRawWriter(rawWriterConn),

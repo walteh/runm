@@ -4,6 +4,7 @@ package goruncruntime
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/walteh/runm/pkg/ticker"
 	"gitlab.com/tozd/go/errors"
 
 	gorunc "github.com/containerd/go-runc"
@@ -25,48 +27,93 @@ func tryReadPidFile(ctx context.Context, pidfile string) (int, error) {
 	return strconv.Atoi(string(pid))
 }
 
-func (r *GoRuncRuntime) reaper(ctx context.Context, pidfilechan chan string, pidfile string, name string) error {
-	pidint := -1
-	done := false
-
-	defer func() {
-		done = true
-		slog.InfoContext(ctx, "done runc - "+name, "pid", pidint)
-	}()
+func waitForFileToExistChan(ctx context.Context, pidfile string) chan error {
+	pidfilechan := make(chan error, 1)
 	go func() {
-		ticker := time.NewTicker(time.Second)
-		defer ticker.Stop()
-		for range ticker.C {
-			if done {
+		for {
+			if _, err := os.Stat(pidfile); err == nil {
+				pidfilechan <- nil
 				return
+			} else {
+				if errors.Is(err, os.ErrNotExist) {
+					time.Sleep(100 * time.Millisecond)
+					continue
+				}
+				pidfilechan <- err
 			}
-			slog.InfoContext(ctx, "still running runc - "+name, "pid", pidint)
 		}
 	}()
+	return pidfilechan
+}
 
-	pidint, err := tryReadPidFile(ctx, pidfile)
+func (r *GoRuncRuntime) reaperLoggingError(ctx context.Context, parentDoneChan chan string, pidfile string, name string, pidchan chan int) {
+	errchan := make(chan error, 1)
+	defer close(errchan)
+	go func() {
+		errchan <- r.reaper(ctx, parentDoneChan, pidfile, name, pidchan)
+	}()
+	err := <-errchan
 	if err != nil {
+		slog.ErrorContext(ctx, "reaper error", "name", name, "pidfile", pidfile, "error", err)
+	}
+}
 
-		slog.DebugContext(ctx, "pid file not ready yet, waiting...", "path", pidfile)
+func (r *GoRuncRuntime) reaper(ctx context.Context, parentDoneChan chan string, pidfile string, name string, pidchan chan int) error {
+	pidint := -1
 
-		<-pidfilechan
+	slog.InfoContext(ctx, "starting reaper", "name", name, "pidfile", pidfile)
 
-		slog.InfoContext(ctx, "pid file ready", "path", pidfile)
+	tickd := ticker.NewTicker(
+		ticker.WithInterval(1*time.Second),
+		ticker.WithStartBurst(5),
+		ticker.WithFrequency(60),
+		ticker.WithMessage(fmt.Sprintf("TICK:START:REAPER[%s]", name)),
+		ticker.WithDoneMessage(fmt.Sprintf("TICK:END  :REAPER[%s]", name)),
+		ticker.WithAttrFunc(func() []slog.Attr {
+			return []slog.Attr{
+				slog.Int("current_pid", pidint),
+			}
+		}),
+	)
 
-		fle, err := os.Open(pidfile)
+	var err error
+
+	go tickd.Run(ctx)
+	defer tickd.Stop()
+	// this hacky logic probably broke the exit status code carryover with go tool task dev:2025-07-02:01
+	if pidchan != nil {
+		pidint = <-pidchan
+	} else {
+		pidint, err = tryReadPidFile(ctx, pidfile)
 		if err != nil {
-			return errors.Errorf("failed to open pid file: %w", err)
-		}
-		defer fle.Close()
+			slog.DebugContext(ctx, "failed to read pid file, waiting for it to be created", "path", pidfile, "error", err)
 
-		pid, err := io.ReadAll(fle)
-		if err != nil {
-			return errors.Errorf("failed to read pid file: %w", err)
-		}
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case err := <-waitForFileToExistChan(ctx, pidfile):
+				if err != nil {
+					return errors.Errorf("failed to wait for pid file to exist: %w", err)
+				}
+			}
 
-		pidint, err = strconv.Atoi(string(pid))
-		if err != nil {
-			return errors.Errorf("failed to convert pid to int: %w", err)
+			slog.DebugContext(ctx, "pid file ready, reading it", "path", pidfile)
+
+			fle, err := os.Open(pidfile)
+			if err != nil {
+				return errors.Errorf("failed to open pid file: %w", err)
+			}
+			defer fle.Close()
+
+			pid, err := io.ReadAll(fle)
+			if err != nil {
+				return errors.Errorf("failed to read pid file: %w", err)
+			}
+
+			pidint, err = strconv.Atoi(string(pid))
+			if err != nil {
+				return errors.Errorf("failed to convert pid to int: %w", err)
+			}
 		}
 	}
 
@@ -75,9 +122,15 @@ func (r *GoRuncRuntime) reaper(ctx context.Context, pidfilechan chan string, pid
 		return errors.Errorf("failed to find process: %w", err)
 	}
 	slog.InfoContext(ctx, "found process", "pid", pidint)
+
 	waiter, err := sys.Wait()
 	if err != nil {
-		return errors.Errorf("failed to wait on pid: %w", err)
+		if errors.Is(err, syscall.ECHILD) {
+			slog.InfoContext(ctx, "process already exited", "name", name, "pidfile", pidfile, "pid", pidint)
+			return nil // TODO:this makes this reaper non-functional
+		} else {
+			return errors.Errorf("failed to wait on pid: %w", err)
+		}
 	}
 	slog.InfoContext(ctx, "waiter done", "waiter", waiter)
 
@@ -88,6 +141,12 @@ func (r *GoRuncRuntime) reaper(ctx context.Context, pidfilechan chan string, pid
 			Status:    int(waiter.Sys().(syscall.WaitStatus).ExitStatus()),
 		}
 	}()
+
+	slog.InfoContext(ctx, "reaper waiting for parent to exit", "name", name, "pidfile", pidfile, "pid", pidint)
+
+	<-parentDoneChan
+
+	slog.InfoContext(ctx, "reaper parent exited, waiting for process to exit", "name", name, "pidfile", pidfile, "pid", pidint)
 
 	return nil
 }
@@ -111,7 +170,7 @@ func (r *GoRuncRuntime) Create(ctx context.Context, id, bundle string, options *
 
 	reaperChan := make(chan string, 1)
 	defer close(reaperChan)
-	go r.reaper(ctx, reaperChan, options.PidFile, "create")
+	go r.reaperLoggingError(ctx, reaperChan, options.PidFile, "create", nil)
 
 	options.NoNewKeyring = true
 
@@ -137,7 +196,9 @@ func (r *GoRuncRuntime) Delete(ctx context.Context, id string, opts *gorunc.Dele
 func (r *GoRuncRuntime) Exec(ctx context.Context, id string, spec specs.Process, opts *gorunc.ExecOpts) error {
 	reaperChan := make(chan string, 1)
 	defer close(reaperChan)
-	go r.reaper(ctx, reaperChan, opts.PidFile, "exec")
+	pidchan := make(chan int, 1)
+	opts.Started = pidchan
+	go r.reaperLoggingError(ctx, reaperChan, opts.PidFile, "exec", pidchan)
 	return WrapWithRuntimeError(ctx, r, func() error {
 		return r.internal.Exec(ctx, id, spec, opts)
 	})

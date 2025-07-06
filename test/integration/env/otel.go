@@ -19,7 +19,7 @@ func SetupOtelForNerdctl(ctx context.Context) (*slog.Logger, func() error, error
 
 func SetupLogForwardingToContainerd(ctx context.Context, shimName string) (*slog.Logger, func() error, error) {
 
-	opts := []logging.OptLoggerOptsSetter{
+	opts := []logging.LoggerOpt{
 		logging.WithDelimiter(constants.VsockDelimitedLogProxyDelimiter),
 		logging.WithEnableDelimiter(true),
 	}

@@ -108,7 +108,7 @@ tasks:
         vars:
             OPTION_GEN_DATA:
                 sh: |-
-                    go tool findcodetag . --tag=//go:opts --type=struct
+                    go tool findcodetag --tag=//go:opts --type=struct .
             OPTION_GEN_SOURCE_FILES:
                 sh: |-
                     grep -rl "//go:opts" --include="*.go" . || true
@@ -121,14 +121,22 @@ tasks:
             cmd: |-
                 set -e
                 if [ -z "{{.OPTION_GEN_DATA}}" ]; then echo "no options to generate"; exit 0; fi
+                STRUCT_NAME="{{ splitList " " .ITEM | last }}"
+                if [[ ! "$STRUCT_NAME" == *"Opts" ]]; then
+                  echo "Error: Struct '$STRUCT_NAME' must have 'Opts' suffix for options generation"
+                  exit 1
+                fi
                 {{.GO_COMMAND}} tool github.com/kazhuravlev/options-gen/cmd/options-gen \
                   -out-filename={{splitList " " .ITEM | first}}/{{ splitList " " .ITEM | last | lower | trimSuffix "opts" }}_opts.gen.go \
                   -filename={{ splitList " " .ITEM | rest | first }} \
                   -from-struct={{ splitList " " .ITEM | last }} \
+                  -out-setter-name={{ splitList " " .ITEM | last | trimSuffix "Opts" }}Opt \
+                  -constructor=private \
+                  -all-variadic \
+                  -public-getters \
                   -pkg={{ splitList " " .ITEM | first | splitList "/" | last }}
           - for: {var: OPTION_GEN_DATA, split: "\n"}
             cmd: |-
-                go tool golangci-lint run --enable-only goimports --fix {{ splitList " " .ITEM | first }}/{{ splitList " " .ITEM | last | lower | trimSuffix "opts" }}_opts.gen.go
                 gofmt -w {{ splitList " " .ITEM | first }}/{{ splitList " " .ITEM | last | lower | trimSuffix "opts" }}_opts.gen.go
 
     gen:mockery:
@@ -231,9 +239,9 @@ tasks:
         desc: builds the nerdctl test
         run: once
         sources:
-          - ./test/integration/**/*.go
-          - ./../nerdctl/**/*.go
-          - ./pkg/**/*.go
+          - test/integration/**
+          - ../nerdctl/**
+          - pkg/**
         generates:
           - '{{.TEST_BIN_DIR}}/nerdctl-test'
         cmds:
@@ -295,8 +303,8 @@ tasks:
         run: once
         sources:
           - "**/*.go"
-          - "../containerd/**/*.go"
-          - "../go-runc/**/*.go"
+          - ../containerd/**
+          - ../go-runc/**
         generates:
           - '{{.TEST_BIN_DIR}}/runm-linux-init'
         cmds:
@@ -629,8 +637,18 @@ tasks:
 
     claude:
         desc: runs the claude agent
+        vars:
+            CLI_ARGS:
+                sh: echo "{{.CLI_ARGS | default ""}}"
+
         cmds:
-          - cmd: bunx --bun @anthropic-ai/claude-code
+          - cmd: bun install -g @anthropic-ai/claude-code
+          - cmd: ~/.bun/bin/claude {{.CLI_ARGS}}
+
+    claude:callback:check-for-go-build-errors:
+        desc: checks for go build errors
+        cmds:
+          - task: test:binaries
 
     setup:
         desc: sets up the environment

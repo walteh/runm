@@ -4,6 +4,7 @@ package main
 
 import (
 	_ "embed"
+
 	_ "github.com/opencontainers/cgroups/devices"
 
 	"errors"
@@ -171,7 +172,7 @@ func main() {
 			return err
 		}
 
-		opts := []logging.OptLoggerOptsSetter{
+		opts := []logging.LoggerOpt{
 			logging.WithDelimiter(constants.VsockDelimitedLogProxyDelimiter),
 			logging.WithEnableDelimiter(true),
 			logging.WithInterceptLogrus(false),
@@ -179,11 +180,11 @@ func main() {
 
 		loggerName := fmt.Sprintf("runc[%s]", context.Args().First())
 
-		opts = append(opts, logging.WithValues([]slog.Attr{
+		opts = append(opts, logging.WithValues(
 			slog.String("run_id", fmt.Sprintf("%d", runId)),
 			slog.String("ppid", fmt.Sprintf("%d", os.Getppid())),
 			slog.String("pid", fmt.Sprintf("%d", os.Getpid())),
-		}))
+		))
 
 		rawConn, err := vsock.Dial(2, uint32(constants.VsockRawWriterProxyPort), nil)
 		if err != nil {

@@ -83,10 +83,10 @@ func processFile(filePath string, config Config) error {
 	for i, line := range lines {
 		if strings.Contains(line, config.tag) {
 			// Find the next type declaration
-			interfaceName := findNextTypeDeclaration(lines, i+1)
-			if interfaceName != "" {
+			typeName, typeType := findNextTypeDeclaration(lines, i+1)
+			if typeName != "" {
 				// Apply type filter if specified
-				if config.typeFilter != "" && !strings.Contains(interfaceName, config.typeFilter) {
+				if config.typeFilter != "" && !strings.Contains(typeType, config.typeFilter) {
 					continue
 				}
 
@@ -100,7 +100,7 @@ func processFile(filePath string, config Config) error {
 				if dir == "" {
 					dir = "."
 				}
-				fmt.Printf("%s %s %s\n", dir, filePath, interfaceName)
+				fmt.Printf("%s %s %s\n", dir, filePath, typeName)
 			}
 		}
 	}
@@ -108,7 +108,7 @@ func processFile(filePath string, config Config) error {
 	return nil
 }
 
-func findNextTypeDeclaration(lines []string, startIndex int) string {
+func findNextTypeDeclaration(lines []string, startIndex int) (string, string) {
 	for i := startIndex; i < len(lines); i++ {
 		line := strings.TrimSpace(lines[i])
 
@@ -130,12 +130,12 @@ func findNextTypeDeclaration(lines []string, startIndex int) string {
 			if idx := strings.Index(name, "["); idx != -1 {
 				name = name[:idx]
 			}
-			return name
+			return name, fields[2]
 		}
 
 		// If we hit a non-comment, non-empty line that's not a type declaration, stop
 		break
 	}
 
-	return ""
+	return "", ""
 }

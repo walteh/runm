@@ -138,3 +138,94 @@ func TestMultilineValueBoxes(t *testing.T) {
 		t.Errorf("Expected 'db.host=localhost' for single-line value")
 	}
 }
+
+func TestMapFlattening(t *testing.T) {
+	var buf bytes.Buffer
+
+	// Create a logger with minimal styling for easier testing
+	handler := NewTermLogger(&buf, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}, WithStyles(EmptyStyles()))
+
+	logger := slog.New(handler)
+
+	// Test simple map flattening
+	summary := map[string]int{
+		"closedConsoles":         0,
+		"closedIOs":              0,
+		"closedUnixConnections":  0,
+		"closedVsockConnections": 0,
+		"openConsoles":           1,
+		"openIOs":                1,
+		"openUnixConnections":    0,
+		"openVsockConnections":   3,
+	}
+
+	logger.Info("test message", slog.Any("summary", summary))
+
+	output := buf.String()
+	t.Logf("Map flattening output: %s", output)
+
+	// Check that individual map entries are flattened with dotted notation
+	expectedKeys := []string{
+		"summary.closedConsoles=0",
+		"summary.closedIOs=0",
+		"summary.closedUnixConnections=0",
+		"summary.closedVsockConnections=0",
+		"summary.openConsoles=1",
+		"summary.openIOs=1",
+		"summary.openUnixConnections=0",
+		"summary.openVsockConnections=3",
+	}
+
+	for _, expected := range expectedKeys {
+		if !strings.Contains(output, expected) {
+			t.Errorf("Expected '%s' in flattened map output, got: %s", expected, output)
+		}
+	}
+
+	// Check that the original map format is NOT present
+	if strings.Contains(output, "map[") {
+		t.Errorf("Expected flattened format, but found original map format in: %s", output)
+	}
+
+	// Test with groups
+	buf.Reset()
+	logger.WithGroup("metrics").Info("system stats", slog.Any("counters", summary))
+
+	output = buf.String()
+	t.Logf("Map flattening with groups output: %s", output)
+
+	// Check nested dotted notation
+	if !strings.Contains(output, "metrics.counters.openConsoles=1") {
+		t.Errorf("Expected 'metrics.counters.openConsoles=1' with nested groups")
+	}
+
+	// Test mixed types map
+	buf.Reset()
+	mixedMap := map[string]interface{}{
+		"name":   "test",
+		"count":  42,
+		"active": true,
+		"ratio":  3.14,
+	}
+
+	logger.Info("mixed map", slog.Any("config", mixedMap))
+
+	output = buf.String()
+	t.Logf("Mixed map output: %s", output)
+
+	// Check mixed types are flattened
+	expectedMixed := []string{
+		"config.name=test",
+		"config.count=42",
+		"config.active=true",
+		"config.ratio=3.14",
+	}
+
+	for _, expected := range expectedMixed {
+		if !strings.Contains(output, expected) {
+			t.Errorf("Expected '%s' in mixed map output, got: %s", expected, output)
+		}
+	}
+}

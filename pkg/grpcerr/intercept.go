@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/walteh/runm/pkg/stackerr"
+	"github.com/walteh/runm/pkg/ticker"
 )
 
 // UnaryServerInterceptor returns a grpc.UnaryServerInterceptor that
@@ -34,6 +35,18 @@ func UnaryServerInterceptor(
 	defer func() {
 		slog.DebugContext(ctx, fmt.Sprintf("%s:SERVER:END  [%s]", service, operation), "service", service, "error", errz, "duration", time.Since(start))
 	}()
+
+	tickd := ticker.NewTicker(
+		ticker.WithInterval(1*time.Second),
+		ticker.WithStartBurst(5),
+		ticker.WithFrequency(60),
+		ticker.WithMessage(fmt.Sprintf("TICK:GRPC-SERVER:RUNNING[%s]", info.FullMethod)),
+		ticker.WithDoneMessage(fmt.Sprintf("TICK:GRPC-SERVER:DONE  :[%s]", info.FullMethod)),
+	)
+
+	go tickd.Run(ctx)
+	defer tickd.Stop()
+
 	resp, errz = handler(ctx, req)
 	if errz == nil {
 		return resp, nil
@@ -86,6 +99,17 @@ func UnaryClientInterceptor(
 	if event == "containerd.services.tasks.v1.Tasks:CLIENT:START[Kill]" {
 		slog.InfoContext(ctx, string(debug.Stack()))
 	}
+
+	tickd := ticker.NewTicker(
+		ticker.WithInterval(1*time.Second),
+		ticker.WithStartBurst(5),
+		ticker.WithFrequency(60),
+		ticker.WithMessage(fmt.Sprintf("TICK:GRPC-CLIENT:RUNNING[%s]", method)),
+		ticker.WithDoneMessage(fmt.Sprintf("TICK:GRPC-CLIENT:DONE  :[%s]", method)),
+	)
+
+	go tickd.Run(ctx)
+	defer tickd.Stop()
 
 	errd := invoker(ctx, method, req, reply, cc, opts...)
 	slog.DebugContext(ctx, fmt.Sprintf("%s:CLIENT:END  [%s]", service, operation), "service", service, "error", errd, "duration", time.Since(start))

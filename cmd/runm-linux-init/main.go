@@ -17,7 +17,6 @@ import (
 	"runtime/debug"
 	"strings"
 	"syscall"
-	"time"
 
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sys/unix"
@@ -36,6 +35,7 @@ import (
 	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/pkg/logging"
+	"github.com/walteh/runm/pkg/ticker"
 
 	goruncruntime "github.com/walteh/runm/core/runc/runtime/gorunc"
 	runtimemock "github.com/walteh/runm/gen/mocks/core/runc/runtime"
@@ -92,7 +92,7 @@ func (r *runmLinuxInit) setupLogger(ctx context.Context) (context.Context, error
 		return nil, errors.Errorf("problem dialing vsock for log proxy: %w", err)
 	}
 
-	opts := []logging.OptLoggerOptsSetter{
+	opts := []logging.LoggerOpt{
 		logging.WithDelimiter(constants.VsockDelimitedLogProxyDelimiter),
 		logging.WithEnableDelimiter(true),
 		logging.WithRawWriter(rawWriterConn),
@@ -290,7 +290,8 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 	})
 
 	errGroupGoWithLogging(ctx, "ticker", errgroupz, func() error {
-		return r.runTicker(ctx)
+		ticker := ticker.NewTicker(ticker.WithMessage("still running in rootfs, waiting to be killed"))
+		return ticker.Run(ctx)
 	})
 
 	go func() {
@@ -367,24 +368,6 @@ func (r *runmLinuxInit) runVsockUnixProxy(ctx context.Context, path string, writ
 		}()
 	}
 
-}
-
-func (r *runmLinuxInit) runTicker(ctx context.Context) error {
-	ticker := time.NewTicker(1 * time.Second)
-	ticks := 0
-	defer ticker.Stop()
-
-	for tick := range ticker.C {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		ticks++
-		if ticks < 5 || ticks%60 == 0 {
-			slog.InfoContext(ctx, "still running in rootfs, waiting to be killed", "tick", tick)
-		}
-	}
-
-	return nil
 }
 
 func loadSpec(ctx context.Context) (spec *oci.Spec, exists bool, err error) {
