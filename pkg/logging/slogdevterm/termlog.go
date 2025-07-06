@@ -158,6 +158,9 @@ type TermLogger struct {
 	enableDebugPatternColoring bool                      // Whether to enable debug pattern coloring
 	enableMultilineBoxes       bool                      // Whether to render multiline messages in boxes
 	patternColorCache          map[string]lipgloss.Color // Cache for deterministic colors
+	// Group and attribute tracking for proper slog group handling
+	groups []string    // Stack of group names for dotted notation
+	attrs  []slog.Attr // Preformatted attributes from WithAttrs
 }
 
 // Generate a deterministic neon color from a string
@@ -237,6 +240,8 @@ func NewTermLogger(writer io.Writer, sopts *slog.HandlerOptions, opts ...TermLog
 		enableDebugPatternColoring: false,
 		enableMultilineBoxes:       true, // Enable by default
 		patternColorCache:          make(map[string]lipgloss.Color),
+		groups:                     []string{},
+		attrs:                      []slog.Attr{},
 	}
 	for _, opt := range opts {
 		opt(&l)
@@ -482,61 +487,93 @@ func (l *TermLogger) Handle(ctx context.Context, r slog.Record) error {
 	b.WriteString(msg)
 
 	// 5. Attributes (key=value ...).
-	if r.NumAttrs() > 0 {
+	hasAttrs := len(l.attrs) > 0 || r.NumAttrs() > 0
+	if hasAttrs {
 		b.WriteByte(' ')
+
+		var attrBuilder strings.Builder
+
+		// First process preformatted attributes from WithAttrs
+		for _, attr := range l.attrs {
+			// Check for errors first - they get special handling
+			if (attr.Key == "error" || attr.Key == "err" || attr.Key == "error.payload") && r.Level > slog.LevelWarn {
+				if err, ok := attr.Value.Any().(error); ok {
+					appendageBuilder.WriteString(ErrorToTrace(err, r, l.styles, l.renderFunc, l.hyperlinkFunc))
+					appendageBuilder.WriteString("\n")
+
+					// Add a placeholder in the main log line
+					keyStyle, ok := l.styles.Keys[attr.Key]
+					if !ok {
+						keyStyle = l.styles.Key
+					}
+					dottedKey := l.buildDottedKey(attr.Key)
+					key := l.render(keyStyle, dottedKey)
+					valColored := l.render(l.styles.ValueAppendage, "[error rendered below]")
+
+					attrBuilder.WriteString(key)
+					attrBuilder.WriteByte('=')
+					attrBuilder.WriteString(valColored)
+					attrBuilder.WriteByte(' ')
+					continue
+				}
+			}
+
+			// Regular attribute processing with dotted notation
+			keyStyle, ok := l.styles.Keys[attr.Key]
+			if !ok {
+				keyStyle = l.styles.Key
+			}
+			valStyle, ok := l.styles.Values[attr.Key]
+			if !ok {
+				valStyle = l.styles.Value
+			}
+			l.processAttribute(attr, keyStyle, valStyle, &attrBuilder)
+		}
+
+		// Then process record attributes
 		r.Attrs(func(a slog.Attr) bool {
-			// Key styling (supports per-key overrides).
+			// Check for errors first - they get special handling
+			if (a.Key == "error" || a.Key == "err" || a.Key == "error.payload") && r.Level > slog.LevelWarn {
+				if err, ok := a.Value.Any().(error); ok {
+					appendageBuilder.WriteString(ErrorToTrace(err, r, l.styles, l.renderFunc, l.hyperlinkFunc))
+					appendageBuilder.WriteString("\n")
+
+					// Add a placeholder in the main log line
+					keyStyle, ok := l.styles.Keys[a.Key]
+					if !ok {
+						keyStyle = l.styles.Key
+					}
+					dottedKey := l.buildDottedKey(a.Key)
+					key := l.render(keyStyle, dottedKey)
+					valColored := l.render(l.styles.ValueAppendage, "[error rendered below]")
+
+					attrBuilder.WriteString(key)
+					attrBuilder.WriteByte('=')
+					attrBuilder.WriteString(valColored)
+					attrBuilder.WriteByte(' ')
+					return true
+				}
+			}
+
+			// Regular attribute processing with dotted notation
 			keyStyle, ok := l.styles.Keys[a.Key]
 			if !ok {
 				keyStyle = l.styles.Key
 			}
-
-			key := l.render(keyStyle, a.Key)
-
-			var valColored string
-
-			// Check for errors first - they get special handling
-			if (a.Key == "error" || a.Key == "err" || a.Key == "error.payload") && r.Level > slog.LevelWarn {
-				// Special handling for error values - use beautiful error trace display
-				if err, ok := a.Value.Any().(error); ok {
-					appendageBuilder.WriteString(ErrorToTrace(err, r, l.styles, l.renderFunc, l.hyperlinkFunc))
-					appendageBuilder.WriteString("\n")
-					valColored = l.render(l.styles.ValueAppendage, "[error rendered below]")
-				} else {
-
-					// Fallback for non-error values in "error" key
-					valStyle, ok := l.styles.Values[a.Key]
-					if !ok {
-						valStyle = l.styles.Value
-					}
-					val := fmt.Sprintf("type: %T - %v", a.Value.Any(), a.Value.Any())
-					valColored = l.render(valStyle, val)
-				}
-			} else {
-				// Value styling (supports per-key overrides).
-				valStyle, ok := l.styles.Values[a.Key]
-				if !ok {
-					valStyle = l.styles.Value
-				}
-
-				// Resolve slog.Value to an interface{} and stringify.
-				val := fmt.Sprint(a.Value)
-				valColored = l.render(valStyle, val)
-
+			valStyle, ok := l.styles.Values[a.Key]
+			if !ok {
+				valStyle = l.styles.Value
 			}
-
-			b.WriteString(key)
-			b.WriteByte('=')
-			b.WriteString(valColored)
-			b.WriteByte(' ')
-
+			l.processAttribute(a, keyStyle, valStyle, &attrBuilder)
 			return true
 		})
-		// Remove trailing space that was added inside the loop.
-		if b.Len() > 0 && b.String()[b.Len()-1] == ' ' {
-			str := b.String()
-			b.Reset()
-			b.WriteString(strings.TrimRight(str, " "))
+
+		// Add the processed attributes to the main log line
+		attrStr := attrBuilder.String()
+		if len(attrStr) > 0 {
+			// Remove trailing space
+			attrStr = strings.TrimRight(attrStr, " ")
+			b.WriteString(attrStr)
 		}
 	}
 
@@ -572,11 +609,31 @@ func (l *TermLogger) Handle(ctx context.Context, r slog.Record) error {
 }
 
 func (l *TermLogger) WithAttrs(attrs []slog.Attr) slog.Handler {
-	return l
+	if len(attrs) == 0 {
+		return l
+	}
+
+	// Create a copy of the logger with the new attributes
+	newLogger := *l
+	newLogger.attrs = make([]slog.Attr, len(l.attrs)+len(attrs))
+	copy(newLogger.attrs, l.attrs)
+	copy(newLogger.attrs[len(l.attrs):], attrs)
+
+	return &newLogger
 }
 
 func (l *TermLogger) WithGroup(name string) slog.Handler {
-	return l
+	if name == "" {
+		return l
+	}
+
+	// Create a copy of the logger with the new group
+	newLogger := *l
+	newLogger.groups = make([]string, len(l.groups)+1)
+	copy(newLogger.groups, l.groups)
+	newLogger.groups[len(l.groups)] = name
+
+	return &newLogger
 }
 
 // isJSONString checks if a string/bytes value looks like JSON
@@ -634,4 +691,69 @@ func isStructLike(v interface{}) bool {
 	}
 
 	return false
+}
+
+// buildDottedKey creates a dotted key from groups and the attribute key
+func (l *TermLogger) buildDottedKey(attrKey string) string {
+	if len(l.groups) == 0 {
+		return attrKey
+	}
+
+	// Join groups with dots and append the attribute key
+	groupPrefix := strings.Join(l.groups, ".")
+	if attrKey == "" {
+		return groupPrefix
+	}
+	return groupPrefix + "." + attrKey
+}
+
+// processAttribute processes a single attribute, handling groups and nested structures
+func (l *TermLogger) processAttribute(a slog.Attr, keyStyle lipgloss.Style, valStyle lipgloss.Style, result *strings.Builder) {
+	// Resolve the attribute value
+	a.Value = a.Value.Resolve()
+
+	// Skip empty attributes
+	if a.Equal(slog.Attr{}) {
+		return
+	}
+
+	// Handle group attributes by processing each sub-attribute with extended group path
+	if a.Value.Kind() == slog.KindGroup {
+		groupAttrs := a.Value.Group()
+		if len(groupAttrs) == 0 {
+			return // Skip empty groups
+		}
+
+		// Create a temporary logger with the extended group path
+		tempLogger := *l
+		if a.Key != "" {
+			// Add this group to the group stack
+			tempLogger.groups = make([]string, len(l.groups)+1)
+			copy(tempLogger.groups, l.groups)
+			tempLogger.groups[len(l.groups)] = a.Key
+		}
+
+		// Process each attribute in the group
+		for _, groupAttr := range groupAttrs {
+			tempLogger.processAttribute(groupAttr, keyStyle, valStyle, result)
+		}
+		return
+	}
+
+	// Create the dotted key for this attribute
+	dottedKey := l.buildDottedKey(a.Key)
+
+	// Render the key-value pair
+	key := l.render(keyStyle, dottedKey)
+
+	var valColored string
+
+	// Regular value handling - no special global error storage
+	val := fmt.Sprint(a.Value)
+	valColored = l.render(valStyle, val)
+
+	result.WriteString(key)
+	result.WriteByte('=')
+	result.WriteString(valColored)
+	result.WriteByte(' ')
 }
