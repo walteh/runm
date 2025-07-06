@@ -1,0 +1,9 @@
+{
+	"mcpServers": {
+		"gopls": {
+			"type": "sse",
+			"url": "http://localhost:50051",
+			"scope": "project"
+		}
+	}
+}

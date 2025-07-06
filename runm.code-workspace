@@ -36,19 +36,19 @@
 		{
 			"name": "buildkit",
 			"path": "../buildkit"
-		},
+		}
 		// {
 		// 	"name": "ec1",
 		// 	"path": "../ec1"
 		// },
-		{
-			"name": "ttrpc",
-			"path": "../ttrpc"
-		},
-		{
-			"name": "vz",
-			"path": "../vz"
-		}
+		// {
+		// 	"name": "ttrpc",
+		// 	"path": "../ttrpc"
+		// },
+		// {
+		// 	"name": "vz",
+		// 	"path": "../vz"
+		// }
 		// {
 		// 	"name": "sys",
 		// 	"path": "../sys"
@@ -96,11 +96,17 @@
 		"go.testExplorer.showOutput": true,
 
 		"gopls": {
+			"build.expandWorkspaceToModule": true,
+			"build.templateExtensions": ["tmpl"],
+			"verboseOutput": false
 			// "build.buildFlags": ["-tags=!windows"]
 		},
-		"go.buildTags": "!windows",
-		"go.testTags": "!windows",
+		"go.languageServerFlags": ["-mcp-listen=localhost:50051"],
+		// "go.buildTags": "!windows",
+		// "go.testTags": "!windows",
 		"go.useLanguageServer": true,
+		"go.testExplorer.showDynamicSubtestsInEditor": true,
+		"go.testExplorer.packageDisplayMode": "nested",
 		// "go.languageServerFlags": ["-tags=!windows"],
 		// "[go]": {
 		// 	"editor.formatOnSave": false
