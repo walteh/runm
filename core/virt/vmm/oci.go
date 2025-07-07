@@ -43,7 +43,6 @@ type OCIVMConfig struct {
 }
 
 func appendContext(ctx context.Context, id string) context.Context {
-
 	return slogctx.Append(ctx,
 		slog.String("vmid", id),
 	)
@@ -100,12 +99,18 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 		return nil, errors.Errorf("creating bundle virtio device: %w", err)
 	}
 
+	tzDev, err := virtio.VirtioFsNew("/usr/share/zoneinfo", constants.ZoneInfoVirtioTag)
+	if err != nil {
+		return nil, errors.Errorf("creating zoneinfo virtio device: %w", err)
+	}
+	devices = append(devices, tzDev)
+
 	mbindDevices, proxyDevices, err := findMbindDevices(ctx, ctrconfig.Spec, ctrconfig.RootfsMounts)
 	if err != nil {
 		return nil, errors.Errorf("finding mbind devices: %w", err)
 	}
 
-	ec1Dev, ec1Proxy, err := makeEc1BlockDevice(ctx, workingDir, ctrconfig.Spec)
+	ec1Dev, ec1Proxy, err := makeEc1BlockDevice(ctx, workingDir, ctrconfig.Spec, ctrconfig.RootfsMounts)
 	if err != nil {
 		return nil, errors.Errorf("creating ec1 block device: %w", err)
 	}
@@ -149,6 +154,21 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 		otelString = "-enable-otlp"
 	}
 
+	localTimeRef, err := os.Readlink("/etc/localtime")
+	if err != nil {
+		return nil, errors.Errorf("reading localtime: %w", err)
+	}
+
+	zisplit := strings.Split(localTimeRef, "zoneinfo/")
+	if len(zisplit) != 2 {
+		return nil, errors.Errorf("invalid localtime reference: %s", localTimeRef)
+	}
+
+	loc, err := time.LoadLocation(zisplit[1])
+	if err != nil {
+		return nil, errors.Errorf("loading location: %w", err)
+	}
+
 	switch ctrconfig.Platform {
 	case units.PlatformLinuxARM64:
 		cfgs := []string{
@@ -163,6 +183,7 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 			"-container-id=" + ctrconfig.ID,
 			otelString,
 			"-mbinds=" + proxyMountString,
+			"-timezone=" + loc.String(),
 		}
 
 		bootloader = &virtio.LinuxBootloader{
@@ -303,7 +324,7 @@ func findMbindDevices(ctx context.Context, spec *oci.Spec, rootfsMounts []proces
 	}
 
 	for _, mount := range rootfsMounts {
-		shareDev, err := virtio.VirtioFsNew(mount.Source, "overlay-"+quickHash(mount.Source))
+		shareDev, err := virtio.VirtioFsNew(mount.Source, "rootfs-"+quickHash(mount.Source))
 		if err != nil {
 			return nil, nil, errors.Errorf("creating share device: %w", err)
 		}
@@ -311,7 +332,7 @@ func findMbindDevices(ctx context.Context, spec *oci.Spec, rootfsMounts []proces
 		devices = append(devices, shareDev)
 		proxyDevices = append(proxyDevices, proxyVirtioFs{
 			Target: mount.Source,
-			Tag:    "overlay-" + quickHash(mount.Source),
+			Tag:    "rootfs-" + quickHash(mount.Source),
 		})
 	}
 
@@ -321,7 +342,7 @@ func findMbindDevices(ctx context.Context, spec *oci.Spec, rootfsMounts []proces
 }
 
 // PrepareContainerVirtioDevicesFromRootfs creates virtio devices using an existing rootfs directory
-func makeEc1BlockDevice(ctx context.Context, wrkdir string, ctrconfig *oci.Spec) (virtio.VirtioDevice, *proxyVirtioFs, error) {
+func makeEc1BlockDevice(ctx context.Context, wrkdir string, ctrconfig *oci.Spec, rootfsMounts []process.Mount) (virtio.VirtioDevice, *proxyVirtioFs, error) {
 	ec1DataPath := filepath.Join(wrkdir, "harpoon-runtime-fs-device")
 
 	err := os.MkdirAll(ec1DataPath, 0755)
@@ -334,8 +355,14 @@ func makeEc1BlockDevice(ctx context.Context, wrkdir string, ctrconfig *oci.Spec)
 		return nil, nil, errors.Errorf("marshalling spec: %w", err)
 	}
 
+	mountBytes, err := json.Marshal(rootfsMounts)
+	if err != nil {
+		return nil, nil, errors.Errorf("marshalling rootfs mounts: %w", err)
+	}
+
 	files := map[string][]byte{
-		constants.ContainerSpecFile: specBytes,
+		constants.ContainerSpecFile:         specBytes,
+		constants.ContainerRootfsMountsFile: mountBytes,
 	}
 
 	for name, file := range files {

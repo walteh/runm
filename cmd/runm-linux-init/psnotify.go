@@ -39,6 +39,16 @@ type pidInfo struct {
 	forkEvent *psnotify.ProcEventFork
 }
 
+func (p *pidInfo) ArgvNoFlags() []string {
+	argv := []string{}
+	for _, arg := range p.argv {
+		if !strings.HasPrefix(arg, "-") {
+			argv = append(argv, arg)
+		}
+	}
+	return argv
+}
+
 var _ slog.LogValuer = (*pidInfo)(nil)
 
 func (p *pidInfo) LogValue() slog.Value {
@@ -49,6 +59,7 @@ func (p *pidInfo) LogValue() slog.Value {
 			slog.Int("pid", p.parent.pid),
 			slog.String("cgroup", p.parent.cgroup),
 			slog.String("argc", p.parent.argc),
+			// slog.String("argv", strings.Join(p.parent.argv, " ")),
 		))
 	}
 
@@ -59,6 +70,7 @@ func (p *pidInfo) LogValue() slog.Value {
 	attrs = append(attrs, slog.Int("pid", p.pid),
 		slog.String("cgroup", p.cgroup),
 		slog.String("argc", p.argc),
+		slog.String("argv", strings.Join(p.argv, " ")),
 	)
 
 	if p.exitEvent != nil {
@@ -123,6 +135,7 @@ func (r *runmLinuxInit) runPsnotify(ctx context.Context, exitChan chan gorunc.Ex
 				slog.ErrorContext(ctx, "failed to get cgroup from proc", "error", err)
 				continue
 			}
+			info.forkEvent = forkEv
 			pidToCgroup.Lock()
 			_, exists := pidToCgroup.m[child]
 			info.parent = parentInfo
@@ -166,9 +179,14 @@ func (r *runmLinuxInit) runPsnotify(ctx context.Context, exitChan chan gorunc.Ex
 
 		case status := <-watcher.Exit:
 			pid := int(status.Pid)
-			pidToCgroup.RLock()
+			pidToCgroup.Lock()
 			grp := pidToCgroup.m[pid]
-			pidToCgroup.RUnlock()
+			if grp != nil {
+				grp.exitEvent = status
+			}
+			pidToCgroup.Unlock()
+
+			grp.resolvePidData()
 
 			// slog.Log(ctx, slog.LevelDebug, "PSNOTIFY[EXIT]", "info", grp)
 
@@ -202,15 +220,31 @@ func (r *runmLinuxInit) runPsnotify(ctx context.Context, exitChan chan gorunc.Ex
 			grp := pidToCgroup.m[pid]
 			pidToCgroup.RUnlock()
 
+			grp.resolvePidData()
+
 			if grp != nil {
 				slog.Log(ctx, slog.LevelDebug, fmt.Sprintf("PSNOTIFY:FORK-EXEC[%d]", pid), "info", grp)
+				grp.execEvent = execEv
 			} else {
 				slog.InfoContext(ctx, fmt.Sprintf("PSNOTIFY:EXEC[%d]", pid), "info", grp)
 			}
+
 			// TODO: your gRPC call here, e.g. reportExec(pid)
 		case err := <-watcher.Error:
 			slog.ErrorContext(ctx, "PSNOTIFY[ERROR]", "error", err)
 		}
+	}
+}
+
+func (p *pidInfo) resolvePidData() {
+	if p.cgroup == "" {
+		p.cgroup, _ = getCgroupFromProc(p.pid)
+	}
+	if len(p.argv) == 0 {
+		p.argv = getArgvFromProc(p.pid)
+	}
+	if p.argc == "" {
+		p.argc, _ = getExePath(p.pid)
 	}
 }
 
@@ -225,9 +259,7 @@ func (r *runmLinuxInit) getPidInfo(pid int) (*pidInfo, error) {
 	// 	slog.Info("got pidfd in fork", "pid", pid)
 	// }
 	// info.pidfd = pidfd
-	info.cgroup, _ = getCgroupFromProc(pid)
-	info.argv = getArgvFromProc(pid)
-	info.argc, _ = getExePath(pid)
+	info.resolvePidData()
 	return info, nil
 }
 

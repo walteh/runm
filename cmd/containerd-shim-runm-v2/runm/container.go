@@ -542,10 +542,10 @@ func (c *Container) Start(ctx context.Context, r *task.StartRequest) (process.Pr
 	defer slog.DebugContext(ctx, "SHIM:CONTAINER:END  [START]", "id", c.ID, "execID", r.ExecID)
 	p, err := c.Process(r.ExecID)
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("process does not exist %s: %w", r.ExecID, errdefs.ErrNotFound)
 	}
 	if err := p.Start(ctx); err != nil {
-		return p, err
+		return p, errors.Errorf("failed to start process %s: %w", r.ExecID, err)
 	}
 	// if c.Cgroup() == nil && p.Pid() > 0 {
 	// 	if cg, err := loadProcessCgroup(ctx, p.Pid()); err == nil {

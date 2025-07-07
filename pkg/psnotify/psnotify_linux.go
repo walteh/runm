@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"time"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -202,7 +204,10 @@ func (w *Watcher) handleEvent(data []byte) {
 		if w.isWatching(pid, PROC_EVENT_EXIT) {
 			w.RemoveWatch(pid)
 
-			w.Exit <- &ProcEventExit{Pid: int(event.ProcessTgid), ExitCode: int(event.ExitCode), ExitSignal: getSignal(event.ExitSignal), Timestamp: now}
+			// raw := uint32(uint32(event.ExitCode)<<8) | uint32(uint32(event.ExitSignal)&0x7F)
+			ws := unix.WaitStatus(event.ExitCode)
+
+			w.Exit <- &ProcEventExit{Pid: int(event.ProcessTgid), ExitCode: ws.ExitStatus(), ExitSignal: ws.Signal(), RawStatus: ws, Timestamp: now}
 		}
 	}
 }

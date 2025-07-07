@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/containerd/console"
 )
@@ -58,6 +59,8 @@ func (s *execCreatedState) Resize(ws console.WinSize) error {
 }
 
 func (s *execCreatedState) Start(ctx context.Context) error {
+	slog.InfoContext(ctx, "TMP0 execCreatedState.Start", "id", s.p.id, "pid", s.p.pid.get())
+	defer slog.InfoContext(ctx, "TMP1 execCreatedState.Start done", "id", s.p.id, "pid", s.p.pid.get())
 	if err := s.p.start(ctx); err != nil {
 		return err
 	}

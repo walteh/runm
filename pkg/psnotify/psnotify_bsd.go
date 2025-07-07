@@ -88,7 +88,7 @@ func (w *Watcher) readEvents() {
 				w.RemoveWatch(pid)
 
 				rawStatus := unix.WaitStatus(ev.Data)
-				w.Exit <- &ProcEventExit{Pid: pid, ExitCode: int(rawStatus.ExitStatus()), ExitSignal: rawStatus.Signal(), Timestamp: now}
+				w.Exit <- &ProcEventExit{Pid: pid, ExitCode: rawStatus.ExitStatus(), ExitSignal: rawStatus.Signal(), RawStatus: rawStatus, Timestamp: now}
 			}
 		}
 	}

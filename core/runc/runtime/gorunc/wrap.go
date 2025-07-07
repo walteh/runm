@@ -3,12 +3,14 @@
 package goruncruntime
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
+	"os/exec"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -27,19 +29,18 @@ func tryReadPidFile(ctx context.Context, pidfile string) (int, error) {
 	return strconv.Atoi(string(pid))
 }
 
-func waitForFileToExistChan(ctx context.Context, pidfile string) chan error {
-	pidfilechan := make(chan error, 1)
+func waitForFileToExistChan(ctx context.Context, pidfile string) chan int {
+	pidfilechan := make(chan int, 1)
 	go func() {
 		for {
-			if _, err := os.Stat(pidfile); err == nil {
-				pidfilechan <- nil
+			if ctx.Err() != nil {
+				pidfilechan <- -1
 				return
-			} else {
-				if errors.Is(err, os.ErrNotExist) {
-					time.Sleep(100 * time.Millisecond)
-					continue
-				}
-				pidfilechan <- err
+			}
+
+			if pidint, err := tryReadPidFile(ctx, pidfile); err == nil {
+				pidfilechan <- pidint
+				return
 			}
 		}
 	}()
@@ -60,6 +61,9 @@ func (r *GoRuncRuntime) reaperLoggingError(ctx context.Context, parentDoneChan c
 
 func (r *GoRuncRuntime) reaper(ctx context.Context, parentDoneChan chan string, pidfile string, name string, pidchan chan int) error {
 	pidint := -1
+	waitingOnPid := true
+	waitingOnParent := true
+	waitingOnProcess := true
 
 	slog.InfoContext(ctx, "starting reaper", "name", name, "pidfile", pidfile)
 
@@ -72,6 +76,9 @@ func (r *GoRuncRuntime) reaper(ctx context.Context, parentDoneChan chan string, 
 		ticker.WithAttrFunc(func() []slog.Attr {
 			return []slog.Attr{
 				slog.Int("current_pid", pidint),
+				slog.Bool("waiting_on_pid", waitingOnPid),
+				slog.Bool("waiting_on_parent", waitingOnParent),
+				slog.Bool("waiting_on_process", waitingOnProcess),
 			}
 		}),
 	)
@@ -79,59 +86,65 @@ func (r *GoRuncRuntime) reaper(ctx context.Context, parentDoneChan chan string, 
 	var err error
 
 	go tickd.Run(ctx)
-	defer tickd.Stop()
+	defer tickd.Stop(ctx)
 	// this hacky logic probably broke the exit status code carryover with go tool task dev:2025-07-02:01
 	if pidchan != nil {
 		pidint = <-pidchan
 	} else {
-		pidint, err = tryReadPidFile(ctx, pidfile)
-		if err != nil {
-			slog.DebugContext(ctx, "failed to read pid file, waiting for it to be created", "path", pidfile, "error", err)
-
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case err := <-waitForFileToExistChan(ctx, pidfile):
-				if err != nil {
-					return errors.Errorf("failed to wait for pid file to exist: %w", err)
-				}
-			}
-
-			slog.DebugContext(ctx, "pid file ready, reading it", "path", pidfile)
-
-			fle, err := os.Open(pidfile)
-			if err != nil {
-				return errors.Errorf("failed to open pid file: %w", err)
-			}
-			defer fle.Close()
-
-			pid, err := io.ReadAll(fle)
-			if err != nil {
-				return errors.Errorf("failed to read pid file: %w", err)
-			}
-
-			pidint, err = strconv.Atoi(string(pid))
-			if err != nil {
-				return errors.Errorf("failed to convert pid to int: %w", err)
-			}
-		}
+		pidint = <-waitForFileToExistChan(ctx, pidfile)
 	}
+
+	waitingOnPid = false
 
 	sys, err := os.FindProcess(pidint)
 	if err != nil {
 		return errors.Errorf("failed to find process: %w", err)
 	}
-	slog.InfoContext(ctx, "found process", "pid", pidint)
 
-	waiter, err := sys.Wait()
-	if err != nil {
-		if errors.Is(err, syscall.ECHILD) {
-			slog.InfoContext(ctx, "process already exited", "name", name, "pidfile", pidfile, "pid", pidint)
-			return nil // TODO:this makes this reaper non-functional
-		} else {
-			return errors.Errorf("failed to wait on pid: %w", err)
+	// output := ""
+
+	// output += debugNamespaces("vm-init", os.Getpid()) + "\n"
+	// output += debugMounts("vm-init", os.Getpid()) + "\n"
+	// output += debugRootfs("vm-init", os.Getpid()) + "\n"
+
+	// output += debugNamespaces("container-init", pidint) + "\n"
+	// output += debugMounts("container-init", pidint) + "\n"
+	// output += debugRootfs("container-init", pidint) + "\n"
+
+	// slog.InfoContext(ctx, "found process", "pid", pidint, "output", output)
+
+	retryCount := 100
+
+	var waiter *os.ProcessState
+	for {
+		waiter, err = sys.Wait()
+		if err != nil {
+			if errors.Is(err, syscall.ECHILD) {
+				retryCount--
+				if retryCount <= 0 {
+					return errors.Errorf("failed to wait on pid %d: %w", pidint, err)
+				}
+				time.Sleep(10 * time.Millisecond)
+				continue
+			}
+			return errors.Errorf("failed to wait on pid %d: %w", pidint, err)
 		}
+		break
 	}
+
+	// waiter, err := sys.Wait()
+	// if err != nil {
+	// 	// if errors.Is(err, syscall.ECHILD) {
+	// 	// 	slog.InfoContext(ctx, "process already exited", "name", name, "pidfile", pidfile, "pid", pidint)
+	// 	// 	waitingOnProcess = false
+	// 	// 	return nil // TODO:this makes this reaper non-functional
+	// 	// } else {
+	// 	return errors.Errorf("failed to wait on pid %d: %w", pidint, err)
+	// 	// }
+	// }
+
+	waitingOnProcess = false
+
 	slog.InfoContext(ctx, "waiter done", "waiter", waiter)
 
 	go func() {
@@ -145,6 +158,8 @@ func (r *GoRuncRuntime) reaper(ctx context.Context, parentDoneChan chan string, 
 	slog.InfoContext(ctx, "reaper waiting for parent to exit", "name", name, "pidfile", pidfile, "pid", pidint)
 
 	<-parentDoneChan
+
+	waitingOnParent = false
 
 	slog.InfoContext(ctx, "reaper parent exited, waiting for process to exit", "name", name, "pidfile", pidfile, "pid", pidint)
 
@@ -170,9 +185,13 @@ func (r *GoRuncRuntime) Create(ctx context.Context, id, bundle string, options *
 
 	reaperChan := make(chan string, 1)
 	defer close(reaperChan)
-	go r.reaperLoggingError(ctx, reaperChan, options.PidFile, "create", nil)
+	// go r.reaperLoggingError(ctx, reaperChan, options.PidFile, "create", nil)
 
 	options.NoNewKeyring = true
+
+	// pidchan := make(chan int, 1)
+	go r.reaperLoggingError(ctx, reaperChan, options.PidFile, "create", nil)
+	// options.Started = pidchan
 
 	return WrapWithRuntimeError(ctx, r, func() error {
 		return r.internal.Create(ctx, id, bundle, options)
@@ -294,4 +313,185 @@ func (r *GoRuncRuntime) Version(ctx context.Context) (gorunc.Version, error) {
 	return WrapWithRuntimeErrorResult(ctx, r, func() (gorunc.Version, error) {
 		return r.internal.Version(ctx)
 	})
+}
+
+// debugNamespaces prints current process namespace information
+func debugNamespaces(processName string, pid int) string {
+	buf := bytes.NewBufferString("")
+	fmt.Fprintf(buf, "=== NAMESPACE DEBUG for %s (PID: %d) ===\n", processName, pid)
+
+	// Read all namespace links
+	namespaces := []string{"mnt", "pid", "net", "ipc", "uts", "user", "cgroup"}
+
+	for _, ns := range namespaces {
+		nsPath := fmt.Sprintf("/proc/%d/ns/%s", pid, ns)
+		if link, err := os.Readlink(nsPath); err == nil {
+			fmt.Fprintf(buf, "  %s: %s\n", ns, link)
+		} else {
+			fmt.Fprintf(buf, "  %s: ERROR - %v\n", ns, err)
+		}
+	}
+
+	// Show parent process for context
+	if ppid := os.Getppid(); ppid > 0 {
+		fmt.Fprintf(buf, "  Parent PID: %d\n", ppid)
+	}
+
+	fmt.Fprintf(buf, "=== END NAMESPACE DEBUG ===\n")
+	return buf.String()
+}
+
+// debugMounts shows current mount namespace view
+func debugMounts(processName string, pid int) string {
+	buf := bytes.NewBufferString("")
+	fmt.Fprintf(buf, "=== MOUNT DEBUG for (%s) (PID: %d) ===\n", processName, pid)
+
+	// Read /proc/self/mounts
+	if data, err := os.ReadFile(fmt.Sprintf("/proc/%d/mounts", pid)); err == nil {
+		lines := strings.Split(string(data), "\n")
+		for _, line := range lines {
+			fmt.Fprintf(buf, "  %s\n", line)
+		}
+	} else {
+		fmt.Fprintf(buf, "  ERROR reading mounts: %v\n", err)
+	}
+
+	fmt.Fprintf(buf, "=== END MOUNT DEBUG ===\n")
+	return buf.String()
+}
+
+// debugRootfs shows what the current rootfs looks like
+func debugRootfs(processName string, pid int) string {
+	buf := bytes.NewBufferString("")
+	fmt.Fprintf(buf, "=== ROOTFS DEBUG for (%s) (PID: %d) ===\n", processName, pid)
+
+	// For container processes, we want to check their actual rootfs
+	// Read from /proc/{pid}/root which is the container's rootfs view
+	var baseDir string
+	if strings.Contains(processName, "container") {
+		baseDir = fmt.Sprintf("/proc/%d/root", pid)
+		fmt.Fprintf(buf, "  Checking container rootfs via %s\n", baseDir)
+	} else {
+		baseDir = ""
+		fmt.Fprintf(buf, "  Checking VM filesystem directly\n")
+	}
+
+	// Check key directories
+	checkDirs := []string{"/", "/usr", "/usr/local", "/usr/local/bin", "/usr/share", "/usr/share/zoneinfo", "/dev", "/sys", "/proc", "/bin", "/bin/sh"}
+
+	for _, dir := range checkDirs {
+		fullPath := baseDir + dir
+		if info, err := os.Stat(fullPath); err == nil {
+			fmt.Fprintf(buf, "  %s: EXISTS (mode: %s)\n", dir, info.Mode())
+
+			// If it's /usr/local/bin, list contents
+			if dir == "/usr/local/bin" {
+				if entries, err := os.ReadDir(fullPath); err == nil {
+					fmt.Fprintf(buf, "    Contents:\n")
+					for _, entry := range entries {
+						fmt.Fprintf(buf, "      %s\n", entry.Name())
+					}
+				} else {
+					fmt.Fprintf(buf, "    ERROR listing contents: %v\n", err)
+				}
+
+			}
+			// In debugRootfs, add this check specifically for docker-entrypoint.sh
+			if dir == "/usr/local/bin" && strings.Contains(processName, "container") {
+				entrypointPath := fullPath + "/docker-entrypoint.sh"
+
+				// Check file details
+				if data, err := os.ReadFile(entrypointPath); err == nil {
+					lines := strings.Split(string(data), "\n")
+					if len(lines) > 0 {
+						fmt.Fprintf(buf, "      Shebang: %s\n", lines[0])
+
+					}
+				}
+
+				// Check if it's executable
+				if info, err := os.Stat(entrypointPath); err == nil {
+					fmt.Fprintf(buf, "      Permissions: %s\n", info.Mode())
+				}
+			}
+			if dir == "/bin/sh" && strings.Contains(processName, "container") {
+				// Check what libraries sh needs
+				fmt.Fprintf(buf, "      Checking /bin/sh dependencies...\n")
+
+				// Check if /lib and /lib64 exist in container
+				libDirs := []string{"/lib", "/lib64", "/usr/lib", "/usr/lib64"}
+				for _, libDir := range libDirs {
+					if _, err := os.Stat(baseDir + libDir); err == nil {
+						fmt.Fprintf(buf, "      %s: EXISTS\n", libDir)
+						if entries, err := os.ReadDir(baseDir + libDir); err == nil && len(entries) > 0 {
+							fmt.Fprintf(buf, "        Contains %d items: ", len(entries))
+							// Show first few items to see what's there
+							for i, entry := range entries {
+								if i >= 3 { // Show first 3 items
+									fmt.Fprintf(buf, "...")
+									break
+								}
+								fmt.Fprintf(buf, "%s ", entry.Name())
+							}
+							fmt.Fprintf(buf, "\n")
+						} else {
+							fmt.Fprintf(buf, "        EMPTY or unreadable\n")
+						}
+					} else {
+						fmt.Fprintf(buf, "      %s: MISSING\n", libDir)
+					}
+				}
+
+				// Check for dynamic linker specifically
+				linkers := []string{"/lib64/ld-linux-x86-64.so.2", "/lib/ld-linux-aarch64.so.1", "/lib/ld-musl-x86_64.so.1", "/lib/ld-musl-aarch64.so.1"}
+				for _, linker := range linkers {
+					if _, err := os.Stat(baseDir + linker); err == nil {
+						fmt.Fprintf(buf, "      Dynamic linker found: %s\n", linker)
+					}
+				}
+
+				// Try different possible locations for ls
+				lsPaths := []string{"/bin/ls", "/usr/bin/ls", "/usr/local/bin/ls"}
+				foundLs := false
+
+				for _, lsPath := range lsPaths {
+					if _, err := os.Stat(baseDir + lsPath); err == nil {
+						fmt.Fprintf(buf, "      Found ls at %s\n", lsPath)
+						// Try to run ls from container using syscall chroot
+						cmd := exec.Command(lsPath, "-la", "/bin")
+						cmd.SysProcAttr = &syscall.SysProcAttr{
+							Chroot: baseDir,
+						}
+						if err := cmd.Run(); err != nil {
+							fmt.Fprintf(buf, "      ERROR: Cannot execute %s in container: %v\n", lsPath, err)
+						} else {
+							fmt.Fprintf(buf, "      SUCCESS: %s works in container\n", lsPath)
+							foundLs = true
+							break
+						}
+					}
+				}
+
+				if !foundLs {
+					fmt.Fprintf(buf, "      ERROR: No ls command found in container\n")
+				}
+
+				// Check if we can execute a simple command using syscall chroot
+				cmd := exec.Command("/bin/sh", "-c", "echo test")
+				cmd.SysProcAttr = &syscall.SysProcAttr{
+					Chroot: baseDir,
+				}
+				if err := cmd.Run(); err != nil {
+					fmt.Fprintf(buf, "      ERROR: Cannot execute /bin/sh in container: %v\n", err)
+				} else {
+					fmt.Fprintf(buf, "      SUCCESS: /bin/sh works in container\n")
+				}
+			}
+		} else {
+			fmt.Fprintf(buf, "  %s: MISSING - %v\n", dir, err)
+		}
+	}
+
+	fmt.Fprintf(buf, "=== END ROOTFS DEBUG ===\n")
+	return buf.String()
 }

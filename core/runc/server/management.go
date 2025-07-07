@@ -71,24 +71,55 @@ func (s *Server) GuestRunCommand(ctx context.Context, req *runmv1.GuestRunComman
 
 }
 
+func formatTimeDiff(after, before uint64) (int64, string) {
+	diff := int64(after) - int64(before)
+	var diffString string
+
+	if diff > (int64(time.Hour) * 1) {
+		diffString = ">1h"
+	} else {
+		diffString = time.Duration(diff).String()
+	}
+
+	if diff > 0 {
+		diffString = "(+) " + diffString
+	} else {
+		diffString = "(-) " + diffString
+	}
+
+	return diff, diffString
+}
+
 // GuestTimeSync implements runmv1.GuestManagementServiceServer.
 func (s *Server) GuestTimeSync(ctx context.Context, req *runmv1.GuestTimeSyncRequest) (*runmv1.GuestTimeSyncResponse, error) {
 	res := &runmv1.GuestTimeSyncResponse{}
-	nowNano := uint64(time.Now().UnixNano())
-	updateNano := uint64(req.GetUnixTimeNs())
+	beforeNano := uint64(time.Now().UnixNano())
+	requestedNano := uint64(req.GetUnixTimeNs())
 
-	tv := unix.NsecToTimeval(int64(updateNano))
+	tv := unix.NsecToTimeval(int64(requestedNano))
 
 	if err := unix.Settimeofday(&tv); err != nil {
-		slog.ErrorContext(ctx, "Settimeofday failed", "error", err)
 		return nil, status.Errorf(codes.Internal, "unix.Settimeofday failed: %v", err)
 	}
 
-	offset := int64(nowNano) - int64(updateNano)
+	afterNano := uint64(time.Now().Local().UnixNano())
 
-	slog.InfoContext(ctx, "time sync", "update", time.Unix(0, int64(updateNano)).UTC().Format(time.RFC3339), "ns_diff", time.Duration(offset))
+	_, diffString := formatTimeDiff(afterNano, beforeNano)
 
-	res.SetPreviousTimeNs(nowNano)
+	attrs := []slog.Attr{slog.GroupAttrs("unix_time_sync", []slog.Attr{
+		slog.String("requested_time_utc", time.Unix(0, int64(requestedNano)).UTC().Format(time.RFC3339)),
+		slog.String("real_before_time_utc", time.Unix(0, int64(beforeNano)).UTC().Format(time.RFC3339)),
+		slog.String("real_after_time_utc", time.Unix(0, int64(afterNano)).UTC().Format(time.RFC3339)),
+		slog.String("adjustment", diffString),
+	}...)}
+
+	res.SetPreviousTimeNs(beforeNano)
+
+	if req.GetTimezone() != "" {
+		slog.WarnContext(ctx, "timezone sync requested, but not implemented", "timezone", req.GetTimezone())
+	}
+
+	slog.LogAttrs(ctx, slog.LevelInfo, "time sync completed", attrs...)
 
 	return res, nil
 }

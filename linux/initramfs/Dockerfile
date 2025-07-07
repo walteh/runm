@@ -8,6 +8,7 @@ ARG ALPINE_VERSION=3.22
 ARG ALPINE_BUSYBOX_VERSION=3.21
 ARG DEBIAN_CODENAME=bookworm
 ARG SOCAT_VERSION=1.8.0.3
+ARG TZDATA_VERSION=2025b
 
 ARG JQ_GIT_REF=master
 ARG LSHW_GIT_REF=master
@@ -43,6 +44,32 @@ RUN apt-get update \
 	&& rm -rf /var/lib/apt/lists/*
 
 
+########################################################
+# timezone builder
+########################################################
+
+FROM alpine-ref AS timezone-builder
+
+WORKDIR /work
+
+RUN curl -L -o tzdata.tar.gz https://data.iana.org/time-zones/tzdata${TZDATA_VERSION}.tar.gz
+
+RUN tar -xf tzdata${TZDATA_VERSION}.tar.gz
+
+ENV ZONEINFO=/out/usr/share/zoneinfo
+RUN mkdir -pv ${ZONEINFO}/{posix,right}
+
+RUN <<EOF
+for tz in etcetera southamerica northamerica europe africa antarctica  \
+		  asia australasia backward pacificnew systemv; do
+	zic -L /dev/null   -d ${ZONEINFO}       -y "sh yearistype.sh" ${tz}
+	zic -L /dev/null   -d ${ZONEINFO}/posix -y "sh yearistype.sh" ${tz}
+	zic -L leapseconds -d ${ZONEINFO}/right -y "sh yearistype.sh" ${tz}
+done
+EOF
+
+RUN cp -v zone.tab zone1970.tab iso3166.tab ${ZONEINFO}
+# RUN zic -d ${ZONEINFO} -p America/New_York
 ########################################################
 # busybox builder2
 ########################################################

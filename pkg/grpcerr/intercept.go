@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
-	"runtime/debug"
 	"time"
 
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
@@ -29,23 +28,24 @@ func UnaryServerInterceptor(
 	start := time.Now()
 	operation := filepath.Base(info.FullMethod)
 	service := filepath.Base(filepath.Dir(info.FullMethod))
-	slog.DebugContext(ctx, fmt.Sprintf("%s:SERVER:START[%s]", service, operation), "service", service)
+	id := fmt.Sprintf("GRPC:SERVER:%s:%s", service, operation)
+	slog.DebugContext(ctx, fmt.Sprintf("%s[START]", id), "service", service)
 	var errz error
 	var resp interface{}
 	defer func() {
-		slog.DebugContext(ctx, fmt.Sprintf("%s:SERVER:END  [%s]", service, operation), "service", service, "error", errz, "duration", time.Since(start))
+		slog.DebugContext(ctx, fmt.Sprintf("%s[END]", id), "service", service, "error", errz, "duration", time.Since(start))
 	}()
 
 	tickd := ticker.NewTicker(
 		ticker.WithInterval(1*time.Second),
 		ticker.WithStartBurst(5),
 		ticker.WithFrequency(60),
-		ticker.WithMessage(fmt.Sprintf("TICK:GRPC-SERVER:RUNNING[%s]", info.FullMethod)),
-		ticker.WithDoneMessage(fmt.Sprintf("TICK:GRPC-SERVER:DONE  :[%s]", info.FullMethod)),
+		ticker.WithMessage(fmt.Sprintf("%s[RUNNING]", id)),
+		// ticker.WithDoneMessage(fmt.Sprintf("%s[DONE]", id)),
 	)
 
 	go tickd.Run(ctx)
-	defer tickd.Stop()
+	defer tickd.Stop(ctx)
 
 	resp, errz = handler(ctx, req)
 	if errz == nil {
@@ -94,25 +94,26 @@ func UnaryClientInterceptor(
 	start := time.Now()
 	service := filepath.Base(filepath.Dir(method))
 	operation := filepath.Base(method)
-	event := fmt.Sprintf("%s:CLIENT:START[%s]", service, operation)
+	id := fmt.Sprintf("GRPC:CLIENT:%s:%s", service, operation)
+	event := fmt.Sprintf("%s[START]", id)
 	slog.DebugContext(ctx, event, "service", service)
-	if event == "containerd.services.tasks.v1.Tasks:CLIENT:START[Kill]" {
-		slog.InfoContext(ctx, string(debug.Stack()))
-	}
+	// if event == "containerd.services.tasks.v1.Tasks:CLIENT:START[Kill]" {
+	// 	slog.InfoContext(ctx, string(debug.Stack()))
+	// }
 
 	tickd := ticker.NewTicker(
 		ticker.WithInterval(1*time.Second),
 		ticker.WithStartBurst(5),
-		ticker.WithFrequency(60),
-		ticker.WithMessage(fmt.Sprintf("TICK:GRPC-CLIENT:RUNNING[%s]", method)),
-		ticker.WithDoneMessage(fmt.Sprintf("TICK:GRPC-CLIENT:DONE  :[%s]", method)),
+		ticker.WithFrequency(15),
+		ticker.WithMessage(fmt.Sprintf("%s[RUNNING]", id)),
+		// ticker.WithDoneMessage(fmt.Sprintf("TICK:GRPC-CLIENT:%s:%s[DONE]", service, operation)),
 	)
 
 	go tickd.Run(ctx)
-	defer tickd.Stop()
+	defer tickd.Stop(ctx)
 
 	errd := invoker(ctx, method, req, reply, cc, opts...)
-	slog.DebugContext(ctx, fmt.Sprintf("%s:CLIENT:END  [%s]", service, operation), "service", service, "error", errd, "duration", time.Since(start))
+	slog.DebugContext(ctx, fmt.Sprintf("%s[END]", id), "service", service, "error", errd, "duration", time.Since(start))
 	return errd
 }
 

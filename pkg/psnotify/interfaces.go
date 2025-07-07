@@ -6,6 +6,7 @@ import (
 	"time"
 
 	gorunc "github.com/containerd/go-runc"
+	"golang.org/x/sys/unix"
 )
 
 // ProcessWatcher defines the interface for a process event watcher
@@ -75,10 +76,11 @@ type ProcEventExec struct {
 }
 
 type ProcEventExit struct {
-	Pid        int            // Pid of the process that called exit()
-	ExitCode   int            // Exit code of the process that called exit()
-	ExitSignal syscall.Signal // Exit signal of the process that called exit()
-	Timestamp  time.Time      // Timestamp of the exit event
+	Pid        int             // Pid of the process that called exit()
+	ExitCode   int             // Exit code of the process that called exit()
+	ExitSignal syscall.Signal  // Exit signal of the process that called exit()
+	RawStatus  unix.WaitStatus // Raw status of the process that called exit()
+	Timestamp  time.Time       // Timestamp of the exit event
 }
 
 // DetectedEventForkExec represents a combined fork+exec event with enhanced information

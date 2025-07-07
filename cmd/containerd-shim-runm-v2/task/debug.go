@@ -72,12 +72,13 @@ func wrap[I, O any](e *errTaskService, f func(context.Context, I) (O, error)) fu
 	funcName := runtime.FuncForPC(pc).Name()
 	realNameS := strings.Split(filepath.Base(funcName), ".")
 	realName := realNameS[len(realNameS)-1]
+	id := fmt.Sprintf("SHIM:TTRPC:SERVER:%s", realName)
 
 	return func(ctx context.Context, req I) (resp O, retErr error) {
 		start := time.Now()
 		reqNum := counter.Add(1)
 
-		startLogRecord := slog.NewRecord(start, slog.LevelDebug, "SHIM:START["+strings.ToUpper(realName)+"]", pc)
+		startLogRecord := slog.NewRecord(start, slog.LevelDebug, fmt.Sprintf("%s[START]", id), pc)
 		startLogRecord.AddAttrs(
 			slog.String("method", realName),
 			slog.Int64("req_num", reqNum),
@@ -86,7 +87,7 @@ func wrap[I, O any](e *errTaskService, f func(context.Context, I) (O, error)) fu
 
 		defer func() {
 			end := time.Now()
-			endLogRecord := slog.NewRecord(end, slog.LevelDebug, "SHIM:END  ["+strings.ToUpper(realName)+"]", pc)
+			endLogRecord := slog.NewRecord(end, slog.LevelDebug, fmt.Sprintf("%s[END]", id), pc)
 			endLogRecord.AddAttrs(
 				slog.String("method", realName),
 				slog.Duration("duration", end.Sub(start)),
@@ -106,11 +107,11 @@ func wrap[I, O any](e *errTaskService, f func(context.Context, I) (O, error)) fu
 			ticker.WithInterval(1*time.Second),
 			ticker.WithStartBurst(5),
 			ticker.WithFrequency(60),
-			ticker.WithMessage(fmt.Sprintf("TICK:SHIM:TTRPC:RUNNING[%s]", realName)),
-			ticker.WithDoneMessage(fmt.Sprintf("TICK:SHIM:TTRPC:DONE  :[%s]", realName)),
+			ticker.WithMessage(fmt.Sprintf("%s[RUNNING]", id)),
+			// ticker.WithDoneMessage(fmt.Sprintf("TICK:SHIM:TTRPC:DONE  :[%s]", realName)),
 		)
 		go tickd.Run(ctx)
-		defer tickd.Stop()
+		defer tickd.Stop(ctx)
 
 		resp, retErr = f(ctx, req)
 

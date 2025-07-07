@@ -518,7 +518,7 @@ tasks:
                     --platform=linux/arm64 \
                     --network=host \
                     --runtime=containerd.shim.runc.v2 \
-                    --pull=missing \
+                    --pull=always \
                     {{.FLAGS}} {{.IMAGE}} {{.ARGS}} {{.STDOUT_FILE_PIPE}} {{.STDOUT_FILE}}
 
     dev:nerdctl-test:exec:
@@ -552,9 +552,11 @@ tasks:
         deps: ['test:binary:nerdctl-test']
         vars:
             FLAGS: '{{.FLAGS | default ""}}'
+            STDOUT_FILE: '{{.STDOUT_FILE | default ""}}'
+            STDOUT_FILE_PIPE: '{{.STDOUT_FILE | empty | ternary "" ">"}}'
         cmds:
           - cmd: |-
-                sudo -A -E {{.TEST_BIN_DIR}}/nerdctl-test ps {{.FLAGS}}
+                sudo -A -E {{.TEST_BIN_DIR}}/nerdctl-test ps {{.FLAGS}} {{.STDOUT_FILE_PIPE}} {{.STDOUT_FILE}}
 
     dev:2025-06-18:01:
         desc: runs the shim for 2025-06-18 - bun version from entrypoint
@@ -610,6 +612,9 @@ tasks:
           - task: dev:nerdctl-test:ps
             vars:
                 FLAGS: ''
+                STDOUT_FILE: '{{.TMP_DIR}}/stdout2.txt'
+          - cmd: |-
+                cat {{.TMP_DIR}}/stdout2.txt | grep $(cat {{.TMP_DIR}}/stdout.txt) || (echo "container not found in ps output" && exit 1)
           - task: dev:nerdctl-test:exec
             vars:
                 COMMAND: 'echo "hello world! this is a test"'

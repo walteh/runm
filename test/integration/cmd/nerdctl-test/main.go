@@ -325,6 +325,12 @@ Config file ($NERDCTL_TOML): %s
 
 		cmd.SetContext(log.WithLogger(cmd.Context(), log.L))
 
+		slog.DebugContext(cmd.Context(), fmt.Sprintf("NERDCTL:COMMAND:%s[START]", cmd.Name()), "args", args)
+
+		return nil
+	}
+	rootCmd.PersistentPostRunE = func(cmd *cobra.Command, args []string) error {
+		slog.DebugContext(cmd.Context(), fmt.Sprintf("NERDCTL:COMMAND:%s[END]", cmd.Name()), "args", args)
 		return nil
 	}
 	rootCmd.RunE = helpers.UnknownSubcommandAction

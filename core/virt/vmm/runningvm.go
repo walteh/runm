@@ -413,10 +413,15 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 		return errors.Errorf("failed to get guest service: %w", err)
 	}
 
+	now := time.Now()
+
+	// zone, offset := now.Zone()
+
 	slog.InfoContext(ctx, "got guest service - making time sync request to management service")
 
 	tsreq := &runmv1.GuestTimeSyncRequest{}
-	tsreq.SetUnixTimeNs(uint64(time.Now().UnixNano()))
+	tsreq.SetUnixTimeNs(uint64(now.UnixNano()))
+	// tsreq.SetTimezone(fmt.Sprintf("%s%d", zone, offset))
 	response, err := connection.Management().GuestTimeSync(ctx, tsreq)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to time sync", "error", err)
@@ -424,9 +429,10 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 	}
 	slog.InfoContext(ctx, "time sync 1", "response", response)
 
+	now = time.Now()
 	// this first request, will take a few extra milliseconds, so we make the same call again
 
-	tsreq.SetUnixTimeNs(uint64(time.Now().UnixNano()))
+	tsreq.SetUnixTimeNs(uint64(now.UnixNano()))
 	response, err = connection.Management().GuestTimeSync(ctx, tsreq)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to time sync", "error", err)

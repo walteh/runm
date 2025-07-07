@@ -23,6 +23,7 @@ import (
 	"github.com/walteh/runm/cmd/containerd-shim-runm-v2/manager"
 	"github.com/walteh/runm/pkg/logging"
 	"github.com/walteh/runm/pkg/logging/sloglogrus"
+	"github.com/walteh/runm/pkg/ticker"
 	"github.com/walteh/runm/test/integration/env"
 
 	taskplugin "github.com/walteh/runm/cmd/containerd-shim-runm-v2/task/plugin"
@@ -85,27 +86,33 @@ func ShimMain() {
 				"sys_time", rusage.Stime)
 		}
 
-		// Start a goroutine to monitor resource usage
-		go func() {
-			ticker := time.NewTicker(60 * time.Second)
-			defer ticker.Stop()
-
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					var rusage syscall.Rusage
-					if err := syscall.Getrusage(syscall.RUSAGE_SELF, &rusage); err == nil {
-						slog.InfoContext(ctx, "SHIM_RESOURCE_USAGE_CHECK",
-							"max_rss", rusage.Maxrss,
-							"user_time", float64(rusage.Utime.Usec)/1000000,
-							"sys_time", float64(rusage.Stime.Usec)/1000000,
-							"num_goroutines", runtime.NumGoroutine())
-					}
+		tickd := ticker.NewTicker(
+			ticker.WithInterval(60*time.Second),
+			ticker.WithStartBurst(5),
+			ticker.WithFrequency(60),
+			ticker.WithMessage("SHIM:PROCESS[RUNNING]"),
+			ticker.WithDoneMessage("SHIM:PROCESS[DONE]"),
+			ticker.WithLogLevel(slog.LevelDebug),
+			ticker.WithAttrFunc(func() []slog.Attr {
+				attrs := []slog.Attr{}
+				if err := syscall.Getrusage(syscall.RUSAGE_SELF, &rusage); err == nil {
+					attrs = append(attrs, []slog.Attr{
+						slog.Int("max_rss", int(rusage.Maxrss)),
+						slog.Float64("user_time", float64(rusage.Utime.Usec)/1000000),
+						slog.Float64("sys_time", float64(rusage.Stime.Usec)/1000000),
+						slog.Int("num_goroutines", runtime.NumGoroutine()),
+					}...)
+				} else {
+					attrs = append(attrs, slog.String("error", err.Error()))
 				}
-			}
-		}()
+				return []slog.Attr{
+					slog.GroupAttrs("resource_usage", attrs...),
+				}
+			}),
+		)
+		defer tickd.Stop(ctx)
+		go tickd.Run(ctx)
+
 	}
 
 	// Monitor for unexpected signals and OS-level events

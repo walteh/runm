@@ -47,6 +47,7 @@ var (
 	bundleSource string
 	mbinds       string
 	enableOtel   bool
+	timezone     string
 )
 
 const (
@@ -61,6 +62,7 @@ func init() {
 	flag.StringVar(&bundleSource, "bundle-source", "", "the bundle source")
 	flag.BoolVar(&enableOtel, "enable-otlp", false, "enable otlp")
 	flag.StringVar(&mbinds, "mbinds", "", "the mbinds") // this errors for some reason
+	flag.StringVar(&timezone, "timezone", "", "the timezone")
 	flag.Parse()
 }
 
@@ -219,7 +221,7 @@ func (r *runmLinuxInit) configureRuntimeServer(ctx context.Context) (*grpc.Serve
 		realEventHandler,
 		cgroupAdapter,
 		server.WithBundleSource(bundleSource),
-		server.WithCustomExitChan(r.exitChan),
+		// server.WithCustomExitChan(r.exitChan),
 	)
 
 	serverz.RegisterGrpcServer(grpcVsockServer)
@@ -290,7 +292,11 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 	})
 
 	errGroupGoWithLogging(ctx, "ticker", errgroupz, func() error {
-		ticker := ticker.NewTicker(ticker.WithMessage("still running in rootfs, waiting to be killed"))
+		ticker := ticker.NewTicker(
+			ticker.WithMessage("RUNM:INIT[RUNNING]"),
+			ticker.WithDoneMessage("RUNM:INIT[DONE]"),
+			ticker.WithLogLevel(slog.LevelDebug),
+		)
 		return ticker.Run(ctx)
 	})
 
@@ -303,6 +309,14 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 
 	if err := mount(ctx); err != nil {
 		return errors.Errorf("problem mounting rootfs: %w", err)
+	}
+
+	if err := ExecCmdForwardingStdio(ctx, "ls", "-lahs", "/"); err != nil {
+		return errors.Errorf("problem listing /: %w", err)
+	}
+
+	if err := ExecCmdForwardingStdio(ctx, "ls", "-lahs", filepath.Join(bundleSource, "rootfs", "/usr/local/bin/docker-entrypoint.sh")); err != nil {
+		return errors.Errorf("problem listing bundleSource/rootfs: %w", err)
 	}
 
 	errGroupGoWithLogging(ctx, "grpc-vsock-server", errgroupz, func() error {
@@ -340,6 +354,13 @@ func runProxyHooks(ctx context.Context) error {
 			slog.InfoContext(ctx, "created symlink", "path", hook.Path)
 		}
 	}
+
+	// format and print out spec
+	specBytes, err := json.MarshalIndent(spec, "", "  ")
+	if err != nil {
+		return errors.Errorf("failed to marshal spec: %w", err)
+	}
+	slog.InfoContext(ctx, "spec", "spec", string(specBytes))
 
 	return nil
 }
@@ -489,13 +510,21 @@ func mount(ctx context.Context) error {
 		return errors.Errorf("failed to enable memory controller: %w", err)
 	}
 
-	// list mounnts
-	mountinfo, err := os.ReadFile("/proc/self/mountinfo")
+	// check that /etc/localtime is a symlink to /usr/share/zoneinfo/something
+	localtime, err := os.Readlink("/etc/localtime")
 	if err != nil {
-		panic(errors.Errorf("problem reading mountinfo: %w", err))
+		return errors.Errorf("problem reading localtime: %w", err)
+	}
+	if !strings.HasPrefix(localtime, "/usr/share/zoneinfo/") {
+		return errors.Errorf("/etc/localtime is not a symlink to /usr/share/zoneinfo/[something]: %s", localtime)
 	}
 
-	slog.InfoContext(ctx, "/proc/self/mountinfo contents: "+string(mountinfo))
+	// list mounnts
+	procMounts, err := exec.CommandContext(ctx, "/bin/busybox", "cat", "/proc/mounts").CombinedOutput()
+	if err != nil {
+		return errors.Errorf("problem listing proc mounts: %w", err)
+	}
+	slog.InfoContext(ctx, "cat /proc/mounts: "+string(procMounts))
 
 	return nil
 }

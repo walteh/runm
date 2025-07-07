@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -185,10 +186,14 @@ func (e *execProcess) Start(ctx context.Context) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	slog.InfoContext(ctx, "TMP0 start", "id", e.id, "pid", e.pid.get())
 	return e.execState.Start(ctx)
 }
 
 func (e *execProcess) start(ctx context.Context) (err error) {
+
+	slog.InfoContext(ctx, "TMP1 process.start pre-pid", "id", e.id)
+	defer slog.InfoContext(ctx, "TMP2 process.start done", "id", e.id)
 	// The reaper may receive exit signal right after
 	// the container is started, before the e.pid is updated.
 	// In that case, we want to block the signal handler to
@@ -196,12 +201,16 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 	e.pid.Lock()
 	defer e.pid.Unlock()
 
+	slog.InfoContext(ctx, "TMP1 process.start pre-pid", "id", e.id, "pid", e.pid.pid)
+
 	var (
 		socket  runtime.ConsoleSocket
 		pio     *processIO
 		pidFile = newExecPidFile(e.path, e.id)
 	)
+
 	if e.stdio.Terminal {
+		slog.InfoContext(ctx, "TMP2 start setting up console socket", "id", e.id, "pid", e.pid.pid)
 		if socket, err = e.parent.runtime.NewTempConsoleSocket(ctx); err != nil {
 			return errors.Errorf("failed to create runc console socket: %w", err)
 		}
@@ -212,29 +221,37 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 		}
 		e.io = pio
 	}
+	slog.InfoContext(ctx, "TMP3 start setting up exec opts", "id", e.id, "pid", e.pid.pid)
 	opts := &gorunc.ExecOpts{
 		PidFile: pidFile.Path(),
 		Detach:  true,
 	}
 	if pio != nil {
+		slog.InfoContext(ctx, "TMP5 start setting up exec opts IO", "id", e.id, "pid", e.pid.pid)
 		opts.IO = pio.IO()
 	}
 	if socket != nil {
+		slog.InfoContext(ctx, "TMP6 start setting up exec opts ConsoleSocket", "id", e.id, "pid", e.pid.pid)
 		opts.ConsoleSocket = socket
 	}
+	slog.InfoContext(ctx, "TMP4 start calling runtime.Exec", "id", e.id, "pid", e.pid.pid)
+	// todo: the prob is that this is never returinging
 	// gorunc:call Exec
 	if err := e.parent.runtime.Exec(ctx, e.parent.id, e.spec, opts); err != nil {
 		close(e.waitBlock)
 		return errors.Errorf("OCI runtime exec failed: %w", err)
 	}
+	slog.InfoContext(ctx, "TMP7 start setting up exec opts stdin", "id", e.id, "pid", e.pid.pid)
 	if e.stdio.Stdin != "" {
 		if err := e.openStdin(e.stdio.Stdin); err != nil {
 			return err
 		}
 	}
+	slog.InfoContext(ctx, "TMP8 start setting up exec opts context", "id", e.id, "pid", e.pid.pid)
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	if socket != nil {
+		slog.InfoContext(ctx, "TMP9 start setting up exec opts console", "id", e.id, "pid", e.pid.pid)
 		console, err := socket.ReceiveMaster()
 		if err != nil {
 			return errors.Errorf("failed to retrieve console master: %w", err)
@@ -243,15 +260,18 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 			return errors.Errorf("failed to start console copy: %w", err)
 		}
 	} else {
+		slog.InfoContext(ctx, "TMP10 start setting up exec opts pio", "id", e.id, "pid", e.pid.get())
 		if err := pio.Copy(ctx, &e.wg); err != nil {
 			return errors.Errorf("failed to start io pipe copy: %w", err)
 		}
 	}
+	slog.InfoContext(ctx, "TMP11 start setting up exec opts pid", "id", e.id, "pid", e.pid.get())
 	pid, err := e.parent.runtime.ReadPidFile(ctx, pidFile.Path())
 	if err != nil {
 		return errors.Errorf("failed to retrieve OCI runtime exec pid: %w", err)
 	}
 	e.pid.pid = pid
+	slog.InfoContext(ctx, "TMP12 start setting up exec opts pid done", "id", e.id, "pid", e.pid.get())
 	return nil
 }
 

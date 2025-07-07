@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
@@ -113,10 +114,13 @@ func newColoredString(s string, color string) lipgloss.Style {
 // simple linux =  \U000F033D"
 // OSIconMap maps OS identifiers to unicode icons \udb80\udf3d
 var OSIconMap = map[string]lipgloss.Style{
-	"darwin":  newColoredString("\uf302", "#00FA9A"), // light green Apple logo for macOS
-	"linux":   newColoredString("\ue712", "#FF9E80"), // orange Penguin for Linux
-	"windows": newColoredString("\ue70f", "#40DFFF"), // blue Window for Windows
-	"freebsd": newColoredString("\uf30c", "white"),   // green BSD Daemon for FreeBSD
+	"darwin":  newColoredString("D", "#00FA9A"), // light green Apple logo for macOS
+	"linux":   newColoredString("L", "#FF9E80"), // orange Penguin for Linux
+	"windows": newColoredString("W", "#40DFFF"), // blue Window for Windows
+	// "darwin":  newColoredString("\uf302", "#00FA9A"), // light green Apple logo for macOS
+	// "linux":   newColoredString("\ue712", "#FF9E80"), // orange Penguin for Linux
+	// "windows": newColoredString("\ue70f", "#40DFFF"), // blue Window for Windows
+	"freebsd": newColoredString("\uf30c", "white"), // green BSD Daemon for FreeBSD
 
 	"openbsd": newColoredString("\uf328", "white"),  // purple Pufferfish for OpenBSD
 	"android": newColoredString("\ue70e", "white"),  // Robot for Android
@@ -158,6 +162,7 @@ type TermLogger struct {
 	enableDebugPatternColoring bool                      // Whether to enable debug pattern coloring
 	enableMultilineBoxes       bool                      // Whether to render multiline messages in boxes
 	patternColorCache          map[string]lipgloss.Color // Cache for deterministic colors
+	pattenColorCacheMutex      sync.Mutex
 	// Group and attribute tracking for proper slog group handling
 	groups []string    // Stack of group names for dotted notation
 	attrs  []slog.Attr // Preformatted attributes from WithAttrs
@@ -240,6 +245,7 @@ func NewTermLogger(writer io.Writer, sopts *slog.HandlerOptions, opts ...TermLog
 		enableDebugPatternColoring: false,
 		enableMultilineBoxes:       true, // Enable by default
 		patternColorCache:          make(map[string]lipgloss.Color),
+		pattenColorCacheMutex:      sync.Mutex{},
 		groups:                     []string{},
 		attrs:                      []slog.Attr{},
 	}
@@ -274,6 +280,9 @@ func (l *TermLogger) renderFunc(s lipgloss.Style, strs string) string {
 
 // getOrCreateColor gets a color from cache or creates a new one
 func (l *TermLogger) getOrCreateColor(key string) lipgloss.Color {
+	l.pattenColorCacheMutex.Lock()
+	defer l.pattenColorCacheMutex.Unlock()
+
 	color, exists := l.patternColorCache[key]
 	if !exists {
 		color = generateDeterministicNeonColor(key)
@@ -379,19 +388,88 @@ const (
 	maxNameLength = 15
 )
 
+// smartWrapText wraps text intelligently at word boundaries with visual indicators
+func smartWrapText(text string, maxWidth int) string {
+	var result strings.Builder
+	lines := strings.Split(text, "\n")
+
+	for lineIdx, line := range lines {
+		if lineIdx > 0 {
+			result.WriteString("\n")
+		}
+
+		// If line is short enough, use it as-is
+		if len(line) <= maxWidth {
+			result.WriteString(line)
+			continue
+		}
+
+		// Smart wrapping: try to break at word boundaries
+		words := strings.Fields(line)
+		if len(words) == 0 {
+			// If no words, fall back to character wrapping
+			result.WriteString(line)
+			continue
+		}
+
+		currentLine := ""
+		for wordIdx, word := range words {
+			testLine := currentLine
+			if testLine != "" {
+				testLine += " "
+			}
+			testLine += word
+
+			// If adding this word would exceed the limit
+			if len(testLine) > maxWidth {
+				// Write the current line if it has content
+				if currentLine != "" {
+					result.WriteString(currentLine)
+					result.WriteString("\n")
+					// Add continuation indicator for wrapped lines
+					result.WriteString("    ↳ ")
+					currentLine = word
+				} else {
+					// Single word is too long, break it
+					result.WriteString(word)
+					if wordIdx < len(words)-1 {
+						result.WriteString("\n    ↳ ")
+					}
+					currentLine = ""
+				}
+			} else {
+				currentLine = testLine
+			}
+		}
+
+		// Write any remaining content
+		if currentLine != "" {
+			result.WriteString(currentLine)
+		}
+	}
+
+	return result.String()
+}
+
 // MessageToBox renders a multiline message in a box similar to error display
 func MessageToBox(message string, styles *Styles, render renderFunc) string {
-	// Format the message nicely in a box
+	// Apply smart text wrapping
+	contentStyle := lipgloss.NewStyle().
+		Foreground(MessageColor).
+		Transform(func(s string) string {
+			return smartWrapText(s, 140) // Slightly smaller to account for padding
+		})
+
+	// Format the message with proper wrapping
 	content := message
 
 	// If the message is already styled, don't apply additional styling
 	if !strings.Contains(message, "\x1b[") {
-		// Apply moderate styling to the content for better readability
-		content = render(lipgloss.NewStyle().Foreground(MessageColor), message)
+		content = render(contentStyle, message)
 	}
 
 	// Render the content in a container with rounded borders
-	boxStyle := styles.Error.Container.Copy().
+	boxStyle := styles.Error.Container.
 		BorderForeground(TreeBorderColor)
 
 	return render(boxStyle, content)

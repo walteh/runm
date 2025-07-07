@@ -12,6 +12,8 @@ import (
 
 func HandleDelimitedProxy(ctx context.Context, reader io.ReadCloser, writer io.Writer, delimiter rune) error {
 	scanner := bufio.NewScanner(reader)
+	// Set reasonable buffer size: 1MB initial, 10MB max
+	scanner.Buffer(make([]byte, 0, 1024*1024), 10*1024*1024)
 	scanner.Split(NewDelimiterSplitFunc(delimiter))
 	for scanner.Scan() {
 		fmt.Fprint(writer, scanner.Text())
