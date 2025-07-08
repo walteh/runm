@@ -149,7 +149,7 @@ func ConvertExecOptsFromProto(opts *runmv1.RuncExecOptions, state runtime.Server
 		Detach:        opts.GetDetach(),
 		ConsoleSocket: cs,
 		ExtraArgs:     opts.GetExtraArgs(),
-		Started:       make(chan int),
+		// Started:       make(chan int),
 	}, nil
 }
 

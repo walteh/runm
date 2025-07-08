@@ -11,10 +11,15 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
+	goruntime "runtime"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -31,6 +36,7 @@ import (
 	slogctx "github.com/veqryn/slog-context"
 
 	"github.com/walteh/runm/core/runc/runtime"
+	"github.com/walteh/runm/core/runc/runtime/gorunc/reaper"
 	"github.com/walteh/runm/core/runc/server"
 	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/grpcerr"
@@ -55,6 +61,8 @@ const (
 )
 
 func init() {
+	goruntime.GOMAXPROCS(goruntime.NumCPU())
+
 	fmt.Println("initializing runm-linux-init")
 	fmt.Println("args", os.Args)
 	flag.StringVar(&containerId, "container-id", "", "the container id")
@@ -64,6 +72,7 @@ func init() {
 	flag.StringVar(&mbinds, "mbinds", "", "the mbinds") // this errors for some reason
 	flag.StringVar(&timezone, "timezone", "", "the timezone")
 	flag.Parse()
+
 }
 
 type runmLinuxInit struct {
@@ -269,15 +278,110 @@ func (r *runmLinuxInit) runGrpcVsockServer(ctx context.Context) error {
 	return nil
 }
 
+func (r *runmLinuxInit) runPprofVsockServer(ctx context.Context) error {
+	slog.InfoContext(ctx, "starting pprof server on vsock", "port", constants.VsockPprofPort)
+
+	listener, err := vsock.ListenContextID(3, uint32(constants.VsockPprofPort), nil)
+	if err != nil {
+		slog.ErrorContext(ctx, "problem listening vsock for pprof", "error", err)
+		return errors.Errorf("problem listening vsock for pprof: %w", err)
+	}
+
+	server := &http.Server{
+		Handler: http.DefaultServeMux,
+	}
+
+	if err := server.Serve(listener); err != nil {
+		return errors.Errorf("problem serving pprof vsock server: %w", err)
+	}
+
+	return nil
+}
+
+func setupSignals() (chan os.Signal, error) {
+	signals := make(chan os.Signal, 32)
+	smp := []os.Signal{unix.SIGTERM, unix.SIGINT, unix.SIGPIPE}
+	// if !config.NoReaper {
+	smp = append(smp, unix.SIGCHLD)
+	// }
+	signal.Notify(signals, smp...)
+	return signals, nil
+}
+
+func handleExitSignals(ctx context.Context, cancel context.CancelFunc) {
+	ch := make(chan os.Signal, 32)
+	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+
+	for {
+		select {
+		case s := <-ch:
+			slog.InfoContext(ctx, "Caught exit signal", "signal", s)
+			cancel()
+			return
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func reap(ctx context.Context, signals chan os.Signal) error {
+	slog.InfoContext(ctx, "starting signal loop")
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case s := <-signals:
+			slog.InfoContext(ctx, "received signal", "signal", s)
+			// Exit signals are handled separately from this loop
+			// They get registered with this channel so that we can ignore such signals for short-running actions (e.g. `delete`)
+			switch s {
+			case unix.SIGCHLD:
+				if err := reaper.Reap(); err != nil {
+					slog.ErrorContext(ctx, "reap exit status", "error", err)
+				}
+			case unix.SIGPIPE:
+			}
+		}
+	}
+}
+
 func (r *runmLinuxInit) run(ctx context.Context) error {
 
 	if containerId == "" {
 		return errors.Errorf("container-id flag is required")
 	}
 
+	signals, err := setupSignals()
+	if err != nil {
+		return errors.Errorf("problem setting up signals: %w", err)
+	}
+
+	defer ticker.NewTicker(
+		ticker.WithMessage("RUNM:INIT[RUNNING]"),
+		ticker.WithDoneMessage("RUNM:INIT[DONE]"),
+		ticker.WithSlogBaseContext(ctx),
+		ticker.WithLogLevel(slog.LevelDebug),
+		ticker.WithFrequency(15),
+		ticker.WithStartBurst(5),
+		ticker.WithAttrFunc(func() []slog.Attr {
+			return []slog.Attr{
+				slog.Int("pid", os.Getpid()),
+				slog.String("gomaxprocs", strconv.Itoa(goruntime.GOMAXPROCS(0))),
+			}
+		}),
+	).RunAsDefer()()
+
+	ctx, cancel := context.WithCancel(ctx)
+	go handleExitSignals(ctx, cancel)
+
 	errgroupz, ctx := errgroup.WithContext(ctx)
 
 	r.exitChan = make(chan gorunc.Exit, 32*100)
+
+	errGroupGoWithLogging(ctx, "reaper", errgroupz, func() error {
+		return reap(ctx, signals)
+	})
 
 	errGroupGoWithLogging(ctx, "psnotify", errgroupz, func() error {
 		return r.runPsnotify(ctx, r.exitChan)
@@ -291,16 +395,16 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 		return r.runVsockUnixProxy(ctx, constants.RawWriterProxyGuestUnixPath, r.rawWriter)
 	})
 
-	errGroupGoWithLogging(ctx, "ticker", errgroupz, func() error {
-		ticker := ticker.NewTicker(
-			ticker.WithMessage("RUNM:INIT[RUNNING]"),
-			ticker.WithDoneMessage("RUNM:INIT[DONE]"),
-			ticker.WithLogLevel(slog.LevelDebug),
-			ticker.WithFrequency(15),
-			ticker.WithStartBurst(5),
-		)
-		return ticker.Run(ctx)
-	})
+	// errGroupGoWithLogging(ctx, "ticker", errgroupz, func() error {
+	// 	ticker.NewTicker(
+	// 		ticker.WithMessage("RUNM:INIT[RUNNING]"),
+	// 		ticker.WithDoneMessage("RUNM:INIT[DONE]"),
+	// 		ticker.WithLogLevel(slog.LevelDebug),
+	// 		ticker.WithFrequency(15),
+	// 		ticker.WithStartBurst(5),
+	// 	).RunWithWaitOnContext(ctx)
+	// 	return nil
+	// })
 
 	go func() {
 		err := runProxyHooks(ctx)
@@ -323,6 +427,10 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 
 	errGroupGoWithLogging(ctx, "grpc-vsock-server", errgroupz, func() error {
 		return r.runGrpcVsockServer(ctx)
+	})
+
+	errGroupGoWithLogging(ctx, "pprof-vsock-server", errgroupz, func() error {
+		return r.runPprofVsockServer(ctx)
 	})
 
 	return errgroupz.Wait()

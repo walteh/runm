@@ -135,6 +135,7 @@ func createIO(ctx context.Context, id string, ioUID, ioGID int, stdio stdio.Stdi
 		pio.stdio.Stdout = filePath
 		pio.stdio.Stderr = filePath
 		pio.copy = true
+		slog.InfoContext(ctx, "creating pipe IO (via file)", "ioUID", ioUID, "ioGID", ioGID, "stdio", stdio)
 		pio.io, err = runtime.NewPipeIO(ctx, ioUID, ioGID, withConditionalIO(stdio))
 	default:
 		return nil, errors.Errorf("unknown STDIO scheme %s", u.Scheme)

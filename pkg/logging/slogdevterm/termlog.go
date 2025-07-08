@@ -24,24 +24,28 @@ import (
 var _ slog.Handler = (*TermLogger)(nil)
 
 // Pattern for special debug log formatting: WORD:WORD[content]
-func ParseSegments(s string) ([]string, bool) {
+func ParseSegments(s string) ([]string, string, bool) {
 	// Find the first "[" and the last "]"
 	open := strings.IndexByte(s, '[')
 	close := strings.LastIndexByte(s, ']')
 	if open < 0 || close < 0 || close <= open {
-		return nil, false
+		return nil, "", false
 	}
 
 	// Extract prefix and suffix
 	prefix := s[:open]
 	suffix := s[open+1 : close]
+	var remaining string
+	if close < len(s) {
+		remaining = s[close+1:]
+	}
 
 	// Split the prefix on ":" (this will yield all m1…mN)
 	parts := strings.Split(prefix, ":")
 
 	// Append the bracketed part as the final element
 	parts = append(parts, suffix)
-	return parts, true
+	return parts, remaining, true
 }
 
 type TermLoggerOption = func(*TermLogger)
@@ -317,7 +321,7 @@ func (l *TermLogger) colorizeDebugPattern(message string, maxWidth int, force bo
 		return fallback()
 	}
 
-	parts, ok := ParseSegments(message)
+	parts, remaining, ok := ParseSegments(message)
 	if !ok {
 		if force {
 			fbs, _ := fallback()
@@ -380,7 +384,7 @@ func (l *TermLogger) colorizeDebugPattern(message string, maxWidth int, force bo
 		out.WriteString(strings.Repeat(" ", maxWidth-charsout))
 	}
 
-	return out.String(), true
+	return out.String() + remaining, true
 }
 
 const (

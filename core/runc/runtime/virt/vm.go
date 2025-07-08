@@ -60,7 +60,7 @@ func NewRunmVMRuntime[VM vmm.VirtualMachine](
 		Spec:           opts.OciSpec,
 		RootfsMounts:   opts.Mounts,
 		StartingMemory: maxMemory.ToBytes(),
-		VCPUs:          1,
+		VCPUs:          2,
 		Platform:       units.PlatformLinuxARM64,
 		Bundle:         opts.Bundle,
 		HostOtlpPort:   opts.HostOtlpPort,

@@ -30,6 +30,8 @@ const (
 	VsockOtelPort                     = 3097
 	VsockDelimitedWriterProxyPort     = 3098
 	VsockRawWriterProxyPort           = 3099
+	VsockDebugPort                    = 2018
+	VsockPprofPort                    = 2017
 	VsockDelimitedLogProxyDelimiter   = rune(0x1F) // ASCII Record Separator
 	DelimitedWriterProxyGuestUnixPath = "/tmp/runm-delim-writer-proxy.sock"
 	RawWriterProxyGuestUnixPath       = "/tmp/runm-raw-writer-proxy.sock"

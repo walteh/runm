@@ -59,6 +59,7 @@ func (g *GuestAllocatedVsockSocket) Port() uint32 {
 }
 
 func (g *GuestAllocatedVsockSocket) Close() error {
+
 	return g.conn.Close()
 }
 
@@ -86,12 +87,14 @@ func NewGuestAllocatedVsockSocket(ctx context.Context, cid uint32, port uint32) 
 
 	go func() {
 		defer close(guestConn.ready)
+		defer listener.Close()
 		conn, err := listener.Accept()
 		if err != nil {
 			guestConn.readyErr = err
 			return
 		}
 		guestConn.conn = conn.(*vsock.Conn)
+		guestConn.listener.Close()
 	}()
 
 	return guestConn, nil

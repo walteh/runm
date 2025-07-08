@@ -17,7 +17,6 @@
 package goruncruntime
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -51,7 +50,11 @@ type ProcessMonitor interface {
 }
 
 type defaultMonitor struct {
-	forwardTo chan gorunc.Exit
+	forwardTo []chan gorunc.Exit
+}
+
+var defaultMonitorInstance *defaultMonitor = &defaultMonitor{
+	forwardTo: make([]chan gorunc.Exit, 0),
 }
 
 func (m *defaultMonitor) Start(c *exec.Cmd) (chan gorunc.Exit, error) {
@@ -90,7 +93,11 @@ func (m *defaultMonitor) Start(c *exec.Cmd) (chan gorunc.Exit, error) {
 		}
 		slog.Debug("DEBUG: monitor.Start after Wait", "event", event)
 		if m.forwardTo != nil {
-			m.forwardTo <- event
+			for _, ch := range m.forwardTo {
+				go func() {
+					ch <- event
+				}()
+			}
 		}
 		ec <- event
 		close(ec)
@@ -105,8 +112,6 @@ func (m *defaultMonitor) StartLocked(c *exec.Cmd) (chan gorunc.Exit, error) {
 	started := make(chan error)
 	ec := make(chan gorunc.Exit, 1)
 
-	ctx := context.Background()
-
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
@@ -114,16 +119,13 @@ func (m *defaultMonitor) StartLocked(c *exec.Cmd) (chan gorunc.Exit, error) {
 			}
 		}()
 
-		tickd := ticker.NewTicker(
+		defer ticker.NewTicker(
 			ticker.WithMessage("MONITOR:STARTLOCKED[RUNNING]"),
 			ticker.WithDoneMessage("MONITOR:STARTLOCKED[DONE]"),
 			ticker.WithLogLevel(slog.LevelDebug),
 			ticker.WithFrequency(15),
 			ticker.WithStartBurst(5),
-		)
-
-		go tickd.Run(ctx)
-		defer tickd.Stop(ctx)
+		).RunAsDefer()()
 
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -158,14 +160,17 @@ func (m *defaultMonitor) StartLocked(c *exec.Cmd) (chan gorunc.Exit, error) {
 			Status:    status,
 		}
 		if m.forwardTo != nil {
-			m.forwardTo <- event
+			for _, ch := range m.forwardTo {
+				go func() {
+					ch <- event
+				}()
+			}
 		}
 		ec <- event
+
 		slog.Info("DEBUG: monitor.StartLocked after Wait channel send", "pid", c.Process.Pid, "status", status)
 		close(ec)
 	}()
-
-	slog.Debug("DEBUG: monitor.StartLocked after go")
 
 	if err := <-started; err != nil {
 		return nil, err

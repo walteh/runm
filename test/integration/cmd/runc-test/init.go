@@ -15,6 +15,7 @@ import (
 
 	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/logging"
+	"github.com/walteh/runm/pkg/ticker"
 )
 
 func init() {
@@ -25,6 +26,15 @@ func init() {
 
 		closer := setupLogging()
 		defer closer()
+
+		defer ticker.NewTicker(
+			ticker.WithInterval(1*time.Millisecond),
+			ticker.WithStartBurst(50),
+			ticker.WithFrequency(15000),
+			ticker.WithMessage("RUNC:INIT[RUNNING]"),
+			ticker.WithDoneMessage("RUNC:INIT[DONE]"),
+			ticker.WithLogLevel(slog.LevelDebug),
+		).RunAsDefer()()
 
 		// debugNamespaces("runc-test[init]")
 		// debugMounts("runc-test[init]")
@@ -84,21 +94,21 @@ func setupLogging() func() {
 
 	// }
 
-	ticker := time.NewTicker(10 * time.Millisecond)
-	ticks := 0
-	closers = append(closers, func() {
-		ticker.Stop()
-	})
+	// ticker := time.NewTicker(10 * time.Millisecond)
+	// ticks := 0
+	// closers = append(closers, func() {
+	// 	ticker.Stop()
+	// })
 
-	go func() {
-		for tick := range ticker.C {
+	// go func() {
+	// 	for tick := range ticker.C {
 
-			ticks++
-			if ticks < 1000 || ticks%100 == 0 {
-				slog.Info("still running in runc-test[init], waiting to be killed", "tick", tick)
-			}
-		}
-	}()
+	// 		ticks++
+	// 		if ticks < 1000 || ticks%100 == 0 {
+	// 			slog.Info("still running in runc-test[init], waiting to be killed", "tick", tick)
+	// 		}
+	// 	}
+	// }()
 
 	return func() {
 		for _, closer := range closers {

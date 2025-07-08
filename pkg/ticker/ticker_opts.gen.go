@@ -3,6 +3,7 @@
 package ticker
 
 import (
+	"context"
 	"log/slog"
 	"time"
 )
@@ -21,6 +22,7 @@ func newTickerOpts(
 	o.logLevel = slog.Level(-4)
 	o.frequency = 60
 	o.message = "ticker running"
+	o.callerSkip = 1
 
 	for _, opt := range options {
 		opt(&o)
@@ -56,6 +58,18 @@ func WithDoneMessage(opt string) TickerOpt {
 	return func(o *TickerOpts) { o.doneMessage = opt }
 }
 
+func WithCallerSkip(opt int) TickerOpt {
+	return func(o *TickerOpts) { o.callerSkip = opt }
+}
+
+func WithSlogBaseContext(opt context.Context) TickerOpt {
+	return func(o *TickerOpts) { o.slogBaseContext = opt }
+}
+
+func WithMessageFunc(opt func() string) TickerOpt {
+	return func(o *TickerOpts) { o.messageFunc = opt }
+}
+
 func (o *TickerOpts) Validate() error {
 	return nil
 }
@@ -75,3 +89,9 @@ func (o TickerOpts) Message() string { return o.message }
 func (o TickerOpts) AttrFunc() func() []slog.Attr { return o.attrFunc }
 
 func (o TickerOpts) DoneMessage() string { return o.doneMessage }
+
+func (o TickerOpts) CallerSkip() int { return o.callerSkip }
+
+func (o TickerOpts) SlogBaseContext() context.Context { return o.slogBaseContext }
+
+func (o TickerOpts) MessageFunc() func() string { return o.messageFunc }

@@ -254,14 +254,33 @@ func (w *Watcher) handleEvent(data []byte) {
 		event := &exitProcEvent{}
 		binary.Read(buf, byteOrder, event)
 		pid := int(event.ProcessTgid)
+		tid := int(event.ProcessPid)
+
+		// Debug: Check for additional info that might indicate reaping
+		// if pid > 80 && pid < 200 {
+		// 	ctx := context.Background()
+		// 	ws := unix.WaitStatus(event.ExitCode)
+
+		// 	// Log detailed exit event info
+		// 	slog.DebugContext(ctx, fmt.Sprintf("PSNOTIFY_LINUX:RAW_EXIT[%d]", pid),
+		// 		"pid", pid, "tid", tid,
+		// 		"raw_exit_code", event.ExitCode, "raw_exit_signal", event.ExitSignal,
+		// 		"parsed_exit_code", ws.ExitStatus(), "parsed_signal", ws.Signal(),
+		// 		"header_what", hdr.What, "header_cpu", hdr.Cpu, "header_timestamp", hdr.Timestamp,
+		// 		"msg_seq", msg.Seq, "msg_ack", msg.Ack, "msg_len", msg.Len, "msg_flags", msg.Flags,
+		// 		"is_watching", w.isWatching(pid, PROC_EVENT_EXIT),
+		// 		"pid_vs_tid_same", pid == tid,
+		// 		"ws_exited", ws.Exited(), "ws_signaled", ws.Signaled(), "ws_stopped", ws.Stopped())
+		// }
 
 		if w.isWatching(pid, PROC_EVENT_EXIT) {
-			// w.RemoveWatch(pid)
+			if pid == tid {
+				w.RemoveWatch(pid)
 
-			// raw := uint32(uint32(event.ExitCode)<<8) | uint32(uint32(event.ExitSignal)&0x7F)
-			ws := unix.WaitStatus(event.ExitCode)
+				ws := unix.WaitStatus(event.ExitCode)
 
-			w.Exit <- &ProcEventExit{Pid: int(event.ProcessTgid), ExitCode: ws.ExitStatus(), ExitSignal: ws.Signal(), RawStatus: ws, Timestamp: now}
+				w.Exit <- &ProcEventExit{Pid: int(event.ProcessTgid), ExitCode: ws.ExitStatus(), ExitSignal: ws.Signal(), RawStatus: ws, Timestamp: now}
+			}
 		}
 	}
 }

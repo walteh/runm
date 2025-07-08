@@ -10,33 +10,49 @@ import (
 
 //go:opts
 type TickerOpts struct {
-	interval    time.Duration `default:"1s"`
-	startBurst  int           `default:"5"`
-	logLevel    slog.Level    `default:"-4"`
-	frequency   int           `default:"60"`
-	message     string        `default:"ticker running"`
-	attrFunc    func() []slog.Attr
-	doneMessage string
-	callerSkip  int `default:"1"`
+	interval        time.Duration `default:"1s"`
+	startBurst      int           `default:"5"`
+	logLevel        slog.Level    `default:"-4"`
+	frequency       int           `default:"60"`
+	message         string        `default:"ticker running"`
+	attrFunc        func() []slog.Attr
+	doneMessage     string
+	callerSkip      int `default:"1"`
+	slogBaseContext context.Context
+	messageFunc     func() string
 }
 
 type Ticker struct {
-	opts    TickerOpts
-	ticker  *time.Ticker
-	ticks   int
-	started bool
-	stopped bool
-	caller  uintptr
+	opts        TickerOpts
+	ticker      *time.Ticker
+	ticks       int
+	started     bool
+	stopped     bool
+	caller      uintptr
+	context     context.Context
+	messageFunc func() string
 }
 
 func NewTicker(opts ...TickerOpt) *Ticker {
 	t := newTickerOpts(opts...)
 	caller, _, _, _ := runtime.Caller(t.callerSkip)
+	if t.slogBaseContext == nil {
+		t.slogBaseContext = context.Background()
+	}
+
+	messageFunc := t.messageFunc
+	if messageFunc == nil {
+		messageFunc = func() string {
+			return t.message
+		}
+	}
 
 	return &Ticker{
-		ticker: time.NewTicker(t.Interval()),
-		opts:   t,
-		caller: caller,
+		ticker:      time.NewTicker(t.Interval()),
+		opts:        t,
+		caller:      caller,
+		context:     context.WithoutCancel(t.slogBaseContext),
+		messageFunc: messageFunc,
 	}
 }
 
@@ -50,19 +66,44 @@ func logAttrs(ctx context.Context, logLevel slog.Level, message string, caller u
 	slog.Default().Handler().Handle(ctx, rec)
 }
 
-func (t *Ticker) Run(ctx context.Context) error {
+func (t *Ticker) RunWithWaiter(fn func()) error {
 	if t.started {
 		return errors.New("ticker already started")
 	}
 	t.started = true
+	go t.run()
+	fn()
+	t.Stop()
+	return nil
+}
 
-	defer t.Stop(ctx)
+func (t *Ticker) RunWithWaitOnContext(ctx context.Context) {
+	if t.started {
+		panic("ticker already started")
+	}
+	t.started = true
+	go t.run()
+	<-ctx.Done()
+	t.Stop()
+}
+
+func (t *Ticker) RunAsDefer() func() {
+	if t.started {
+		panic("ticker already started")
+	}
+	t.started = true
+	go t.run()
+	return t.Stop
+}
+
+func (t *Ticker) run() {
+
 	for range t.ticker.C {
 		// if ctx.Err() != nil {
 		// 	return ctx.Err()
 		// }
 		if t.stopped {
-			return nil
+			return
 		}
 		t.ticks++
 		if t.ticks < t.opts.StartBurst() || t.ticks%t.opts.Frequency() == 0 {
@@ -71,14 +112,14 @@ func (t *Ticker) Run(ctx context.Context) error {
 				attrs = t.opts.attrFunc()
 			}
 			attrs = append(attrs, slog.Any("tick", t.ticks))
-			attrs = append(attrs, slog.Any("ctx_err", ctx.Err()))
-			logAttrs(ctx, t.opts.logLevel, t.opts.message, t.caller, attrs...)
+			attrs = append(attrs, slog.Any("ctx_err", t.context.Err()))
+			logAttrs(t.context, t.opts.logLevel, t.messageFunc(), t.caller, attrs...)
 		}
 	}
-	return nil
+
 }
 
-func (t *Ticker) Stop(ctx context.Context) {
+func (t *Ticker) Stop() {
 	if t.stopped {
 		return
 	}
@@ -98,5 +139,5 @@ func (t *Ticker) Stop(ctx context.Context) {
 	if t.opts.attrFunc != nil {
 		attrs = append(attrs, t.opts.attrFunc()...)
 	}
-	logAttrs(ctx, t.opts.logLevel, t.opts.doneMessage, t.caller, attrs...)
+	logAttrs(t.context, t.opts.logLevel, t.opts.doneMessage, t.caller, attrs...)
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/walteh/runm/core/runc/socket"
 	"github.com/walteh/runm/core/runc/state"
 
+	gorunc "github.com/containerd/go-runc"
 	runmv1 "github.com/walteh/runm/proto/v1"
 )
 
@@ -105,7 +106,11 @@ func (s *Server) AllocateConsole(ctx context.Context, req *runmv1.AllocateConsol
 
 func (s *Server) AllocateIO(ctx context.Context, req *runmv1.AllocateIORequest) (*runmv1.AllocateIOResponse, error) {
 	ioref := runtime.NewIoReferenceId()
-	pio, err := s.runtime.NewPipeIO(ctx, int(req.GetIoUid()), int(req.GetIoGid()))
+	pio, err := s.runtime.NewPipeIO(ctx, int(req.GetIoUid()), int(req.GetIoGid()), func(opts *gorunc.IOOption) {
+		opts.OpenStdin = req.GetOpenStdin()
+		opts.OpenStdout = req.GetOpenStdout()
+		opts.OpenStderr = req.GetOpenStderr()
+	})
 	if err != nil {
 		return nil, errors.Errorf("failed to allocate io: %w", err)
 	}
@@ -270,10 +275,15 @@ func (s *Server) BindIOToSockets(ctx context.Context, req *runmv1.BindIOToSocket
 		}
 	}
 
-	err = socket.BindIOToSockets(ctx, io, iosocks[0], iosocks[1], iosocks[2])
-	if err != nil {
-		return nil, err
-	}
+	io.Close()
+
+	ios := socket.NewAllocatedSocketIO(iosocks[0], iosocks[1], iosocks[2])
+	s.state.StoreOpenIO(req.GetIoReferenceId(), ios)
+
+	// err = socket.BindIOToSockets(ctx, io, ios)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	return &runmv1.BindIOToSocketsResponse{}, nil
 }

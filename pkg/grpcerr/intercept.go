@@ -36,16 +36,14 @@ func UnaryServerInterceptor(
 		slog.DebugContext(ctx, fmt.Sprintf("%s[END]", id), "service", service, "error", errz, "duration", time.Since(start))
 	}()
 
-	tickd := ticker.NewTicker(
+	defer ticker.NewTicker(
 		ticker.WithInterval(1*time.Second),
 		ticker.WithStartBurst(5),
 		ticker.WithFrequency(15),
 		ticker.WithMessage(fmt.Sprintf("%s[RUNNING]", id)),
-		// ticker.WithDoneMessage(fmt.Sprintf("%s[DONE]", id)),
-	)
-
-	go tickd.Run(ctx)
-	defer tickd.Stop(ctx)
+		ticker.WithSlogBaseContext(ctx),
+		ticker.WithLogLevel(slog.LevelDebug),
+	).RunAsDefer()()
 
 	resp, errz = handler(ctx, req)
 	if errz == nil {
@@ -101,16 +99,13 @@ func UnaryClientInterceptor(
 	// 	slog.InfoContext(ctx, string(debug.Stack()))
 	// }
 
-	tickd := ticker.NewTicker(
+	defer ticker.NewTicker(
 		ticker.WithInterval(1*time.Second),
 		ticker.WithStartBurst(5),
 		ticker.WithFrequency(15),
 		ticker.WithMessage(fmt.Sprintf("%s[RUNNING]", id)),
 		// ticker.WithDoneMessage(fmt.Sprintf("TICK:GRPC-CLIENT:%s:%s[DONE]", service, operation)),
-	)
-
-	go tickd.Run(ctx)
-	defer tickd.Stop(ctx)
+	).RunAsDefer()()
 
 	errd := invoker(ctx, method, req, reply, cc, opts...)
 	slog.DebugContext(ctx, fmt.Sprintf("%s[END]", id), "service", service, "error", errd, "duration", time.Since(start))

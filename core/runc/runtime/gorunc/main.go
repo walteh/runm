@@ -25,6 +25,7 @@ import (
 	gorunc "github.com/containerd/go-runc"
 
 	"github.com/walteh/runm/core/runc/runtime"
+	"github.com/walteh/runm/core/runc/runtime/gorunc/reaper"
 	"github.com/walteh/runm/pkg/logging"
 )
 
@@ -38,12 +39,6 @@ type GoRuncRuntime struct {
 	reaperChanMutex   sync.Mutex
 	// sharedDirPathPrefix string
 }
-
-// Checkpoint implements runtime.Runtime.
-
-// func (r *GoRuncRuntime) SharedDir() string {
-// 	return r.internal.Root
-// }
 
 func WrapdGoRuncRuntime(rt *gorunc.Runc) *GoRuncRuntime {
 	r := &GoRuncRuntime{
@@ -86,26 +81,22 @@ func (r *GoRuncRuntime) SubscribeToReaperExits2(ctx context.Context) (<-chan gor
 	return ch, nil
 }
 
+func init() {
+	// gorunc.Monitor = defaultMonitorInstance
+	gorunc.Monitor = reaper.Default
+
+	reaper.SetSubreaper(os.Getpid())
+
+}
+
 func (r *GoRuncRuntime) SubscribeToReaperExits(ctx context.Context) (<-chan gorunc.Exit, error) {
 	slog.InfoContext(ctx, "subscribing to custom monitor exits")
 
-	initOnce.Do(func() {
-		// gorunc.Monitor = reaper.Default
+	defaultMonitorInstance.forwardTo = append(defaultMonitorInstance.forwardTo, r.reaperCh)
 
-		// r.reaperCh = reaper.Default.Subscribe()
-
-		// customMonitor = &CustomMonitor{
-		// 	defaultMonitor: goRuncProcessMonitor,
-		// 	subscribers:    make(map[chan gorunc.Exit]struct{}),
-		// }
-
-		gorunc.Monitor = &defaultMonitor{
-			forwardTo: r.reaperCh,
-		}
-
-	})
-
-	// r.reaperCh =
+	if gorunc.Monitor == reaper.Default {
+		return reaper.Default.Subscribe(), nil
+	}
 
 	return r.reaperCh, nil
 }

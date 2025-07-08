@@ -62,7 +62,7 @@ func LogRecord(ctx context.Context, level slog.Level, callerOffset int, msg stri
 	for _, arg := range args {
 		rec.AddAttrs(slog.Attr{Key: "arg", Value: slog.AnyValue(arg)})
 	}
-	slog.Default().Log(ctx, slog.LevelDebug, msg, args...)
+	slog.Default().Handler().Handle(ctx, rec)
 }
 
 // func ForwardMyStdioWritersTo(ctx context.Context, connOut, connErr interface{ File() (*os.File, error) }) error {

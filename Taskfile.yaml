@@ -530,6 +530,8 @@ tasks:
             CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
             COMMAND: '{{.COMMAND | default "sh"}}'
             FLAGS: '{{.FLAGS | default "-it"}}'
+
+        interactive: true
         cmds:
           - cmd: |-
                 {{.TIMEOUT}} sudo -A -E {{.TEST_BIN_DIR}}/nerdctl-test exec \
@@ -595,6 +597,7 @@ tasks:
     dev:2025-07-05:01:
         desc: runs the shim for 2025-07-05 - detached mode
         deps: ['test:linux:runtime', 'test:binaries']
+        interactive: true
         vars:
             TMP_DIR:
                 sh: mktemp -d -t runm-2025-07-05-XXXXXX

@@ -103,15 +103,14 @@ func wrap[I, O any](e *errTaskService, f func(context.Context, I) (O, error)) fu
 
 		ctx = slogctx.Append(ctx, slog.String("ttrpc_method", realName))
 
-		tickd := ticker.NewTicker(
+		defer ticker.NewTicker(
 			ticker.WithInterval(1*time.Second),
 			ticker.WithStartBurst(5),
 			ticker.WithFrequency(15),
 			ticker.WithMessage(fmt.Sprintf("%s[RUNNING]", id)),
+			ticker.WithSlogBaseContext(ctx),
 			// ticker.WithDoneMessage(fmt.Sprintf("TICK:SHIM:TTRPC:DONE  :[%s]", realName)),
-		)
-		go tickd.Run(ctx)
-		defer tickd.Stop(ctx)
+		).RunAsDefer()()
 
 		resp, retErr = f(ctx, req)
 

@@ -214,36 +214,41 @@ func (r *runmLinuxInit) runPsnotify(ctx context.Context, exitChan chan gorunc.Ex
 			if grp == nil {
 				slog.WarnContext(ctx, fmt.Sprintf("PSNOTIFY:EXIT-OF-ALREADY-REAPED[%d]", pid), "pid", pid)
 				continue
+			} else {
+				grp.resolvePidData()
+				slog.DebugContext(ctx, fmt.Sprintf("PSNOTIFY:REAP[%d]", pid), "info", grp)
 			}
-
-			grp.resolvePidData()
 
 			// slog.Log(ctx, slog.LevelDebug, "PSNOTIFY[EXIT]", "info", grp)
 
-			go func() {
+			// go func() {
 
-				exitFd, err := getPidFd(pid)
-				if err == nil {
-					err := pidfdWait(exitFd)
-					if err != nil {
-						slog.ErrorContext(ctx, "failed to wait for process", "error", err, "info", grp)
-					}
-				}
+			// 	exitFd, err := getPidFd(pid)
+			// 	if err == nil {
+			// 		err := pidfdWait(exitFd)
+			// 		if err != nil {
+			// 			slog.ErrorContext(ctx, "failed to wait for process", "error", err, "info", grp)
+			// 		}
+			// 	}
 
-				slog.DebugContext(ctx, fmt.Sprintf("PSNOTIFY:REAP[%d]", pid), "info", grp)
+			// 	slog.DebugContext(ctx, fmt.Sprintf("PSNOTIFY:REAP[%d]", pid), "info", grp)
 
-				exitChan <- gorunc.Exit{
-					Pid:       pid,
-					Status:    int(status.ExitCode),
-					Timestamp: status.Timestamp,
-				}
+			// 	exitChan <- gorunc.Exit{
+			// 		Pid:       pid,
+			// 		Status:    int(status.ExitCode),
+			// 		Timestamp: status.Timestamp,
+			// 	}
 
-				watcher.RemoveWatch(pid)
-				pidToCgroup.Lock()
-				delete(pidToCgroup.m, pid)
-				pidToCgroup.Unlock()
+			// 	watcher.RemoveWatch(pid)
+			// 	pidToCgroup.Lock()
+			// 	delete(pidToCgroup.m, pid)
+			// 	pidToCgroup.Unlock()
 
-			}()
+			// }()
+			watcher.RemoveWatch(pid)
+			pidToCgroup.Lock()
+			delete(pidToCgroup.m, pid)
+			pidToCgroup.Unlock()
 
 			// Clean up
 

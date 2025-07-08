@@ -332,6 +332,40 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 		return nil
 	})
 
+	errgrp.Go(func() error {
+		// open up a tcp port (lets just do 2017)
+		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", 2017))
+		if err != nil {
+			slog.ErrorContext(ctx, "error listening on tcp port", "err", err)
+			return errors.Errorf("listening on tcp port: %w", err)
+		}
+		defer listener.Close()
+		slog.InfoContext(ctx, "running vsock delimited writer proxy server", "port", 2017)
+		err = rvm.RunVsockProxyClient(ctx, uint32(constants.VsockDebugPort), listener)
+		if err != nil {
+			slog.ErrorContext(ctx, "error running vsock delimited writer proxy server", "error", err)
+			return errors.Errorf("running vsock delimited writer proxy server: %w", err)
+		}
+		return nil
+	})
+
+	errgrp.Go(func() error {
+		// open up a tcp port for pprof (port 6060)
+		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", 6060))
+		if err != nil {
+			slog.ErrorContext(ctx, "error listening on tcp port for pprof", "err", err)
+			return errors.Errorf("listening on tcp port for pprof: %w", err)
+		}
+		defer listener.Close()
+		slog.InfoContext(ctx, "running vsock pprof proxy server", "port", 6060)
+		err = rvm.RunVsockProxyClient(ctx, uint32(constants.VsockPprofPort), listener)
+		if err != nil {
+			slog.ErrorContext(ctx, "error running vsock pprof proxy server", "error", err)
+			return errors.Errorf("running vsock pprof proxy server: %w", err)
+		}
+		return nil
+	})
+
 	if rvm.hostOtlpPort != 0 {
 		errgrp.Go(func() error {
 			err = rvm.SetupOtelForwarder(ctx)
@@ -663,6 +697,47 @@ func (rvm *RunningVM[VM]) RunVsockProxyServer(ctx context.Context, port uint32, 
 				slog.ErrorContext(ctx, "error copying to writer", "err", err, "port", port)
 			} else {
 				slog.InfoContext(ctx, "copied to writer - closing connection", "port", port, "bytes", tb)
+			}
+		}()
+	}
+}
+
+func (rvm *RunningVM[VM]) RunVsockProxyClient(ctx context.Context, port uint32, listener net.Listener) error {
+
+	for {
+		myConn, err := listener.Accept()
+		if err != nil {
+			slog.ErrorContext(ctx, "vsock accept failed", "err", err)
+			continue
+		}
+
+		defer myConn.Close()
+
+		// open up
+		vConn, err := rvm.vm.VSockConnect(ctx, port)
+		if err != nil {
+			slog.ErrorContext(ctx, "vsock listen failed", "err", err)
+			return errors.Errorf("listening on vsock: %w", err)
+		}
+		defer vConn.Close()
+
+		go func() {
+			defer myConn.Close()
+			tb, err := io.Copy(myConn, vConn)
+			if err != nil {
+				slog.ErrorContext(ctx, "error copying to myConn", "err", err, "port", port, "bytes", tb)
+			} else {
+				slog.InfoContext(ctx, "copied to myConn - closing connection", "port", port, "bytes", tb)
+			}
+		}()
+
+		go func() {
+			defer vConn.Close()
+			tb, err := io.Copy(vConn, myConn)
+			if err != nil {
+				slog.ErrorContext(ctx, "error copying to vConn", "err", err, "port", port, "bytes", tb)
+			} else {
+				slog.InfoContext(ctx, "copied to vConn - closing connection", "port", port, "bytes", tb)
 			}
 		}()
 	}

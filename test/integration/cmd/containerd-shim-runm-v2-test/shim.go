@@ -86,7 +86,7 @@ func ShimMain() {
 				"sys_time", rusage.Stime)
 		}
 
-		tickd := ticker.NewTicker(
+		defer ticker.NewTicker(
 			ticker.WithInterval(1*time.Second),
 			ticker.WithStartBurst(5),
 			ticker.WithFrequency(15),
@@ -109,9 +109,7 @@ func ShimMain() {
 					slog.GroupAttrs("resource_usage", attrs...),
 				}
 			}),
-		)
-		defer tickd.Stop(ctx)
-		go tickd.Run(ctx)
+		).RunAsDefer()()
 
 	}
 
