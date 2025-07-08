@@ -39,7 +39,7 @@ func UnaryServerInterceptor(
 	tickd := ticker.NewTicker(
 		ticker.WithInterval(1*time.Second),
 		ticker.WithStartBurst(5),
-		ticker.WithFrequency(60),
+		ticker.WithFrequency(15),
 		ticker.WithMessage(fmt.Sprintf("%s[RUNNING]", id)),
 		// ticker.WithDoneMessage(fmt.Sprintf("%s[DONE]", id)),
 	)

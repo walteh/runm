@@ -87,9 +87,9 @@ func ShimMain() {
 		}
 
 		tickd := ticker.NewTicker(
-			ticker.WithInterval(60*time.Second),
+			ticker.WithInterval(1*time.Second),
 			ticker.WithStartBurst(5),
-			ticker.WithFrequency(60),
+			ticker.WithFrequency(15),
 			ticker.WithMessage("SHIM:PROCESS[RUNNING]"),
 			ticker.WithDoneMessage("SHIM:PROCESS[DONE]"),
 			ticker.WithLogLevel(slog.LevelDebug),

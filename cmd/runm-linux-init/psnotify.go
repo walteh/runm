@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -39,6 +40,36 @@ type pidInfo struct {
 	forkEvent *psnotify.ProcEventFork
 }
 
+func (p *pidInfo) id() string {
+	switch {
+	case p.pid == 1:
+		return "init[1]"
+	case filepath.Base(p.argc) == "busybox" && len(p.argv) > 0:
+		if p.argv[0] == p.argc {
+			if len(p.argv) > 1 {
+				return fmt.Sprintf("busybox:%s[%d]", p.argv[1], p.pid)
+			}
+			return fmt.Sprintf("busybox[%d]", p.pid)
+		}
+		if len(p.argv) > 0 {
+			return fmt.Sprintf("busybox:%s[%d]", p.argv[0], p.pid)
+		}
+		return fmt.Sprintf("busybox[%d]", p.pid)
+	case filepath.Base(p.argc) == "runc" || filepath.Base(p.argc) == "runc-test":
+		knownRuncNames := []string{"start", "create", "run", "init"}
+		for _, name := range knownRuncNames {
+			for _, arg := range p.argv {
+				if arg == name {
+					return fmt.Sprintf("runc:%s[%d]", name, p.pid)
+				}
+			}
+		}
+		return fmt.Sprintf("runc:unknown[%d]", p.pid)
+	default:
+		return fmt.Sprintf("%s[%d]", p.argc, p.pid)
+	}
+}
+
 func (p *pidInfo) ArgvNoFlags() []string {
 	argv := []string{}
 	for _, arg := range p.argv {
@@ -59,9 +90,20 @@ func (p *pidInfo) LogValue() slog.Value {
 			slog.Int("pid", p.parent.pid),
 			slog.String("cgroup", p.parent.cgroup),
 			slog.String("argc", p.parent.argc),
+			slog.String("id", p.parent.id()),
 			// slog.String("argv", strings.Join(p.parent.argv, " ")),
 		))
 	}
+
+	myid := p.id()
+
+	parentChain := []string{"init[1]"}
+	for pz := p.parent; pz != nil; pz = pz.parent {
+		parentChain = append(parentChain, pz.id())
+	}
+	parentChain = append(parentChain, myid)
+
+	attrs = append(attrs, slog.String("chain", strings.Join(parentChain, " -> ")), slog.String("id", myid))
 
 	attrs = append(attrs, slog.Group("children",
 		slog.Int("count", len(p.children)),
@@ -70,7 +112,7 @@ func (p *pidInfo) LogValue() slog.Value {
 	attrs = append(attrs, slog.Int("pid", p.pid),
 		slog.String("cgroup", p.cgroup),
 		slog.String("argc", p.argc),
-		slog.String("argv", strings.Join(p.argv, " ")),
+		// slog.String("argv", strings.Join(p.argv, " ")),
 	)
 
 	if p.exitEvent != nil {
@@ -156,26 +198,9 @@ func (r *runmLinuxInit) runPsnotify(ctx context.Context, exitChan chan gorunc.Ex
 
 			// slog.DebugContext(ctx, "PSNOTIFY[FORK]", "parent", parent, "child", child, "parent_argc", parentArgc, "child_argc", info.argc)
 
-			if err := watcher.Watch(child, psnotify.PROC_EVENT_EXIT); err != nil {
+			if err := watcher.Watch(child, psnotify.PROC_EVENT_FORK|psnotify.PROC_EVENT_EXEC|psnotify.PROC_EVENT_EXIT); err != nil {
 				slog.ErrorContext(ctx, "failed to watch child", "error", err)
 			}
-
-		// case status := <-watcher.Exec:
-		// 	pid := int(status.Pid)
-		// 	pidToCgroup.RLock()
-		// 	info := pidToCgroup.m[pid]
-		// 	pidToCgroup.RUnlock()
-
-		// 	slog.DebugContext(ctx, "PSNOTIFY[EXEC]", "pid", pid)
-
-		// 	if info.pidfd == 0 {
-		// 		info.pidfd, err = getPidFd(pid)
-		// 		if err != nil {
-		// 			slog.ErrorContext(ctx, "failed to get pidfd in exec", "error", err)
-		// 		} else {
-		// 			slog.InfoContext(ctx, "got pidfd in exec", "pid", pid)
-		// 		}
-		// 	}
 
 		case status := <-watcher.Exit:
 			pid := int(status.Pid)
@@ -185,6 +210,11 @@ func (r *runmLinuxInit) runPsnotify(ctx context.Context, exitChan chan gorunc.Ex
 				grp.exitEvent = status
 			}
 			pidToCgroup.Unlock()
+
+			if grp == nil {
+				slog.WarnContext(ctx, fmt.Sprintf("PSNOTIFY:EXIT-OF-ALREADY-REAPED[%d]", pid), "pid", pid)
+				continue
+			}
 
 			grp.resolvePidData()
 
@@ -207,24 +237,39 @@ func (r *runmLinuxInit) runPsnotify(ctx context.Context, exitChan chan gorunc.Ex
 					Status:    int(status.ExitCode),
 					Timestamp: status.Timestamp,
 				}
+
+				watcher.RemoveWatch(pid)
+				pidToCgroup.Lock()
+				delete(pidToCgroup.m, pid)
+				pidToCgroup.Unlock()
+
 			}()
 
 			// Clean up
-			watcher.RemoveWatch(pid)
-			pidToCgroup.Lock()
-			delete(pidToCgroup.m, pid)
-			pidToCgroup.Unlock()
+
 		case execEv := <-watcher.Exec:
 			pid := int(execEv.Pid)
 			pidToCgroup.RLock()
 			grp := pidToCgroup.m[pid]
 			pidToCgroup.RUnlock()
 
-			grp.resolvePidData()
-
 			if grp != nil {
-				slog.Log(ctx, slog.LevelDebug, fmt.Sprintf("PSNOTIFY:FORK-EXEC[%d]", pid), "info", grp)
+				grp.resolvePidData()
 				grp.execEvent = execEv
+
+				// If this looks like a container init process after exec, ensure we're watching for forks
+				// isContainerInit := grp.cgroup != "/" && grp.cgroup != "" && !strings.Contains(grp.argc, "runc")
+				// if isContainerInit {
+				// 	slog.InfoContext(ctx, fmt.Sprintf("PSNOTIFY:EXEC-CONTAINER-INIT[%d]", pid), "info", grp)
+				// 	// Re-establish fork watching for container init processes
+				// 	if err := watcher.Watch(pid, psnotify.PROC_EVENT_FORK|psnotify.PROC_EVENT_EXEC|psnotify.PROC_EVENT_EXIT); err != nil {
+				// 		slog.ErrorContext(ctx, "failed to re-watch container init after exec", "error", err, "pid", pid)
+				// 	} else {
+				// 		slog.DebugContext(ctx, "re-established fork watching for container init after exec", "pid", pid, "info", grp)
+				// 	}
+				// } else {
+				// 	slog.Log(ctx, slog.LevelDebug, fmt.Sprintf("PSNOTIFY:FORK-EXEC[%d]", pid), "info", grp)
+				// }
 			} else {
 				slog.InfoContext(ctx, fmt.Sprintf("PSNOTIFY:EXEC[%d]", pid), "info", grp)
 			}

@@ -160,6 +160,26 @@ func (w *Watcher) isWatching(pid int, event uint32) bool {
 	return false
 }
 
+// // Debug helper to dump current watch state
+// func (w *Watcher) debugWatches() {
+// 	ctx := context.Background()
+// 	watchList := make([]string, 0, len(w.watches))
+// 	for pid, watch := range w.watches {
+// 		flags := []string{}
+// 		if watch.flags&PROC_EVENT_FORK != 0 {
+// 			flags = append(flags, "FORK")
+// 		}
+// 		if watch.flags&PROC_EVENT_EXEC != 0 {
+// 			flags = append(flags, "EXEC")
+// 		}
+// 		if watch.flags&PROC_EVENT_EXIT != 0 {
+// 			flags = append(flags, "EXIT")
+// 		}
+// 		watchList = append(watchList, fmt.Sprintf("%d:[%s]", pid, strings.Join(flags, ",")))
+// 	}
+// 	slog.DebugContext(ctx, "PSNOTIFY_LINUX:CURRENT_WATCHES", "total", len(w.watches), "watches", strings.Join(watchList, " "))
+// }
+
 // Dispatch events from the netlink socket to the Event channels.
 // Unlike bsd kqueue, netlink receives events for all pids,
 // so we apply filtering based on the watch table via isWatching()
@@ -179,6 +199,31 @@ func (w *Watcher) handleEvent(data []byte) {
 		ppid := int(event.ParentTgid)
 		pid := int(event.ChildTgid)
 
+		// Debug: log all fork events we receive for processes we might care about
+		// if ppid > 1 && pid > 1 { // Skip kernel threads
+		// 	isWatchingExec := w.isWatching(ppid, PROC_EVENT_EXEC)
+		// 	isWatchingFork := w.isWatching(ppid, PROC_EVENT_FORK)
+
+		// 	// Log fork events for processes we're tracking or that look like container processes
+		// 	if isWatchingFork || isWatchingExec || (ppid > 80 && ppid < 200) {
+		// 		ctx := context.Background()
+		// 		if isWatchingFork {
+		// 			slog.DebugContext(ctx, fmt.Sprintf("PSNOTIFY_LINUX:FORK[%d->%d]", ppid, pid),
+		// 				"parent_pid", ppid, "child_pid", pid, "watching_fork", true, "will_send_event", true)
+		// 		} else if isWatchingExec {
+		// 			slog.DebugContext(ctx, fmt.Sprintf("PSNOTIFY_LINUX:FORK[%d->%d]", ppid, pid),
+		// 				"parent_pid", ppid, "child_pid", pid, "watching_exec", true, "watching_fork", false, "will_send_event", false)
+		// 		} else {
+		// 			slog.DebugContext(ctx, fmt.Sprintf("PSNOTIFY_LINUX:FORK[%d->%d]", ppid, pid),
+		// 				"parent_pid", ppid, "child_pid", pid, "watching", false, "will_send_event", false)
+		// 			// For problematic forks, dump the current watch state
+		// 			if ppid > 80 && ppid < 200 {
+		// 				w.debugWatches()
+		// 			}
+		// 		}
+		// 	}
+		// }
+
 		if w.isWatching(ppid, PROC_EVENT_EXEC) {
 			// follow forks
 			watch, _ := w.watches[ppid]
@@ -193,6 +238,15 @@ func (w *Watcher) handleEvent(data []byte) {
 		binary.Read(buf, byteOrder, event)
 		pid := int(event.ProcessTgid)
 
+		// Debug: log exec events for processes we're watching
+		// if w.isWatching(pid, PROC_EVENT_EXEC) || w.isWatching(pid, PROC_EVENT_FORK) || w.isWatching(pid, PROC_EVENT_EXIT) {
+		// 	ctx := context.Background()
+		// 	slog.DebugContext(ctx, fmt.Sprintf("PSNOTIFY_LINUX:EXEC[%d]", pid),
+		// 		"pid", pid, "watching_exec", w.isWatching(pid, PROC_EVENT_EXEC),
+		// 		"watching_fork", w.isWatching(pid, PROC_EVENT_FORK),
+		// 		"will_send_event", w.isWatching(pid, PROC_EVENT_EXEC))
+		// }
+
 		if w.isWatching(pid, PROC_EVENT_EXEC) {
 			w.Exec <- &ProcEventExec{Pid: pid, Timestamp: now}
 		}
@@ -202,7 +256,7 @@ func (w *Watcher) handleEvent(data []byte) {
 		pid := int(event.ProcessTgid)
 
 		if w.isWatching(pid, PROC_EVENT_EXIT) {
-			w.RemoveWatch(pid)
+			// w.RemoveWatch(pid)
 
 			// raw := uint32(uint32(event.ExitCode)<<8) | uint32(uint32(event.ExitSignal)&0x7F)
 			ws := unix.WaitStatus(event.ExitCode)

@@ -35,6 +35,7 @@ type GoRuncRuntime struct {
 	internal          *gorunc.Runc
 	reaperCh          chan gorunc.Exit
 	reaperSubscribers map[chan gorunc.Exit]struct{}
+	reaperChanMutex   sync.Mutex
 	// sharedDirPathPrefix string
 }
 
@@ -45,11 +46,24 @@ type GoRuncRuntime struct {
 // }
 
 func WrapdGoRuncRuntime(rt *gorunc.Runc) *GoRuncRuntime {
-	return &GoRuncRuntime{
+	r := &GoRuncRuntime{
 		internal:          rt,
-		reaperCh:          make(chan gorunc.Exit, 1),
+		reaperCh:          make(chan gorunc.Exit, 32),
 		reaperSubscribers: make(map[chan gorunc.Exit]struct{}),
+		reaperChanMutex:   sync.Mutex{},
 	}
+	go func() {
+		for exit := range r.reaperCh {
+			r.reaperChanMutex.Lock()
+			defer r.reaperChanMutex.Unlock()
+			for subscriber := range r.reaperSubscribers {
+				go func() {
+					subscriber <- exit
+				}()
+			}
+		}
+	}()
+	return r
 }
 
 var initOnce sync.Once
@@ -64,51 +78,36 @@ type MonitorWithSubscribers interface {
 
 var customMonitor MonitorWithSubscribers
 
-func (r *GoRuncRuntime) SubscribeToReaperExits(ctx context.Context) (<-chan gorunc.Exit, error) {
+func (r *GoRuncRuntime) SubscribeToReaperExits2(ctx context.Context) (<-chan gorunc.Exit, error) {
 	ch := make(chan gorunc.Exit, 1)
+	r.reaperChanMutex.Lock()
+	defer r.reaperChanMutex.Unlock()
 	r.reaperSubscribers[ch] = struct{}{}
-	go func() {
-		for exit := range r.reaperCh {
-			for subscriber := range r.reaperSubscribers {
-				go func() {
-					subscriber <- exit
-				}()
-			}
-		}
-	}()
-	return r.reaperCh, nil
+	return ch, nil
 }
 
-func (r *GoRuncRuntime) SubscribeToReaperExits2(ctx context.Context) (<-chan gorunc.Exit, error) {
+func (r *GoRuncRuntime) SubscribeToReaperExits(ctx context.Context) (<-chan gorunc.Exit, error) {
 	slog.InfoContext(ctx, "subscribing to custom monitor exits")
 
 	initOnce.Do(func() {
-		// Check if we're running as PID 1
-		if os.Getpid() == 1 {
-			// Use the PID 1 optimized monitor
-			// Create a new PID 1 monitor
-			pid1Monitor := NewPid1Monitor()
+		// gorunc.Monitor = reaper.Default
 
-			// Set it as the global monitor
-			gorunc.Monitor = pid1Monitor
+		// r.reaperCh = reaper.Default.Subscribe()
 
-			customMonitor = pid1Monitor
-			slog.Info("running as PID 1, using optimized monitor")
-		} else {
-			// Initialize the standard custom monitor
-			customMonitor = &CustomMonitor{
-				defaultMonitor: gorunc.Monitor,
-				subscribers:    make(map[chan gorunc.Exit]struct{}),
-			}
+		// customMonitor = &CustomMonitor{
+		// 	defaultMonitor: goRuncProcessMonitor,
+		// 	subscribers:    make(map[chan gorunc.Exit]struct{}),
+		// }
 
-			// Replace the default monitor with our custom monitor
-			gorunc.Monitor = customMonitor
-
-			slog.Debug("initialized custom process monitor")
+		gorunc.Monitor = &defaultMonitor{
+			forwardTo: r.reaperCh,
 		}
+
 	})
 
-	return customMonitor.Subscribe(ctx), nil
+	// r.reaperCh =
+
+	return r.reaperCh, nil
 }
 
 type wrappedConsoleSocket struct {

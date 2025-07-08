@@ -613,8 +613,9 @@ tasks:
             vars:
                 FLAGS: ''
                 STDOUT_FILE: '{{.TMP_DIR}}/stdout2.txt'
+          - cmd: cat {{.TMP_DIR}}/stdout2.txt
           - cmd: |-
-                cat {{.TMP_DIR}}/stdout2.txt | grep $(cat {{.TMP_DIR}}/stdout.txt) || (echo "container not found in ps output" && exit 1)
+                cat {{.TMP_DIR}}/stdout2.txt | grep $(cat {{.TMP_DIR}}/stdout.txt | cut -c1-12) || (echo "container not found in ps output" && exit 1)
           - task: dev:nerdctl-test:exec
             vars:
                 COMMAND: 'echo "hello world! this is a test"'

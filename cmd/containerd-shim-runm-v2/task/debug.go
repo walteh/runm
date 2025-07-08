@@ -106,7 +106,7 @@ func wrap[I, O any](e *errTaskService, f func(context.Context, I) (O, error)) fu
 		tickd := ticker.NewTicker(
 			ticker.WithInterval(1*time.Second),
 			ticker.WithStartBurst(5),
-			ticker.WithFrequency(60),
+			ticker.WithFrequency(15),
 			ticker.WithMessage(fmt.Sprintf("%s[RUNNING]", id)),
 			// ticker.WithDoneMessage(fmt.Sprintf("TICK:SHIM:TTRPC:DONE  :[%s]", realName)),
 		)

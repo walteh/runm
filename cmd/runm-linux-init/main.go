@@ -296,6 +296,8 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 			ticker.WithMessage("RUNM:INIT[RUNNING]"),
 			ticker.WithDoneMessage("RUNM:INIT[DONE]"),
 			ticker.WithLogLevel(slog.LevelDebug),
+			ticker.WithFrequency(15),
+			ticker.WithStartBurst(5),
 		)
 		return ticker.Run(ctx)
 	})

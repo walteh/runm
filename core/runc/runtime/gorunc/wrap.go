@@ -47,11 +47,11 @@ func waitForFileToExistChan(ctx context.Context, pidfile string) chan int {
 	return pidfilechan
 }
 
-func (r *GoRuncRuntime) reaperLoggingError(ctx context.Context, parentDoneChan chan string, pidfile string, name string, pidchan chan int) {
+func (r *GoRuncRuntime) reaperLoggingError(ctx context.Context, parentDoneChan chan string, pidfile string, name string, pidchan chan int, justWait bool) {
 	errchan := make(chan error, 1)
 	defer close(errchan)
 	go func() {
-		errchan <- r.reaper(ctx, parentDoneChan, pidfile, name, pidchan)
+		errchan <- r.reaper(ctx, parentDoneChan, pidfile, name, pidchan, justWait)
 	}()
 	err := <-errchan
 	if err != nil {
@@ -59,27 +59,212 @@ func (r *GoRuncRuntime) reaperLoggingError(ctx context.Context, parentDoneChan c
 	}
 }
 
-func (r *GoRuncRuntime) reaper(ctx context.Context, parentDoneChan chan string, pidfile string, name string, pidchan chan int) error {
+func (r *GoRuncRuntime) reaper(ctx context.Context, parentDoneChan chan string, pidfile string, name string, pidchan chan int, justWait bool) error {
 	pidint := -1
 	waitingOnPid := true
 	waitingOnParent := true
 	waitingOnProcess := true
+
+	// since this is a background process, we don't want to die when the parent dies
+	ctx = context.WithoutCancel(ctx)
 
 	slog.InfoContext(ctx, "starting reaper", "name", name, "pidfile", pidfile)
 
 	tickd := ticker.NewTicker(
 		ticker.WithInterval(1*time.Second),
 		ticker.WithStartBurst(5),
-		ticker.WithFrequency(60),
-		ticker.WithMessage(fmt.Sprintf("TICK:START:REAPER[%s]", name)),
-		ticker.WithDoneMessage(fmt.Sprintf("TICK:END  :REAPER[%s]", name)),
+		ticker.WithFrequency(15),
+		ticker.WithMessage(fmt.Sprintf("GORUNC:REAPER:%s[RUNNING]", name)),
+		ticker.WithDoneMessage(fmt.Sprintf("GORUNC:REAPER:%s[DONE]", name)),
 		ticker.WithAttrFunc(func() []slog.Attr {
-			return []slog.Attr{
+			attrs := []slog.Attr{
 				slog.Int("current_pid", pidint),
 				slog.Bool("waiting_on_pid", waitingOnPid),
 				slog.Bool("waiting_on_parent", waitingOnParent),
 				slog.Bool("waiting_on_process", waitingOnProcess),
 			}
+
+			// Add process state information if we have a valid PID
+			if pidint > 0 {
+				// Check if process still exists
+				if _, err := os.FindProcess(pidint); err == nil {
+					attrs = append(attrs, slog.Bool("process_exists", true))
+
+					// Get process status
+					if statusData, err := os.ReadFile(fmt.Sprintf("/proc/%d/status", pidint)); err == nil {
+						status := string(statusData)
+						if strings.Contains(status, "State:") {
+							lines := strings.Split(status, "\n")
+							for _, line := range lines {
+								if strings.HasPrefix(line, "State:") {
+									attrs = append(attrs, slog.String("process_state", strings.TrimSpace(line)))
+									break
+								}
+							}
+						}
+					}
+
+					// Count open file descriptors
+					if fdDir, err := os.Open(fmt.Sprintf("/proc/%d/fd", pidint)); err == nil {
+						if fdEntries, err := fdDir.Readdir(-1); err == nil {
+							attrs = append(attrs, slog.Int("open_fds", len(fdEntries)))
+
+							// Get details about open FDs
+							fdTypes := make(map[string]int)
+							for _, entry := range fdEntries {
+								fdPath := fmt.Sprintf("/proc/%d/fd/%s", pidint, entry.Name())
+								if target, err := os.Readlink(fdPath); err == nil {
+									if strings.Contains(target, "socket:") {
+										fdTypes["socket"]++
+									} else if strings.Contains(target, "pipe:") {
+										fdTypes["pipe"]++
+									} else if strings.HasPrefix(target, "/") {
+										fdTypes["file"]++
+									} else {
+										fdTypes["other"]++
+									}
+								}
+							}
+
+							// Add FD type counts
+							for fdType, count := range fdTypes {
+								attrs = append(attrs, slog.Int(fmt.Sprintf("fd_%s", fdType), count))
+							}
+						}
+						fdDir.Close()
+					}
+
+					// Check if process is a zombie
+					if statData, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pidint)); err == nil {
+						fields := strings.Fields(string(statData))
+						if len(fields) > 2 {
+							attrs = append(attrs, slog.String("process_stat_state", fields[2]))
+						}
+					}
+
+					// Check what the process is waiting on (if sleeping)
+					if wchanData, err := os.ReadFile(fmt.Sprintf("/proc/%d/wchan", pidint)); err == nil {
+						wchan := strings.TrimSpace(string(wchanData))
+						if wchan != "" && wchan != "0" {
+							attrs = append(attrs, slog.String("waiting_on", wchan))
+
+							// Detect if process is stuck in namespace cleanup
+							if strings.Contains(wchan, "zap_pid_ns_processes") {
+								attrs = append(attrs, slog.Bool("stuck_in_namespace_cleanup", true))
+							}
+						}
+					}
+
+					// Check process stack trace if available
+					// if stackData, err := os.ReadFile(fmt.Sprintf("/proc/%d/stack", pidint)); err == nil {
+					// 	stack := strings.TrimSpace(string(stackData))
+					// 	if stack != "" {
+					// 		// Just show the first few lines to avoid spam
+					// 		lines := strings.Split(stack, "\n")
+					// 		if len(lines) > 3 {
+					// 			lines = lines[:3]
+					// 		}
+					// 		attrs = append(attrs, slog.String("stack_trace", strings.Join(lines, " | ")))
+					// 	}
+					// }
+
+					// Check for child processes that might be keeping the namespace alive
+					if entries, err := os.ReadDir("/proc"); err == nil {
+						childCount := 0
+						zombieCount := 0
+						var childInfo []string
+						for _, entry := range entries {
+							if !entry.IsDir() {
+								continue
+							}
+							// Check if it's a PID directory
+							if childPid, err := strconv.Atoi(entry.Name()); err == nil && childPid != pidint {
+								// Check if this process has our target as parent
+								if statData, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", childPid)); err == nil {
+									fields := strings.Fields(string(statData))
+									if len(fields) > 3 {
+										if ppid, err := strconv.Atoi(fields[3]); err == nil && ppid == pidint {
+											childCount++
+											state := "unknown"
+											cmd := "unknown"
+											if len(fields) > 2 {
+												state = fields[2]
+												if state == "Z" {
+													zombieCount++
+												}
+											}
+											if len(fields) > 1 {
+												cmd = fields[1]
+											}
+											childInfo = append(childInfo, fmt.Sprintf("%d:%s:%s", childPid, cmd, state))
+										}
+									}
+								}
+							}
+						}
+						if childCount > 0 {
+							attrs = append(attrs, slog.Int("child_processes", childCount))
+							attrs = append(attrs, slog.String("child_details", strings.Join(childInfo, ",")))
+						}
+						if zombieCount > 0 {
+							attrs = append(attrs, slog.Int("zombie_children", zombieCount))
+						}
+					}
+
+					// Check threads in the same thread group
+					if taskEntries, err := os.ReadDir(fmt.Sprintf("/proc/%d/task", pidint)); err == nil {
+						threadCount := len(taskEntries)
+						if threadCount > 1 {
+							attrs = append(attrs, slog.Int("thread_count", threadCount))
+
+							// Check what other threads are doing
+							busyThreads := 0
+							for _, taskEntry := range taskEntries {
+								if taskPid, err := strconv.Atoi(taskEntry.Name()); err == nil && taskPid != pidint {
+									if taskStatData, err := os.ReadFile(fmt.Sprintf("/proc/%d/task/%d/stat", pidint, taskPid)); err == nil {
+										fields := strings.Fields(string(taskStatData))
+										if len(fields) > 2 && fields[2] != "S" { // Not sleeping
+											busyThreads++
+										}
+									}
+								}
+							}
+							if busyThreads > 0 {
+								attrs = append(attrs, slog.Int("active_threads", busyThreads))
+							}
+						}
+					}
+
+					// Check process group and session info
+					if statData, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pidint)); err == nil {
+						fields := strings.Fields(string(statData))
+						if len(fields) > 7 {
+							if pgid, err := strconv.Atoi(fields[4]); err == nil {
+								attrs = append(attrs, slog.Int("process_group", pgid))
+							}
+							if sid, err := strconv.Atoi(fields[5]); err == nil {
+								attrs = append(attrs, slog.Int("session_id", sid))
+							}
+						}
+					}
+
+					// Check mount namespace references
+					if mountData, err := os.ReadFile(fmt.Sprintf("/proc/%d/mounts", pidint)); err == nil {
+						mounts := strings.Split(string(mountData), "\n")
+						mountCount := 0
+						for _, mount := range mounts {
+							if strings.TrimSpace(mount) != "" {
+								mountCount++
+							}
+						}
+						attrs = append(attrs, slog.Int("mount_count", mountCount))
+					}
+				} else {
+					attrs = append(attrs, slog.Bool("process_exists", false))
+				}
+			}
+
+			return attrs
 		}),
 	)
 
@@ -87,6 +272,12 @@ func (r *GoRuncRuntime) reaper(ctx context.Context, parentDoneChan chan string, 
 
 	go tickd.Run(ctx)
 	defer tickd.Stop(ctx)
+
+	if justWait {
+		<-parentDoneChan
+		return nil
+	}
+
 	// this hacky logic probably broke the exit status code carryover with go tool task dev:2025-07-02:01
 	if pidchan != nil {
 		pidint = <-pidchan
@@ -113,7 +304,7 @@ func (r *GoRuncRuntime) reaper(ctx context.Context, parentDoneChan chan string, 
 
 	// slog.InfoContext(ctx, "found process", "pid", pidint, "output", output)
 
-	retryCount := 100
+	retryCount := 1000
 
 	var waiter *os.ProcessState
 	for {
@@ -190,7 +381,7 @@ func (r *GoRuncRuntime) Create(ctx context.Context, id, bundle string, options *
 	options.NoNewKeyring = true
 
 	// pidchan := make(chan int, 1)
-	go r.reaperLoggingError(ctx, reaperChan, options.PidFile, "create", nil)
+	go r.reaperLoggingError(ctx, reaperChan, options.PidFile, "create", nil, false)
 	// options.Started = pidchan
 
 	return WrapWithRuntimeError(ctx, r, func() error {
@@ -217,7 +408,7 @@ func (r *GoRuncRuntime) Exec(ctx context.Context, id string, spec specs.Process,
 	defer close(reaperChan)
 	pidchan := make(chan int, 1)
 	opts.Started = pidchan
-	go r.reaperLoggingError(ctx, reaperChan, opts.PidFile, "exec", pidchan)
+	go r.reaperLoggingError(ctx, reaperChan, opts.PidFile, "exec", pidchan, true)
 	return WrapWithRuntimeError(ctx, r, func() error {
 		return r.internal.Exec(ctx, id, spec, opts)
 	})

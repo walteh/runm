@@ -407,13 +407,41 @@ func smartWrapText(text string, maxWidth int) string {
 		// Smart wrapping: try to break at word boundaries
 		words := strings.Fields(line)
 		if len(words) == 0 {
-			// If no words, fall back to character wrapping
+			// If no words, fall back to character wrapping with proper breaks
+			for len(line) > maxWidth {
+				result.WriteString(line[:maxWidth])
+				result.WriteString("\n      ↳ ")
+				line = line[maxWidth:]
+			}
 			result.WriteString(line)
 			continue
 		}
 
 		currentLine := ""
 		for wordIdx, word := range words {
+			// If a single word is too long, break it
+			if len(word) > maxWidth {
+				// Write current line if it has content
+				if currentLine != "" {
+					result.WriteString(currentLine)
+					result.WriteString("\n")
+					currentLine = ""
+				}
+				// Break the long word
+				for len(word) > maxWidth {
+					result.WriteString("      ↳ ")
+					result.WriteString(word[:maxWidth-8]) // Account for continuation indicator
+					result.WriteString("\n")
+					word = word[maxWidth-8:]
+				}
+				// Add remaining part of word
+				if len(word) > 0 {
+					result.WriteString("      ↳ ")
+					currentLine = word
+				}
+				continue
+			}
+
 			testLine := currentLine
 			if testLine != "" {
 				testLine += " "
@@ -427,13 +455,13 @@ func smartWrapText(text string, maxWidth int) string {
 					result.WriteString(currentLine)
 					result.WriteString("\n")
 					// Add continuation indicator for wrapped lines
-					result.WriteString("    ↳ ")
+					result.WriteString("      ↳ ")
 					currentLine = word
 				} else {
-					// Single word is too long, break it
+					// Single word is too long, break it (shouldn't happen due to check above)
 					result.WriteString(word)
 					if wordIdx < len(words)-1 {
-						result.WriteString("\n    ↳ ")
+						result.WriteString("\n      ↳ ")
 					}
 					currentLine = ""
 				}
@@ -453,24 +481,26 @@ func smartWrapText(text string, maxWidth int) string {
 
 // MessageToBox renders a multiline message in a box similar to error display
 func MessageToBox(message string, styles *Styles, render renderFunc) string {
-	// Apply smart text wrapping
-	contentStyle := lipgloss.NewStyle().
-		Foreground(MessageColor).
-		Transform(func(s string) string {
-			return smartWrapText(s, 140) // Slightly smaller to account for padding
-		})
+	// Apply smart text wrapping with proper width accounting for padding
+	maxContentWidth := 140
+	wrappedMessage := smartWrapText(message, maxContentWidth)
 
-	// Format the message with proper wrapping
-	content := message
+	// Format the message with proper styling
+	content := wrappedMessage
 
 	// If the message is already styled, don't apply additional styling
 	if !strings.Contains(message, "\x1b[") {
-		content = render(contentStyle, message)
+		contentStyle := lipgloss.NewStyle().Foreground(MessageColor)
+		content = render(contentStyle, wrappedMessage)
 	}
 
 	// Render the content in a container with rounded borders
-	boxStyle := styles.Error.Container.
-		BorderForeground(TreeBorderColor)
+	boxStyle := lipgloss.NewStyle().
+		Padding(1, 2).
+		Margin(1, 0).
+		MaxWidth(150).
+		BorderForeground(TreeBorderColor).
+		BorderStyle(lipgloss.RoundedBorder())
 
 	return render(boxStyle, content)
 }
@@ -968,26 +998,35 @@ func (l *TermLogger) processAttribute(a slog.Attr, keyStyle lipgloss.Style, valS
 
 // ValueToBox renders a multiline value in a box with the attribute key as title
 func ValueToBox(value string, keyName string, styles *Styles, render renderFunc) string {
-	// Preserve any existing coloring in the content
-	content := value
+	// Apply smart text wrapping with proper width accounting for padding
+	maxContentWidth := 140
+	wrappedValue := smartWrapText(value, maxContentWidth)
+
+	// Format the value with proper styling
+	content := wrappedValue
 
 	// If the value doesn't have existing styling, apply moderate styling for readability
 	if !strings.Contains(value, "\x1b[") {
-		content = render(lipgloss.NewStyle().Foreground(MessageColor), value)
+		contentStyle := lipgloss.NewStyle().Foreground(MessageColor)
+		content = render(contentStyle, wrappedValue)
 	}
 
-	// Create the box style with wrapping and max width like error boxes
-	boxStyle := styles.Error.Container.Copy().
-		BorderForeground(TreeBorderColor).
-		MaxWidth(160). // Same max width as error boxes
-		Width(0)       // Let it size naturally up to max width
-
-	// Create the title header
+	// Create the title header with proper styling
 	titleStyle := lipgloss.NewStyle().
-		Foreground(styles.Tree.Root.GetForeground()).
+		Foreground(TreeKeyColor).
 		Bold(true)
 
-	header := titleStyle.Render(keyName)
+	header := render(titleStyle, keyName)
+
+	// Create the box style with proper dimensions
+	boxStyle := lipgloss.NewStyle().
+		Padding(1, 2).
+		Margin(1, 0).
+		MaxWidth(150).
+		BorderForeground(TreeBorderColor).
+		BorderStyle(lipgloss.RoundedBorder())
+
+	// Combine header and content with proper separation
 	fullContent := header + "\n" + content
 
 	return render(boxStyle, fullContent)
