@@ -10,11 +10,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-
 	"github.com/walteh/runm/pkg/taskgroup"
 )
 
-func TestTraceGroup_BasicUsage(t *testing.T) {
+func TestTaskGroup_BasicUsage(t *testing.T) {
 	ctx := context.Background()
 	tg := taskgroup.NewTaskGroup(ctx)
 
@@ -34,7 +33,7 @@ func TestTraceGroup_BasicUsage(t *testing.T) {
 	assert.Equal(t, int64(2), atomic.LoadInt64(&counter))
 }
 
-func TestTraceGroup_WithError(t *testing.T) {
+func TestTaskGroup_WithError(t *testing.T) {
 	ctx := context.Background()
 	tg := taskgroup.NewTaskGroup(ctx)
 
@@ -53,7 +52,7 @@ func TestTraceGroup_WithError(t *testing.T) {
 	assert.Contains(t, err.Error(), "test error")
 }
 
-func TestTraceGroup_WithContext(t *testing.T) {
+func TestTaskGroup_WithContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	tg := taskgroup.NewTaskGroup(ctx)
 
@@ -75,12 +74,12 @@ func TestTraceGroup_WithContext(t *testing.T) {
 	assert.Contains(t, err.Error(), "context canceled")
 }
 
-func TestTraceGroup_WithTimeout(t *testing.T) {
+func TestTaskGroup_WithTimeout(t *testing.T) {
 	ctx := context.Background()
 	tg := taskgroup.NewTaskGroup(ctx, taskgroup.WithTimeout(100*time.Millisecond))
 
 	tg.Go(func() error {
-		// Use the tracegroup context to respect timeout
+		// Use the taskgroup context to respect timeout
 		select {
 		case <-time.After(200 * time.Millisecond):
 			return nil
@@ -98,7 +97,7 @@ func TestTraceGroup_WithTimeout(t *testing.T) {
 	assert.Less(t, elapsed, 150*time.Millisecond)
 }
 
-func TestTraceGroup_WithLimit(t *testing.T) {
+func TestTaskGroup_WithLimit(t *testing.T) {
 	ctx := context.Background()
 	tg := taskgroup.NewTaskGroup(ctx, taskgroup.WithMaxConcurrent(2))
 
@@ -133,7 +132,7 @@ func TestTraceGroup_WithLimit(t *testing.T) {
 	assert.LessOrEqual(t, atomic.LoadInt64(&maxConcurrent), int64(2))
 }
 
-func TestTraceGroup_TryGo(t *testing.T) {
+func TestTaskGroup_TryGo(t *testing.T) {
 	ctx := context.Background()
 	tg := taskgroup.NewTaskGroup(ctx, taskgroup.WithMaxConcurrent(1))
 
@@ -154,7 +153,7 @@ func TestTraceGroup_TryGo(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestTraceGroup_WithName(t *testing.T) {
+func TestTaskGroup_WithName(t *testing.T) {
 	ctx := context.Background()
 	tg := taskgroup.NewTaskGroup(ctx, taskgroup.WithName("test-group"))
 
@@ -176,7 +175,7 @@ func TestTraceGroup_WithName(t *testing.T) {
 	assert.NoError(t, taskErr)
 }
 
-func TestTraceGroup_Status(t *testing.T) {
+func TestTaskGroup_Status(t *testing.T) {
 	ctx := context.Background()
 	tg := taskgroup.NewTaskGroup(ctx)
 
@@ -212,7 +211,7 @@ func TestTraceGroup_Status(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestTraceGroup_WithLogLevels(t *testing.T) {
+func TestTaskGroup_WithLogLevels(t *testing.T) {
 	ctx := context.Background()
 	tg := taskgroup.NewTaskGroup(ctx,
 		taskgroup.WithLogLevel(slog.LevelDebug),
@@ -230,7 +229,7 @@ func TestTraceGroup_WithLogLevels(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestTraceGroup_MultipleErrors(t *testing.T) {
+func TestTaskGroup_MultipleErrors(t *testing.T) {
 	ctx := context.Background()
 	tg := taskgroup.NewTaskGroup(ctx)
 
@@ -252,7 +251,7 @@ func TestTraceGroup_MultipleErrors(t *testing.T) {
 	assert.Contains(t, err.Error(), "error 1")
 }
 
-func TestTraceGroup_WithContext_Function(t *testing.T) {
+func TestTaskGroup_WithContext_Function(t *testing.T) {
 	ctx := context.Background()
 	tg, groupCtx := taskgroup.WithContext(ctx, taskgroup.WithName("context-group"))
 
@@ -270,7 +269,7 @@ func TestTraceGroup_WithContext_Function(t *testing.T) {
 	assert.Equal(t, groupCtx, ctxReceived)
 }
 
-func TestTraceGroup_SetLimit(t *testing.T) {
+func TestTaskGroup_SetLimit(t *testing.T) {
 	ctx := context.Background()
 	tg := taskgroup.NewTaskGroup(ctx)
 
@@ -303,7 +302,7 @@ func TestTraceGroup_SetLimit(t *testing.T) {
 	assert.LessOrEqual(t, atomic.LoadInt64(&maxConcurrent), int64(2))
 }
 
-func TestTraceGroup_SetLimitAfterStart(t *testing.T) {
+func TestTaskGroup_SetLimitAfterStart(t *testing.T) {
 	ctx := context.Background()
 	tg := taskgroup.NewTaskGroup(ctx)
 
@@ -332,7 +331,7 @@ func TestTraceGroup_SetLimitAfterStart(t *testing.T) {
 	// Should have been able to run more than 1 concurrent since limit was ignored
 }
 
-func TestTraceGroup_WithAttrFunc(t *testing.T) {
+func TestTaskGroup_WithAttrFunc(t *testing.T) {
 	ctx := context.Background()
 
 	attrFunc := func() []slog.Attr {
@@ -352,7 +351,7 @@ func TestTraceGroup_WithAttrFunc(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestTraceGroup_ZeroTasks(t *testing.T) {
+func TestTaskGroup_ZeroTasks(t *testing.T) {
 	ctx := context.Background()
 	tg := taskgroup.NewTaskGroup(ctx)
 
@@ -366,7 +365,7 @@ func TestTraceGroup_ZeroTasks(t *testing.T) {
 	assert.NoError(t, taskErr)
 }
 
-func TestTraceGroup_TryGoWithName(t *testing.T) {
+func TestTaskGroup_TryGoWithName(t *testing.T) {
 	ctx := context.Background()
 	tg := taskgroup.NewTaskGroup(ctx, taskgroup.WithMaxConcurrent(1))
 
@@ -387,7 +386,233 @@ func TestTraceGroup_TryGoWithName(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func BenchmarkTraceGroup_BasicUsage(b *testing.B) {
+func TestTaskGroup_TaskRegistry(t *testing.T) {
+	ctx := context.Background()
+	tg := taskgroup.NewTaskGroup(ctx)
+
+	// Initially no tasks
+	assert.Equal(t, 0, tg.GetTaskCount())
+	assert.Equal(t, 0, tg.GetRunningTaskCount())
+
+	// Add tasks
+	tg.GoWithName("task1", func() error {
+		time.Sleep(50 * time.Millisecond)
+		return nil
+	})
+
+	tg.GoWithName("task2", func() error {
+		time.Sleep(50 * time.Millisecond)
+		return errors.New("task error")
+	})
+
+	// Brief wait to let tasks start
+	time.Sleep(10 * time.Millisecond)
+
+	// Check running tasks
+	runningTasks := tg.GetRunningTasks()
+	assert.Equal(t, 2, len(runningTasks))
+	assert.Equal(t, 2, tg.GetRunningTaskCount())
+
+	// Check task names
+	taskNames := make([]string, len(runningTasks))
+	for i, task := range runningTasks {
+		taskNames[i] = task.Name
+	}
+	assert.Contains(t, taskNames, "task1")
+	assert.Contains(t, taskNames, "task2")
+
+	// Wait for completion
+	err := tg.Wait()
+	assert.Error(t, err)
+
+	// Check final status
+	assert.Equal(t, 0, tg.GetRunningTaskCount())
+
+	completedTasks := tg.GetTasksByStatus(taskgroup.TaskStatusCompleted)
+	failedTasks := tg.GetTasksByStatus(taskgroup.TaskStatusFailed)
+	assert.Equal(t, 1, len(completedTasks))
+	assert.Equal(t, 1, len(failedTasks))
+}
+
+func TestTaskGroup_WithMetadata(t *testing.T) {
+	ctx := context.Background()
+	tg := taskgroup.NewTaskGroup(ctx)
+
+	metadata := map[string]any{
+		"priority": "high",
+		"timeout":  30,
+		"retries":  3,
+	}
+
+	tg.GoWithNameAndMeta("meta-task", metadata, func() error {
+		return nil
+	})
+
+	err := tg.Wait()
+	assert.NoError(t, err)
+
+	// Check task metadata
+	tasks := tg.GetTasksByName("meta-task")
+	assert.Equal(t, 1, len(tasks))
+	assert.Equal(t, metadata, tasks[0].Metadata)
+}
+
+func TestTaskGroup_PanicRecovery(t *testing.T) {
+	ctx := context.Background()
+	tg := taskgroup.NewTaskGroup(ctx, taskgroup.WithLogTaskPanic(true))
+
+	tg.GoWithName("panic-task", func() error {
+		panic("test panic")
+	})
+
+	err := tg.Wait()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "panic in task")
+
+	// Check panic info
+	panickedTasks := tg.GetTasksByStatus(taskgroup.TaskStatusPanicked)
+	assert.Equal(t, 1, len(panickedTasks))
+	assert.NotNil(t, panickedTasks[0].PanicInfo)
+	assert.Equal(t, "test panic", panickedTasks[0].PanicInfo.Value)
+	assert.NotEmpty(t, panickedTasks[0].PanicInfo.Stack)
+}
+
+func TestTaskGroup_WithTicker(t *testing.T) {
+	ctx := context.Background()
+	tg := taskgroup.NewTaskGroup(ctx,
+		taskgroup.WithEnableTicker(true),
+		taskgroup.WithTickerInterval(100*time.Millisecond),
+		taskgroup.WithTickerFrequency(1),
+	)
+
+	tg.GoWithName("ticker-task", func() error {
+		time.Sleep(250 * time.Millisecond)
+		return nil
+	})
+
+	err := tg.Wait()
+	assert.NoError(t, err)
+}
+
+func TestTaskGroup_TaskHistory(t *testing.T) {
+	ctx := context.Background()
+	tg := taskgroup.NewTaskGroup(ctx, taskgroup.WithKeepTaskHistory(true))
+
+	tg.GoWithName("history-task", func() error {
+		return nil
+	})
+
+	err := tg.Wait()
+	assert.NoError(t, err)
+
+	// Check task history
+	history := tg.GetTaskHistory()
+	assert.Equal(t, 1, len(history))
+	assert.Equal(t, "history-task", history[0].Name)
+	assert.Equal(t, taskgroup.TaskStatusCompleted, history[0].Status)
+}
+
+func TestTaskGroup_TaskStateLogValue(t *testing.T) {
+	ctx := context.Background()
+	tg := taskgroup.NewTaskGroup(ctx)
+
+	metadata := map[string]any{"key": "value"}
+	tg.GoWithNameAndMeta("log-task", metadata, func() error {
+		return nil
+	})
+
+	err := tg.Wait()
+	assert.NoError(t, err)
+
+	// Test TaskState.LogValue()
+	tasks := tg.GetTasksByName("log-task")
+	assert.Equal(t, 1, len(tasks))
+
+	logValue := tasks[0].LogValue()
+	assert.NotNil(t, logValue)
+}
+
+func TestTaskGroup_TaskStateHelpers(t *testing.T) {
+	task := &taskgroup.TaskState{
+		Status: taskgroup.TaskStatusRunning,
+	}
+
+	assert.True(t, task.IsRunning())
+	assert.False(t, task.IsCompleted())
+
+	task.Status = taskgroup.TaskStatusCompleted
+	assert.False(t, task.IsRunning())
+	assert.True(t, task.IsCompleted())
+
+	task.Status = taskgroup.TaskStatusFailed
+	assert.False(t, task.IsRunning())
+	assert.True(t, task.IsCompleted())
+
+	task.Status = taskgroup.TaskStatusPanicked
+	assert.False(t, task.IsRunning())
+	assert.True(t, task.IsCompleted())
+}
+
+func TestTaskGroup_GetTasksByName(t *testing.T) {
+	ctx := context.Background()
+	tg := taskgroup.NewTaskGroup(ctx)
+
+	// Add multiple tasks with same name
+	tg.GoWithName("duplicate-task", func() error {
+		return nil
+	})
+
+	tg.GoWithName("duplicate-task", func() error {
+		return nil
+	})
+
+	tg.GoWithName("unique-task", func() error {
+		return nil
+	})
+
+	err := tg.Wait()
+	assert.NoError(t, err)
+
+	// Test GetTasksByName
+	duplicateTasks := tg.GetTasksByName("duplicate-task")
+	assert.Equal(t, 2, len(duplicateTasks))
+
+	uniqueTasks := tg.GetTasksByName("unique-task")
+	assert.Equal(t, 1, len(uniqueTasks))
+
+	nonExistentTasks := tg.GetTasksByName("non-existent")
+	assert.Equal(t, 0, len(nonExistentTasks))
+}
+
+func TestTaskGroup_GetTask(t *testing.T) {
+	ctx := context.Background()
+	tg := taskgroup.NewTaskGroup(ctx)
+
+	var taskID string
+	tg.GoWithName("get-task", func() error {
+		// Find the task ID
+		tasks := tg.GetTasksByName("get-task")
+		if len(tasks) > 0 {
+			taskID = tasks[0].ID
+		}
+		return nil
+	})
+
+	err := tg.Wait()
+	assert.NoError(t, err)
+
+	// Test GetTask
+	task, exists := tg.GetTask(taskID)
+	assert.True(t, exists)
+	assert.NotNil(t, task)
+	assert.Equal(t, "get-task", task.Name)
+
+	// Test non-existent task
+	_, exists = tg.GetTask("non-existent-id")
+	assert.False(t, exists)
+}
+
+func BenchmarkTaskGroup_BasicUsage(b *testing.B) {
 	ctx := context.Background()
 
 	b.ResetTimer()
@@ -404,7 +629,7 @@ func BenchmarkTraceGroup_BasicUsage(b *testing.B) {
 	}
 }
 
-func BenchmarkTraceGroup_WithLimit(b *testing.B) {
+func BenchmarkTaskGroup_WithLimit(b *testing.B) {
 	ctx := context.Background()
 
 	b.ResetTimer()
@@ -424,5 +649,30 @@ func BenchmarkTraceGroup_WithLimit(b *testing.B) {
 		}
 
 		_ = tg.Wait()
+	}
+}
+
+func BenchmarkTaskGroup_WithRegistry(b *testing.B) {
+	ctx := context.Background()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		tg := taskgroup.NewTaskGroup(ctx,
+			taskgroup.WithLogStart(false),
+			taskgroup.WithLogEnd(false),
+			taskgroup.WithKeepTaskHistory(true),
+		)
+
+		for j := 0; j < 10; j++ {
+			tg.GoWithName("bench-task", func() error {
+				return nil
+			})
+		}
+
+		_ = tg.Wait()
+
+		// Query the registry
+		_ = tg.GetTaskCount()
+		_ = tg.GetRunningTaskCount()
 	}
 }
