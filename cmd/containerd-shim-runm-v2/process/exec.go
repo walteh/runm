@@ -256,6 +256,7 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 		if err != nil {
 			return errors.Errorf("failed to retrieve console master: %w", err)
 		}
+		slog.InfoContext(ctx, "TMP9.1 copying console")
 		if e.console, err = e.parent.Platform.CopyConsole(ctx, console, e.id, e.stdio.Stdin, e.stdio.Stdout, e.stdio.Stderr, &e.wg); err != nil {
 			return errors.Errorf("failed to start console copy: %w", err)
 		}

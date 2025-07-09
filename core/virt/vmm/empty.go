@@ -4,6 +4,7 @@ package vmm
 
 import (
 	"context"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/walteh/runm/core/virt/host"
 	"github.com/walteh/runm/core/virt/virtio"
+	"github.com/walteh/runm/pkg/logging"
 	"github.com/walteh/runm/pkg/units"
 )
 
@@ -24,6 +26,8 @@ type EmptyVMConfig struct {
 	StartingMemory strongunits.B
 	VCPUs          uint64
 	Platform       units.Platform
+	RawWriter      io.Writer
+	DelimWriter    io.Writer
 }
 
 // NewContainerizedVirtualMachineFromRootfs creates a VM using an already-prepared rootfs directory
@@ -32,6 +36,13 @@ func NewKernelCommandVM[VM VirtualMachine](
 	ctx context.Context,
 	hpv Hypervisor[VM],
 	ctrconfig *EmptyVMConfig) (*RunningVM[VM], error) {
+
+	if ctrconfig.RawWriter == nil {
+		ctrconfig.RawWriter = logging.GetDefaultRawWriter()
+	}
+	if ctrconfig.DelimWriter == nil {
+		ctrconfig.DelimWriter = logging.GetDefaultDelimWriter()
+	}
 
 	id := "vm-empty-" + xid.New().String()
 	creationErrGroup, ctx := errgroup.WithContext(ctx)
@@ -119,9 +130,10 @@ func NewKernelCommandVM[VM VirtualMachine](
 		vm:           vm,
 		portOnHostIP: hostIPPort,
 		wait:         make(chan error, 1),
-		runtime:      nil,
 		workingDir:   workingDir,
 		netdev:       netdev,
+		rawWriter:    ctrconfig.RawWriter,
+		delimWriter:  ctrconfig.DelimWriter,
 	}
 
 	return runner, nil

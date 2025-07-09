@@ -85,8 +85,6 @@ func init() {
 	// gorunc.Monitor = defaultMonitorInstance
 	gorunc.Monitor = reaper.Default
 
-	reaper.SetSubreaper(os.Getpid())
-
 }
 
 func (r *GoRuncRuntime) SubscribeToReaperExits(ctx context.Context) (<-chan gorunc.Exit, error) {

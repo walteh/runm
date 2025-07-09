@@ -41,6 +41,7 @@ import (
 	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/pkg/logging"
+	"github.com/walteh/runm/pkg/reap"
 	"github.com/walteh/runm/pkg/ticker"
 
 	goruncruntime "github.com/walteh/runm/core/runc/runtime/gorunc"
@@ -145,6 +146,8 @@ func main() {
 
 	pid := os.Getpid()
 
+	reap.SetSubreaper(os.Getpid())
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -238,13 +241,12 @@ func (r *runmLinuxInit) configureRuntimeServer(ctx context.Context) (*grpc.Serve
 	return grpcVsockServer, serverz, nil
 }
 
-func errGroupGoWithLogging(ctx context.Context, name string, egroup *errgroup.Group, f func() error) {
+func WrapErrGroupGoWithLogging(ctx context.Context, name string, egroup *errgroup.Group, f func() error) {
 	egroup.Go(func() (err error) {
 		slog.DebugContext(ctx, "starting goroutine", "name", name)
 		defer func() {
 			if r := recover(); r != nil {
-				slog.ErrorContext(ctx, "panic in goroutine", "name", name, "error", r)
-				debug.PrintStack()
+				slog.ErrorContext(ctx, "panic in goroutine", "name", name, "error", r, "stack", string(debug.Stack()))
 				err = errors.Errorf("panic in goroutine: %v", r)
 			}
 			if err != nil {
@@ -324,7 +326,7 @@ func handleExitSignals(ctx context.Context, cancel context.CancelFunc) {
 	}
 }
 
-func reap(ctx context.Context, signals chan os.Signal) error {
+func reapOnSignals(ctx context.Context, signals chan os.Signal) error {
 	slog.InfoContext(ctx, "starting signal loop")
 
 	for {
@@ -379,23 +381,23 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 
 	r.exitChan = make(chan gorunc.Exit, 32*100)
 
-	errGroupGoWithLogging(ctx, "reaper", errgroupz, func() error {
-		return reap(ctx, signals)
+	WrapErrGroupGoWithLogging(ctx, "reaper", errgroupz, func() error {
+		return reapOnSignals(ctx, signals)
 	})
 
-	errGroupGoWithLogging(ctx, "psnotify", errgroupz, func() error {
+	WrapErrGroupGoWithLogging(ctx, "psnotify", errgroupz, func() error {
 		return r.runPsnotify(ctx, r.exitChan)
 	})
 
-	errGroupGoWithLogging(ctx, "delim-writer-unix-proxy", errgroupz, func() error {
+	WrapErrGroupGoWithLogging(ctx, "delim-writer-unix-proxy", errgroupz, func() error {
 		return r.runVsockUnixProxy(ctx, constants.DelimitedWriterProxyGuestUnixPath, r.logWriter)
 	})
 
-	errGroupGoWithLogging(ctx, "raw-writer-unix-proxy", errgroupz, func() error {
+	WrapErrGroupGoWithLogging(ctx, "raw-writer-unix-proxy", errgroupz, func() error {
 		return r.runVsockUnixProxy(ctx, constants.RawWriterProxyGuestUnixPath, r.rawWriter)
 	})
 
-	// errGroupGoWithLogging(ctx, "ticker", errgroupz, func() error {
+	// WrapErrGroupGoWithLogging(ctx, "ticker", errgroupz, func() error {
 	// 	ticker.NewTicker(
 	// 		ticker.WithMessage("RUNM:INIT[RUNNING]"),
 	// 		ticker.WithDoneMessage("RUNM:INIT[DONE]"),
@@ -425,11 +427,11 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 		return errors.Errorf("problem listing bundleSource/rootfs: %w", err)
 	}
 
-	errGroupGoWithLogging(ctx, "grpc-vsock-server", errgroupz, func() error {
+	WrapErrGroupGoWithLogging(ctx, "grpc-vsock-server", errgroupz, func() error {
 		return r.runGrpcVsockServer(ctx)
 	})
 
-	errGroupGoWithLogging(ctx, "pprof-vsock-server", errgroupz, func() error {
+	WrapErrGroupGoWithLogging(ctx, "pprof-vsock-server", errgroupz, func() error {
 		return r.runPprofVsockServer(ctx)
 	})
 

@@ -244,7 +244,6 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 		vm:           vm,
 		portOnHostIP: hostIPPort,
 		wait:         make(chan error, 1),
-		runtime:      nil,
 		workingDir:   workingDir,
 		netdev:       netdev,
 		rawWriter:    ctrconfig.RawWriter,

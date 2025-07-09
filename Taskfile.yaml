@@ -31,6 +31,16 @@ env:
     PAGER: less
 
 tasks:
+    claude:
+        desc: runs the claude agent
+        vars:
+            CLI_ARGS:
+                sh: echo "{{.CLI_ARGS | default ""}}"
+
+        cmds:
+          - cmd: bun install -g @anthropic-ai/claude-code
+          - cmd: ~/.bun/bin/claude --ide {{.CLI_ARGS}}
+
     go:tidy:
         run: once
         aliases: [go-mod-tidy]
@@ -42,8 +52,7 @@ tasks:
         aliases: [go-mod-upgrade]
         run: once
         cmds:
-          - |-
-            {{.GO_COMMAND}} tool go-mod-upgrade --force
+          - cmd: go tool go-mod-upgrade --force
           - task: go-mod-tidy
 
     go:update:
@@ -69,8 +78,10 @@ tasks:
 
     go:test:
         desc: runs the tests
+        vars:
+            ARGS: '{{.CLI_ARGS | default "./..."}}'
         cmds:
-          - cmd: go tool gotestsum go test ./...
+          - cmd: go tool goshim test -function-coverage {{.ARGS}}
 
     term:
         desc: opens a terminal in the project root
@@ -624,7 +635,7 @@ tasks:
                 COMMAND: 'echo "hello world! this is a test"'
                 CONTAINER_ID:
                     sh: cat {{.TMP_DIR}}/stdout.txt
-                FLAGS: ''
+                FLAGS: '--tty'
           - task: dev:nerdctl-test:stop
             vars:
                 CONTAINER_ID:
@@ -643,21 +654,6 @@ tasks:
         cmds:
           - task: test:cleanup-running-shims
           - cmd: sudo -A -E {{.TEST_BIN_DIR}}/containerd-test
-
-    claude:
-        desc: runs the claude agent
-        vars:
-            CLI_ARGS:
-                sh: echo "{{.CLI_ARGS | default ""}}"
-
-        cmds:
-          - cmd: bun install -g @anthropic-ai/claude-code
-          - cmd: ~/.bun/bin/claude {{.CLI_ARGS}}
-
-    claude:callback:check-for-go-build-errors:
-        desc: checks for go build errors
-        cmds:
-          - task: test:binaries
 
     setup:
         desc: sets up the environment

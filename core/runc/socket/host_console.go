@@ -4,11 +4,9 @@ package socket
 
 import (
 	"context"
-	"io"
 	"log/slog"
 	"net"
 	"os"
-	"sync"
 
 	"golang.org/x/sys/unix"
 
@@ -24,8 +22,9 @@ import (
 var _ runtime.ConsoleSocket = &HostConsoleSocket{}
 
 type HostConsoleSocket struct {
-	socket      runtime.AllocatedSocketWithUnixConn
-	referenceId string
+	socket       runtime.AllocatedSocketWithUnixConn
+	runcUnixConn *net.UnixConn
+	referenceId  string
 }
 
 func (h *HostConsoleSocket) FileConn() file.FileConn {
@@ -51,7 +50,7 @@ func (h *HostConsoleSocket) Path() string {
 func (h *HostConsoleSocket) ReceiveMaster() (console.Console, error) {
 	f, err := RecvFd(h.socket.UnixConn())
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("receiving master: %w", err)
 	}
 	return console.ConsoleFromFile(f)
 }
@@ -59,7 +58,7 @@ func (h *HostConsoleSocket) ReceiveMaster() (console.Console, error) {
 func NewHostUnixConsoleSocket(ctx context.Context, referenceId string, socket runtime.AllocatedSocketWithUnixConn) (*HostConsoleSocket, error) {
 	tmp, err := gorunc.NewTempConsoleSocket()
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("creating temp console socket: %w", err)
 	}
 
 	// connect to the unix socket
@@ -68,31 +67,33 @@ func NewHostUnixConsoleSocket(ctx context.Context, referenceId string, socket ru
 		return nil, errors.Errorf("failed to dial unix socket: %w", err)
 	}
 
-	wg := sync.WaitGroup{}
-	wg.Add(2)
+	bind("runcConsole->hostConsole", runcUnixConn, socket.Conn())
 
-	go func() {
-		defer wg.Done()
-		io.Copy(runcUnixConn, socket.UnixConn())
-	}()
-
-	go func() {
-		defer wg.Done()
-		io.Copy(socket.UnixConn(), runcUnixConn)
-	}()
-
-	go func() {
-		wg.Wait()
-		runcUnixConn.Close()
-		tmp.Close()
-	}()
+	bind("hostConsole->runcConsole", socket.Conn(), runcUnixConn)
 
 	return &HostConsoleSocket{
-		socket:      socket,
-		referenceId: referenceId,
+		socket:       socket,
+		runcUnixConn: runcUnixConn,
+		referenceId:  referenceId,
 	}, nil
 
 	// return &HostConsoleSocket{socket: socket, path: tmp.Path(), conn: tmp.Conn().(*net.UnixConn)}, nil
+}
+
+func BindRuncConsoleToSocket(ctx context.Context, cons runtime.ConsoleSocket, sock runtime.AllocatedSocket) error {
+
+	// // open up the console socket path, and create a pipe to it
+
+	consConn := cons.UnixConn()
+	sockConn := sock.Conn()
+
+	// create a goroutine to read from the pipe and write to the socket
+	bind("socket->console", consConn, sockConn)
+
+	// create a goroutine to read from the socket and write to the console
+	bind("console->socket", sockConn, consConn)
+
+	return nil
 }
 
 // func NewHostVsockFdConsoleSocket(ctx context.Context, socket runtime.VsockAllocatedSocket, proxier runtime.VsockProxier) (*HostConsoleSocket, error) {
@@ -126,7 +127,8 @@ func RecvFd(socket *net.UnixConn) (*os.File, error) {
 
 	n, oobn, _, _, err := socket.ReadMsgUnix(name, oob)
 	if err != nil {
-		return nil, err
+		slog.Info("recvfd - A.1", "error", err)
+		return nil, errors.Errorf("reading unix message from socket: %w", err)
 	}
 
 	slog.Info("recvfd - B")

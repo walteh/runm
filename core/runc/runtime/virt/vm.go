@@ -4,15 +4,16 @@ package virt
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 
 	"github.com/containers/common/pkg/strongunits"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/walteh/run"
+	"gitlab.com/tozd/go/errors"
 
 	"github.com/walteh/runm/core/runc/oom"
 	"github.com/walteh/runm/core/runc/runtime"
+	grpcruntime "github.com/walteh/runm/core/runc/runtime/grpc"
 	"github.com/walteh/runm/core/virt/vmm"
 	"github.com/walteh/runm/pkg/logging"
 	"github.com/walteh/runm/pkg/units"
@@ -90,14 +91,21 @@ func NewRunmVMRuntime[VM vmm.VirtualMachine](
 		return nil, ctx.Err()
 	}
 
-	srv, err := vm.GuestService(ctx)
+	srv, err := vm.GuestVsockConn(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("getting guest vsock conn: %w", err)
 	}
+
+	rsrv, err := grpcruntime.NewGRPCClientRuntimeFromConn(srv)
+	if err != nil {
+		return nil, errors.Errorf("creating grpc client runtime: %w", err)
+	}
+
+	rsrv.SetVsockProxier(vm)
 
 	slog.InfoContext(ctx, "connected to guest service", "id", vm.VM().ID())
 
-	ep := oom.NewWatcher(opts.Publisher, srv)
+	ep := oom.NewWatcher(opts.Publisher, rsrv)
 
 	slog.InfoContext(ctx, "created oom watcher", "id", vm.VM().ID())
 
@@ -107,12 +115,12 @@ func NewRunmVMRuntime[VM vmm.VirtualMachine](
 		vm:              vm,
 		oomWatcher:      ep,
 		spec:            cfg.Spec,
-		Runtime:         srv,
-		RuntimeExtras:   srv,
-		CgroupAdapter:   srv,
-		EventHandler:    srv,
+		Runtime:         rsrv,
+		RuntimeExtras:   rsrv,
+		CgroupAdapter:   rsrv,
+		EventHandler:    rsrv,
 		closers:         closers,
-		GuestManagement: srv,
+		GuestManagement: rsrv,
 		runGroup:        runGroup,
 	}, nil
 }

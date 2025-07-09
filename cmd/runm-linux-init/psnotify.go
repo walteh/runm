@@ -19,13 +19,6 @@ import (
 	"github.com/walteh/runm/pkg/psnotify"
 )
 
-func init() {
-	err := setSubreaper()
-	if err != nil {
-		slog.Error("failed to set subreaper", "error", err)
-	}
-}
-
 type pidInfo struct {
 	pid      int
 	pidfd    int
@@ -56,7 +49,7 @@ func (p *pidInfo) id() string {
 		}
 		return fmt.Sprintf("busybox[%d]", p.pid)
 	case filepath.Base(p.argc) == "runc" || filepath.Base(p.argc) == "runc-test":
-		knownRuncNames := []string{"start", "create", "run", "init"}
+		knownRuncNames := []string{"start", "create", "run", "init", "exec"}
 		for _, name := range knownRuncNames {
 			for _, arg := range p.argv {
 				if arg == name {
@@ -112,7 +105,7 @@ func (p *pidInfo) LogValue() slog.Value {
 	attrs = append(attrs, slog.Int("pid", p.pid),
 		slog.String("cgroup", p.cgroup),
 		slog.String("argc", p.argc),
-		// slog.String("argv", strings.Join(p.argv, " ")),
+		slog.String("argv", strings.Join(p.argv, " ")),
 	)
 
 	if p.exitEvent != nil {
@@ -149,10 +142,7 @@ var pidToCgroup = struct {
 }{m: make(map[int]*pidInfo)}
 
 func (r *runmLinuxInit) runPsnotify(ctx context.Context, exitChan chan gorunc.Exit) error {
-	err := setSubreaper()
-	if err != nil {
-		slog.ErrorContext(ctx, "failed to set subreaper", "error", err)
-	}
+
 	watcher, err := psnotify.NewWatcher()
 	if err != nil {
 		return errors.Errorf("failed to create psnotify watcher: %w", err)

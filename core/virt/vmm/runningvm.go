@@ -29,40 +29,47 @@ import (
 	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/pkg/logging"
 
-	grpcruntime "github.com/walteh/runm/core/runc/runtime/grpc"
 	runmv1 "github.com/walteh/runm/proto/v1"
 )
 
 type RunningVM[VM VirtualMachine] struct {
-	// streamExecReady bool
-	// manager                *VSockManager
-	runtime      *grpcruntime.GRPCClientRuntime
+	cachedGuestGrpcConn *grpc.ClientConn
+	// hostGrpcListener net.Listener
 	hostOtlpPort uint32
 	bootloader   virtio.Bootloader
-
-	closeCancel context.CancelFunc
-
-	// streamexec   *streamexec.Client
+	closeCancel  context.CancelFunc
 	portOnHostIP uint16
 	wait         chan error
 	vm           VM
 	netdev       gvnet.Proxy
 	workingDir   string
-	// stdin        io.Reader
-	// stdout       io.Writer
-	// stderr       io.Writer
-	// connStatus      <-chan VSockManagerState
-	start time.Time
-
-	rawWriter   io.Writer
-	delimWriter io.Writer
+	start        time.Time
+	rawWriter    io.Writer
+	delimWriter  io.Writer
 }
 
-func (r *RunningVM[VM]) GuestService(ctx context.Context) (*grpcruntime.GRPCClientRuntime, error) {
+func (r *RunningVM[VM]) GuestService(ctx context.Context) (runmv1.GuestManagementServiceClient, error) {
 	slog.InfoContext(ctx, "getting guest service", "id", r.vm.ID())
-	if r.runtime != nil {
-		return r.runtime, nil
+
+	conn, err := r.GuestVsockConn(ctx)
+	if err != nil {
+		return nil, errors.Errorf("getting guest vsock conn: %w", err)
 	}
+
+	return runmv1.NewGuestManagementServiceClient(conn), nil
+
+}
+
+func (r *RunningVM[VM]) GuestVsockConn(ctx context.Context) (*grpc.ClientConn, error) {
+
+	if r.cachedGuestGrpcConn != nil {
+		return r.cachedGuestGrpcConn, nil
+	}
+
+	return r.buildGuestGrpcConn(ctx)
+}
+
+func (r *RunningVM[VM]) GuestVsockConnOLD(ctx context.Context) (*grpc.ClientConn, error) {
 
 	ticker := time.NewTicker(100 * time.Millisecond)
 	timeout := time.NewTimer(3 * time.Second)
@@ -75,19 +82,19 @@ func (r *RunningVM[VM]) GuestService(ctx context.Context) (*grpcruntime.GRPCClie
 		select {
 		case <-ticker.C:
 			slog.InfoContext(ctx, "connecting to vsock", "port", constants.RunmGuestServerVsockPort)
-			conn, err := r.vm.VSockConnect(ctx, uint32(constants.RunmGuestServerVsockPort))
-			if err != nil {
-				lastError = err
-				continue
-			}
+
 			opts := []grpc.DialOption{
 				grpc.WithTransportCredentials(insecure.NewCredentials()),
 				grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
 					slog.InfoContext(ctx, "dialing vsock", "port", constants.RunmGuestServerVsockPort, "ignored_addr", addr)
+					conn, err := r.vm.VSockConnect(ctx, uint32(constants.RunmGuestServerVsockPort))
+					if err != nil {
+						return nil, err
+					}
 					return conn, nil
 				}),
 				grpc.WithUnaryInterceptor(grpcerr.UnaryClientInterceptor),
-				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024 * 1024 * 10)),
+				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*10), grpc.WaitForReady(true)),
 			}
 			if logging.GetGlobalOtelInstances() != nil {
 				opts = append(opts, logging.GetGlobalOtelInstances().GetGrpcClientOpts())
@@ -101,13 +108,14 @@ func (r *RunningVM[VM]) GuestService(ctx context.Context) (*grpcruntime.GRPCClie
 			// test the connection
 			grpcConn.Connect()
 
-			r.runtime, err = grpcruntime.NewGRPCClientRuntimeFromConn(grpcConn)
-			if err != nil {
-				lastError = err
-				continue
-			}
-			r.runtime.SetVsockProxier(r)
-			return r.runtime, nil
+			// r.runtime, err = grpcruntime.NewGRPCClientRuntimeFromConn(grpcConn)
+			// if err != nil {
+			// 	lastError = err
+			// 	continue
+			// }
+			// r.runtime.SetVsockProxier(r)
+			// return r.runtime, nil
+			return grpcConn, nil
 		case <-timeout.C:
 			slog.ErrorContext(ctx, "timeout waiting for guest service connection", "error", lastError)
 			return nil, errors.Errorf("timeout waiting for guest service connection: %w", lastError)
@@ -117,20 +125,6 @@ func (r *RunningVM[VM]) GuestService(ctx context.Context) (*grpcruntime.GRPCClie
 		}
 	}
 }
-
-// open a new unix socket pair
-
-// // attempt to get the raw connection, otherwise proxy it
-
-// rc, err := hack.TryGetUnexportedFieldOf[net.Conn](conn, "rawConn")
-// if err != nil {
-// 	return nil, errors.Errorf("getting raw connection: %w", err)
-// }
-
-// unixConn, ok := rc.(*net.UnixConn)
-// if !ok {
-// 	return nil, errors.Errorf("raw connection is not a net.UnixConn")
-// }
 
 func (r *RunningVM[VM]) ListenAndAcceptSingleVsockConnection(ctx context.Context, port uint32, dialCallback func(ctx context.Context) error) (*net.UnixConn, error) {
 
@@ -153,30 +147,29 @@ func (r *RunningVM[VM]) ListenAndAcceptSingleVsockConnection(ctx context.Context
 	return unixConn, nil
 }
 
-// type filer interface {
-// 	File() (*os.File, error)
-// }
-
-// rawConn := hack.GetUnexportedFieldOf(conn, "rawConn")
-// rawConnf, ok := rawConn.(filer)
-// if !ok {
-// 	return nil, errors.Errorf("connection does not support File()")
-// }
-
-// file, err := rawConnf.File()
-// if err != nil {
-// 	return nil, errors.Errorf("getting file from connection: %w", err)
-// }
-// defer file.Close()
-
-// // Now use this fd with mdlayher/socket
-// sockConn, err := socket.FileConn(
-// 	file,
-// 	"custom",
-// )
-
-// return sockConn, nil
-// }
+func (r *RunningVM[VM]) buildGuestGrpcConn(ctx context.Context) (*grpc.ClientConn, error) {
+	opts := []grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+			slog.InfoContext(ctx, "dialing vsock", "port", constants.RunmGuestServerVsockPort, "ignored_addr", addr)
+			conn, err := r.vm.VSockConnect(ctx, uint32(constants.RunmGuestServerVsockPort))
+			if err != nil {
+				return nil, err
+			}
+			return conn, nil
+		}),
+		grpc.WithUnaryInterceptor(grpcerr.UnaryClientInterceptor),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*10), grpc.WaitForReady(true)),
+	}
+	if logging.GetGlobalOtelInstances() != nil {
+		opts = append(opts, logging.GetGlobalOtelInstances().GetGrpcClientOpts())
+	}
+	grpcConn, err := grpc.NewClient("passthrough:target", opts...)
+	if err != nil {
+		return nil, errors.Errorf("building guest grpc conn: %w", err)
+	}
+	return grpcConn, nil
+}
 
 func (r *RunningVM[VM]) Close(ctx context.Context) error {
 	r.closeCancel()
@@ -266,7 +259,7 @@ func (r *RunningVM[VM]) RunCommandSimple(ctx context.Context, command string) ([
 		return nil, nil, 0, err
 	}
 
-	exec, err := guestService.Management().GuestRunCommand(ctx, req)
+	exec, err := guestService.GuestRunCommand(ctx, req)
 	if err != nil {
 		return nil, nil, 0, err
 	}
@@ -280,6 +273,14 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 	errgrp, _ := errgroup.WithContext(ctx)
 
 	rvm.closeCancel = closeCancel
+
+	if rvm.cachedGuestGrpcConn == nil {
+		conn, err := rvm.buildGuestGrpcConn(ctx)
+		if err != nil {
+			return errors.Errorf("building guest grpc conn: %w", err)
+		}
+		rvm.cachedGuestGrpcConn = conn
+	}
 
 	errgrp.Go(func() error {
 		err := rvm.netdev.Wait(ctx)
@@ -297,6 +298,11 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 		}
 		return errors.Errorf("booting virtual machine: %w", err)
 	}
+
+	go func() {
+		rvm.cachedGuestGrpcConn.Connect()
+
+	}()
 
 	errgrp.Go(func() error {
 		var writer io.Writer
@@ -412,13 +418,6 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 			slog.ErrorContext(ctx, "error running gvproxy", "error", err)
 		}
 
-		// // Wait for runtime services to finish
-		// if err := runErrGroup.Wait(); err != nil && err != context.Canceled {
-		// 	slog.ErrorContext(ctx, "error running runtime services", "error", err)
-		// 	errCh <- err
-		// 	return
-		// }
-
 		// Only send error if VM actually encounters an error state
 		stateNotify := rvm.VM().StateChangeNotify(ctx)
 		for {
@@ -440,6 +439,16 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 		}
 	}()
 
+	err = rvm.RunInitalTimesyncRequests(ctx)
+	if err != nil {
+		slog.ErrorContext(ctx, "error running initial timesync requests", "error", err)
+		return errors.Errorf("running initial timesync requests: %w", err)
+	}
+
+	return nil
+}
+
+func (rvm *RunningVM[VM]) RunInitalTimesyncRequests(ctx context.Context) error {
 	slog.InfoContext(ctx, "waiting for guest service")
 
 	connection, err := rvm.GuestService(ctx)
@@ -449,14 +458,12 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 
 	now := time.Now()
 
-	// zone, offset := now.Zone()
-
 	slog.InfoContext(ctx, "got guest service - making time sync request to management service")
 
 	tsreq := &runmv1.GuestTimeSyncRequest{}
 	tsreq.SetUnixTimeNs(uint64(now.UnixNano()))
 	// tsreq.SetTimezone(fmt.Sprintf("%s%d", zone, offset))
-	response, err := connection.Management().GuestTimeSync(ctx, tsreq)
+	response, err := connection.GuestTimeSync(ctx, tsreq)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to time sync", "error", err)
 		return errors.Errorf("failed to time sync: %w", err)
@@ -467,7 +474,7 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 	// this first request, will take a few extra milliseconds, so we make the same call again
 
 	tsreq.SetUnixTimeNs(uint64(now.UnixNano()))
-	response, err = connection.Management().GuestTimeSync(ctx, tsreq)
+	response, err = connection.GuestTimeSync(ctx, tsreq)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to time sync", "error", err)
 		return errors.Errorf("failed to time sync: %w", err)
