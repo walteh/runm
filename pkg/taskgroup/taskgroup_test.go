@@ -1,4 +1,4 @@
-package tracegroup
+package taskgroup_test
 
 import (
 	"context"
@@ -10,11 +10,13 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/walteh/runm/pkg/taskgroup"
 )
 
 func TestTraceGroup_BasicUsage(t *testing.T) {
 	ctx := context.Background()
-	tg := NewTraceGroup(ctx)
+	tg := taskgroup.NewTaskGroup(ctx)
 
 	var counter int64
 	tg.Go(func() error {
@@ -34,7 +36,7 @@ func TestTraceGroup_BasicUsage(t *testing.T) {
 
 func TestTraceGroup_WithError(t *testing.T) {
 	ctx := context.Background()
-	tg := NewTraceGroup(ctx)
+	tg := taskgroup.NewTaskGroup(ctx)
 
 	expectedErr := errors.New("test error")
 	tg.Go(func() error {
@@ -53,7 +55,7 @@ func TestTraceGroup_WithError(t *testing.T) {
 
 func TestTraceGroup_WithContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	tg := NewTraceGroup(ctx)
+	tg := taskgroup.NewTaskGroup(ctx)
 
 	var started bool
 	tg.Go(func() error {
@@ -75,7 +77,7 @@ func TestTraceGroup_WithContext(t *testing.T) {
 
 func TestTraceGroup_WithTimeout(t *testing.T) {
 	ctx := context.Background()
-	tg := NewTraceGroup(ctx, WithTimeout(100*time.Millisecond))
+	tg := taskgroup.NewTaskGroup(ctx, taskgroup.WithTimeout(100*time.Millisecond))
 
 	tg.Go(func() error {
 		// Use the tracegroup context to respect timeout
@@ -98,7 +100,7 @@ func TestTraceGroup_WithTimeout(t *testing.T) {
 
 func TestTraceGroup_WithLimit(t *testing.T) {
 	ctx := context.Background()
-	tg := NewTraceGroup(ctx, WithMaxConcurrent(2))
+	tg := taskgroup.NewTaskGroup(ctx, taskgroup.WithMaxConcurrent(2))
 
 	var concurrent int64
 	var maxConcurrent int64
@@ -109,7 +111,7 @@ func TestTraceGroup_WithLimit(t *testing.T) {
 		tg.Go(func() error {
 			defer wg.Done()
 			current := atomic.AddInt64(&concurrent, 1)
-			
+
 			// Update max if this is higher
 			for {
 				max := atomic.LoadInt64(&maxConcurrent)
@@ -117,7 +119,7 @@ func TestTraceGroup_WithLimit(t *testing.T) {
 					break
 				}
 			}
-			
+
 			time.Sleep(50 * time.Millisecond)
 			atomic.AddInt64(&concurrent, -1)
 			return nil
@@ -126,14 +128,14 @@ func TestTraceGroup_WithLimit(t *testing.T) {
 
 	err := tg.Wait()
 	wg.Wait()
-	
+
 	assert.NoError(t, err)
 	assert.LessOrEqual(t, atomic.LoadInt64(&maxConcurrent), int64(2))
 }
 
 func TestTraceGroup_TryGo(t *testing.T) {
 	ctx := context.Background()
-	tg := NewTraceGroup(ctx, WithMaxConcurrent(1))
+	tg := taskgroup.NewTaskGroup(ctx, taskgroup.WithMaxConcurrent(1))
 
 	// First should succeed
 	success1 := tg.TryGo(func() error {
@@ -154,7 +156,7 @@ func TestTraceGroup_TryGo(t *testing.T) {
 
 func TestTraceGroup_WithName(t *testing.T) {
 	ctx := context.Background()
-	tg := NewTraceGroup(ctx, WithName("test-group"))
+	tg := taskgroup.NewTaskGroup(ctx, taskgroup.WithName("test-group"))
 
 	tg.GoWithName("task1", func() error {
 		return nil
@@ -176,7 +178,7 @@ func TestTraceGroup_WithName(t *testing.T) {
 
 func TestTraceGroup_Status(t *testing.T) {
 	ctx := context.Background()
-	tg := NewTraceGroup(ctx)
+	tg := taskgroup.NewTaskGroup(ctx)
 
 	// Initial status
 	started, finished, taskCount, err := tg.Status()
@@ -212,12 +214,12 @@ func TestTraceGroup_Status(t *testing.T) {
 
 func TestTraceGroup_WithLogLevels(t *testing.T) {
 	ctx := context.Background()
-	tg := NewTraceGroup(ctx, 
-		WithLogLevel(slog.LevelDebug),
-		WithLogStart(true),
-		WithLogEnd(true),
-		WithLogTaskStart(true),
-		WithLogTaskEnd(true),
+	tg := taskgroup.NewTaskGroup(ctx,
+		taskgroup.WithLogLevel(slog.LevelDebug),
+		taskgroup.WithLogStart(true),
+		taskgroup.WithLogEnd(true),
+		taskgroup.WithLogTaskStart(true),
+		taskgroup.WithLogTaskEnd(true),
 	)
 
 	tg.GoWithName("debug-task", func() error {
@@ -230,7 +232,7 @@ func TestTraceGroup_WithLogLevels(t *testing.T) {
 
 func TestTraceGroup_MultipleErrors(t *testing.T) {
 	ctx := context.Background()
-	tg := NewTraceGroup(ctx)
+	tg := taskgroup.NewTaskGroup(ctx)
 
 	err1 := errors.New("error 1")
 	err2 := errors.New("error 2")
@@ -252,7 +254,7 @@ func TestTraceGroup_MultipleErrors(t *testing.T) {
 
 func TestTraceGroup_WithContext_Function(t *testing.T) {
 	ctx := context.Background()
-	tg, groupCtx := WithContext(ctx, WithName("context-group"))
+	tg, groupCtx := taskgroup.WithContext(ctx, taskgroup.WithName("context-group"))
 
 	assert.NotNil(t, tg)
 	assert.NotNil(t, groupCtx)
@@ -270,7 +272,7 @@ func TestTraceGroup_WithContext_Function(t *testing.T) {
 
 func TestTraceGroup_SetLimit(t *testing.T) {
 	ctx := context.Background()
-	tg := NewTraceGroup(ctx)
+	tg := taskgroup.NewTaskGroup(ctx)
 
 	// Set limit before starting
 	tg.SetLimit(2)
@@ -281,7 +283,7 @@ func TestTraceGroup_SetLimit(t *testing.T) {
 	for i := 0; i < 4; i++ {
 		tg.Go(func() error {
 			current := atomic.AddInt64(&concurrent, 1)
-			
+
 			// Update max if this is higher
 			for {
 				max := atomic.LoadInt64(&maxConcurrent)
@@ -289,7 +291,7 @@ func TestTraceGroup_SetLimit(t *testing.T) {
 					break
 				}
 			}
-			
+
 			time.Sleep(50 * time.Millisecond)
 			atomic.AddInt64(&concurrent, -1)
 			return nil
@@ -303,7 +305,7 @@ func TestTraceGroup_SetLimit(t *testing.T) {
 
 func TestTraceGroup_SetLimitAfterStart(t *testing.T) {
 	ctx := context.Background()
-	tg := NewTraceGroup(ctx)
+	tg := taskgroup.NewTaskGroup(ctx)
 
 	// Start a task first
 	tg.Go(func() error {
@@ -332,15 +334,15 @@ func TestTraceGroup_SetLimitAfterStart(t *testing.T) {
 
 func TestTraceGroup_WithAttrFunc(t *testing.T) {
 	ctx := context.Background()
-	
+
 	attrFunc := func() []slog.Attr {
 		return []slog.Attr{
 			slog.String("custom", "value"),
 			slog.Int("test", 42),
 		}
 	}
-	
-	tg := NewTraceGroup(ctx, WithAttrFunc(attrFunc))
+
+	tg := taskgroup.NewTaskGroup(ctx, taskgroup.WithAttrFunc(attrFunc))
 
 	tg.Go(func() error {
 		return nil
@@ -352,7 +354,7 @@ func TestTraceGroup_WithAttrFunc(t *testing.T) {
 
 func TestTraceGroup_ZeroTasks(t *testing.T) {
 	ctx := context.Background()
-	tg := NewTraceGroup(ctx)
+	tg := taskgroup.NewTaskGroup(ctx)
 
 	err := tg.Wait()
 	assert.NoError(t, err)
@@ -366,7 +368,7 @@ func TestTraceGroup_ZeroTasks(t *testing.T) {
 
 func TestTraceGroup_TryGoWithName(t *testing.T) {
 	ctx := context.Background()
-	tg := NewTraceGroup(ctx, WithMaxConcurrent(1))
+	tg := taskgroup.NewTaskGroup(ctx, taskgroup.WithMaxConcurrent(1))
 
 	// First should succeed
 	success1 := tg.TryGoWithName("task1", func() error {
@@ -387,40 +389,40 @@ func TestTraceGroup_TryGoWithName(t *testing.T) {
 
 func BenchmarkTraceGroup_BasicUsage(b *testing.B) {
 	ctx := context.Background()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		tg := NewTraceGroup(ctx, WithLogStart(false), WithLogEnd(false))
-		
+		tg := taskgroup.NewTaskGroup(ctx, taskgroup.WithLogStart(false), taskgroup.WithLogEnd(false))
+
 		for j := 0; j < 10; j++ {
 			tg.Go(func() error {
 				return nil
 			})
 		}
-		
+
 		_ = tg.Wait()
 	}
 }
 
 func BenchmarkTraceGroup_WithLimit(b *testing.B) {
 	ctx := context.Background()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		tg := NewTraceGroup(ctx, 
-			WithMaxConcurrent(5),
-			WithLogStart(false), 
-			WithLogEnd(false),
-			WithLogTaskStart(false),
-			WithLogTaskEnd(false),
+		tg := taskgroup.NewTaskGroup(ctx,
+			taskgroup.WithMaxConcurrent(5),
+			taskgroup.WithLogStart(false),
+			taskgroup.WithLogEnd(false),
+			taskgroup.WithLogTaskStart(false),
+			taskgroup.WithLogTaskEnd(false),
 		)
-		
+
 		for j := 0; j < 20; j++ {
 			tg.Go(func() error {
 				return nil
 			})
 		}
-		
+
 		_ = tg.Wait()
 	}
 }

@@ -1,4 +1,4 @@
-package tracegroup
+package taskgroup
 
 import (
 	"context"
@@ -10,8 +10,8 @@ import (
 )
 
 //go:opts
-type TraceGroupOpts struct {
-	name            string     `default:"tracegroup"`
+type TaskGroupOpts struct {
+	name            string     `default:"taskgroup"`
 	logLevel        slog.Level `default:"-4"`
 	logStart        bool       `default:"true"`
 	logEnd          bool       `default:"true"`
@@ -24,12 +24,12 @@ type TraceGroupOpts struct {
 	maxConcurrent   int // 0 means unlimited
 }
 
-type TraceGroup struct {
+type TaskGroup struct {
 	ctx         context.Context
 	cancel      context.CancelFunc
 	wg          sync.WaitGroup
 	mu          sync.Mutex
-	opts        TraceGroupOpts
+	opts        TaskGroupOpts
 	err         error
 	errOnce     sync.Once
 	caller      uintptr
@@ -47,8 +47,8 @@ type TaskInfo struct {
 	Error    error
 }
 
-func NewTraceGroup(ctx context.Context, opts ...TraceGroupOpt) *TraceGroup {
-	options := newTraceGroupOpts(opts...)
+func NewTaskGroup(ctx context.Context, opts ...TaskGroupOpt) *TaskGroup {
+	options := newTaskGroupOpts(opts...)
 
 	if options.slogBaseContext == nil {
 		options.slogBaseContext = ctx
@@ -66,7 +66,7 @@ func NewTraceGroup(ctx context.Context, opts ...TraceGroupOpt) *TraceGroup {
 		semaphore = make(chan struct{}, options.maxConcurrent)
 	}
 
-	tg := &TraceGroup{
+	tg := &TaskGroup{
 		ctx:       ctx,
 		cancel:    cancel,
 		opts:      options,
@@ -77,11 +77,11 @@ func NewTraceGroup(ctx context.Context, opts ...TraceGroupOpt) *TraceGroup {
 	return tg
 }
 
-func (tg *TraceGroup) Context() context.Context {
+func (tg *TaskGroup) Context() context.Context {
 	return tg.ctx
 }
 
-func (tg *TraceGroup) Start() {
+func (tg *TaskGroup) Start() {
 	tg.mu.Lock()
 	defer tg.mu.Unlock()
 
@@ -92,15 +92,15 @@ func (tg *TraceGroup) Start() {
 	tg.started = true
 
 	if tg.opts.logStart {
-		tg.log(slog.LevelInfo, "tracegroup started", slog.String("name", tg.opts.name))
+		tg.log(slog.LevelInfo, "taskgroup started", slog.String("name", tg.opts.name))
 	}
 }
 
-func (tg *TraceGroup) Go(fn func() error) {
+func (tg *TaskGroup) Go(fn func() error) {
 	tg.GoWithName("", fn)
 }
 
-func (tg *TraceGroup) GoWithName(name string, fn func() error) {
+func (tg *TaskGroup) GoWithName(name string, fn func() error) {
 	tg.Start()
 
 	tg.mu.Lock()
@@ -159,7 +159,7 @@ func (tg *TraceGroup) GoWithName(name string, fn func() error) {
 	}()
 }
 
-func (tg *TraceGroup) Wait() error {
+func (tg *TaskGroup) Wait() error {
 	tg.Start()
 
 	// Use a channel to signal when WaitGroup is done
@@ -196,17 +196,17 @@ func (tg *TraceGroup) Wait() error {
 		if tg.err != nil {
 			attrs = append(attrs, slog.String("error", tg.err.Error()))
 		}
-		tg.log(slog.LevelInfo, "tracegroup finished", attrs...)
+		tg.log(slog.LevelInfo, "taskgroup finished", attrs...)
 	}
 
 	return tg.err
 }
 
-func (tg *TraceGroup) TryGo(fn func() error) bool {
+func (tg *TaskGroup) TryGo(fn func() error) bool {
 	return tg.TryGoWithName("", fn)
 }
 
-func (tg *TraceGroup) TryGoWithName(name string, fn func() error) bool {
+func (tg *TaskGroup) TryGoWithName(name string, fn func() error) bool {
 	tg.Start()
 
 	tg.mu.Lock()
@@ -275,14 +275,14 @@ func (tg *TraceGroup) TryGoWithName(name string, fn func() error) bool {
 	return true
 }
 
-func (tg *TraceGroup) Status() (started, finished bool, taskCount int, err error) {
+func (tg *TaskGroup) Status() (started, finished bool, taskCount int, err error) {
 	tg.mu.Lock()
 	defer tg.mu.Unlock()
 
 	return tg.started, tg.finished, tg.taskCounter, tg.err
 }
 
-func (tg *TraceGroup) setError(err error) {
+func (tg *TaskGroup) setError(err error) {
 	tg.errOnce.Do(func() {
 		tg.mu.Lock()
 		tg.err = err
@@ -291,7 +291,7 @@ func (tg *TraceGroup) setError(err error) {
 	})
 }
 
-func (tg *TraceGroup) log(level slog.Level, msg string, attrs ...slog.Attr) {
+func (tg *TaskGroup) log(level slog.Level, msg string, attrs ...slog.Attr) {
 	if tg.opts.attrFunc != nil {
 		attrs = append(attrs, tg.opts.attrFunc()...)
 	}
@@ -307,14 +307,14 @@ func (tg *TraceGroup) log(level slog.Level, msg string, attrs ...slog.Attr) {
 	_ = slog.Default().Handler().Handle(ctx, rec)
 }
 
-// WithContext creates a new TraceGroup with the given context
-func WithContext(ctx context.Context, opts ...TraceGroupOpt) (*TraceGroup, context.Context) {
-	tg := NewTraceGroup(ctx, opts...)
+// WithContext creates a new TaskGroup with the given context
+func WithContext(ctx context.Context, opts ...TaskGroupOpt) (*TaskGroup, context.Context) {
+	tg := NewTaskGroup(ctx, opts...)
 	return tg, tg.Context()
 }
 
 // SetLimit sets the maximum number of concurrent goroutines
-func (tg *TraceGroup) SetLimit(n int) {
+func (tg *TaskGroup) SetLimit(n int) {
 	tg.mu.Lock()
 	defer tg.mu.Unlock()
 
