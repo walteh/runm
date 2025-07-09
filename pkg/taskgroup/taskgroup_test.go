@@ -19,12 +19,12 @@ func TestTaskGroup_BasicUsage(t *testing.T) {
 	tg := taskgroup.NewTaskGroup(ctx)
 
 	var counter int64
-	tg.Go(func() error {
+	tg.Go(func(context.Context) error {
 		atomic.AddInt64(&counter, 1)
 		return nil
 	})
 
-	tg.Go(func() error {
+	tg.Go(func(context.Context) error {
 		atomic.AddInt64(&counter, 1)
 		return nil
 	})
@@ -39,11 +39,11 @@ func TestTaskGroup_WithError(t *testing.T) {
 	tg := taskgroup.NewTaskGroup(ctx)
 
 	expectedErr := errors.New("test error")
-	tg.Go(func() error {
+	tg.Go(func(context.Context) error {
 		return expectedErr
 	})
 
-	tg.Go(func() error {
+	tg.Go(func(context.Context) error {
 		time.Sleep(100 * time.Millisecond)
 		return nil
 	})
@@ -58,7 +58,7 @@ func TestTaskGroup_WithContext(t *testing.T) {
 	tg := taskgroup.NewTaskGroup(ctx)
 
 	var started bool
-	tg.Go(func() error {
+	tg.Go(func(context.Context) error {
 		started = true
 		<-ctx.Done()
 		return ctx.Err()
@@ -79,7 +79,7 @@ func TestTaskGroup_WithTimeout(t *testing.T) {
 	ctx := context.Background()
 	tg := taskgroup.NewTaskGroup(ctx, taskgroup.WithTimeout(100*time.Millisecond))
 
-	tg.Go(func() error {
+	tg.Go(func(context.Context) error {
 		// Use the taskgroup context to respect timeout
 		select {
 		case <-time.After(200 * time.Millisecond):
@@ -108,7 +108,7 @@ func TestTaskGroup_WithLimit(t *testing.T) {
 
 	for i := 0; i < 5; i++ {
 		wg.Add(1)
-		tg.Go(func() error {
+		tg.Go(func(context.Context) error {
 			defer wg.Done()
 			current := atomic.AddInt64(&concurrent, 1)
 
@@ -138,14 +138,14 @@ func TestTaskGroup_TryGo(t *testing.T) {
 	tg := taskgroup.NewTaskGroup(ctx, taskgroup.WithMaxConcurrent(1))
 
 	// First should succeed
-	success1 := tg.TryGo(func() error {
+	success1 := tg.TryGo(func(context.Context) error {
 		time.Sleep(100 * time.Millisecond)
 		return nil
 	})
 	assert.True(t, success1)
 
 	// Second should fail immediately due to limit
-	success2 := tg.TryGo(func() error {
+	success2 := tg.TryGo(func(context.Context) error {
 		return nil
 	})
 	assert.False(t, success2)
@@ -158,11 +158,11 @@ func TestTaskGroup_WithName(t *testing.T) {
 	ctx := context.Background()
 	tg := taskgroup.NewTaskGroup(ctx, taskgroup.WithName("test-group"))
 
-	tg.GoWithName("task1", func() error {
+	tg.GoWithName("task1", func(context.Context) error {
 		return nil
 	})
 
-	tg.GoWithName("task2", func() error {
+	tg.GoWithName("task2", func(context.Context) error {
 		return nil
 	})
 
@@ -188,7 +188,7 @@ func TestTaskGroup_Status(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Start a task
-	tg.Go(func() error {
+	tg.Go(func(context.Context) error {
 		time.Sleep(50 * time.Millisecond)
 		return nil
 	})
@@ -222,7 +222,7 @@ func TestTaskGroup_WithLogLevels(t *testing.T) {
 		taskgroup.WithLogTaskEnd(true),
 	)
 
-	tg.GoWithName("debug-task", func() error {
+	tg.GoWithName("debug-task", func(context.Context) error {
 		return nil
 	})
 
@@ -237,11 +237,11 @@ func TestTaskGroup_MultipleErrors(t *testing.T) {
 	err1 := errors.New("error 1")
 	err2 := errors.New("error 2")
 
-	tg.Go(func() error {
+	tg.Go(func(context.Context) error {
 		return err1
 	})
 
-	tg.Go(func() error {
+	tg.Go(func(context.Context) error {
 		time.Sleep(10 * time.Millisecond)
 		return err2
 	})
@@ -260,7 +260,7 @@ func TestTaskGroup_WithContext_Function(t *testing.T) {
 	assert.NotNil(t, groupCtx)
 
 	var ctxReceived context.Context
-	tg.Go(func() error {
+	tg.Go(func(context.Context) error {
 		ctxReceived = groupCtx
 		return nil
 	})
@@ -281,7 +281,7 @@ func TestTaskGroup_SetLimit(t *testing.T) {
 	var maxConcurrent int64
 
 	for i := 0; i < 4; i++ {
-		tg.Go(func() error {
+		tg.Go(func(context.Context) error {
 			current := atomic.AddInt64(&concurrent, 1)
 
 			// Update max if this is higher
@@ -308,7 +308,7 @@ func TestTaskGroup_SetLimitAfterStart(t *testing.T) {
 	tg := taskgroup.NewTaskGroup(ctx)
 
 	// Start a task first
-	tg.Go(func() error {
+	tg.Go(func(context.Context) error {
 		time.Sleep(10 * time.Millisecond)
 		return nil
 	})
@@ -319,7 +319,7 @@ func TestTaskGroup_SetLimitAfterStart(t *testing.T) {
 	// Add more tasks
 	var concurrent int64
 	for i := 0; i < 3; i++ {
-		tg.Go(func() error {
+		tg.Go(func(context.Context) error {
 			atomic.AddInt64(&concurrent, 1)
 			time.Sleep(50 * time.Millisecond)
 			atomic.AddInt64(&concurrent, -1)
@@ -344,7 +344,7 @@ func TestTaskGroup_WithAttrFunc(t *testing.T) {
 
 	tg := taskgroup.NewTaskGroup(ctx, taskgroup.WithAttrFunc(attrFunc))
 
-	tg.Go(func() error {
+	tg.Go(func(context.Context) error {
 		return nil
 	})
 
@@ -371,14 +371,14 @@ func TestTaskGroup_TryGoWithName(t *testing.T) {
 	tg := taskgroup.NewTaskGroup(ctx, taskgroup.WithMaxConcurrent(1))
 
 	// First should succeed
-	success1 := tg.TryGoWithName("task1", func() error {
+	success1 := tg.TryGoWithName("task1", func(context.Context) error {
 		time.Sleep(100 * time.Millisecond)
 		return nil
 	})
 	assert.True(t, success1)
 
 	// Second should fail immediately due to limit
-	success2 := tg.TryGoWithName("task2", func() error {
+	success2 := tg.TryGoWithName("task2", func(context.Context) error {
 		return nil
 	})
 	assert.False(t, success2)
@@ -396,12 +396,12 @@ func TestTaskGroup_TaskRegistry(t *testing.T) {
 	assert.Equal(t, 0, tg.GetRunningTaskCount())
 
 	// Add tasks
-	tg.GoWithName("task1", func() error {
+	tg.GoWithName("task1", func(context.Context) error {
 		time.Sleep(50 * time.Millisecond)
 		return nil
 	})
 
-	tg.GoWithName("task2", func() error {
+	tg.GoWithName("task2", func(context.Context) error {
 		time.Sleep(50 * time.Millisecond)
 		return errors.New("task error")
 	})
@@ -445,7 +445,7 @@ func TestTaskGroup_WithMetadata(t *testing.T) {
 		"retries":  3,
 	}
 
-	tg.GoWithNameAndMeta("meta-task", metadata, func() error {
+	tg.GoWithNameAndMeta("meta-task", metadata, func(context.Context) error {
 		return nil
 	})
 
@@ -462,7 +462,7 @@ func TestTaskGroup_PanicRecovery(t *testing.T) {
 	ctx := context.Background()
 	tg := taskgroup.NewTaskGroup(ctx, taskgroup.WithLogTaskPanic(true))
 
-	tg.GoWithName("panic-task", func() error {
+	tg.GoWithName("panic-task", func(context.Context) error {
 		panic("test panic")
 	})
 
@@ -486,7 +486,7 @@ func TestTaskGroup_WithTicker(t *testing.T) {
 		taskgroup.WithTickerFrequency(1),
 	)
 
-	tg.GoWithName("ticker-task", func() error {
+	tg.GoWithName("ticker-task", func(context.Context) error {
 		time.Sleep(250 * time.Millisecond)
 		return nil
 	})
@@ -499,7 +499,7 @@ func TestTaskGroup_TaskHistory(t *testing.T) {
 	ctx := context.Background()
 	tg := taskgroup.NewTaskGroup(ctx, taskgroup.WithKeepTaskHistory(true))
 
-	tg.GoWithName("history-task", func() error {
+	tg.GoWithName("history-task", func(context.Context) error {
 		return nil
 	})
 
@@ -518,7 +518,7 @@ func TestTaskGroup_TaskStateLogValue(t *testing.T) {
 	tg := taskgroup.NewTaskGroup(ctx)
 
 	metadata := map[string]any{"key": "value"}
-	tg.GoWithNameAndMeta("log-task", metadata, func() error {
+	tg.GoWithNameAndMeta("log-task", metadata, func(context.Context) error {
 		return nil
 	})
 
@@ -559,15 +559,15 @@ func TestTaskGroup_GetTasksByName(t *testing.T) {
 	tg := taskgroup.NewTaskGroup(ctx)
 
 	// Add multiple tasks with same name
-	tg.GoWithName("duplicate-task", func() error {
+	tg.GoWithName("duplicate-task", func(context.Context) error {
 		return nil
 	})
 
-	tg.GoWithName("duplicate-task", func() error {
+	tg.GoWithName("duplicate-task", func(context.Context) error {
 		return nil
 	})
 
-	tg.GoWithName("unique-task", func() error {
+	tg.GoWithName("unique-task", func(context.Context) error {
 		return nil
 	})
 
@@ -590,7 +590,7 @@ func TestTaskGroup_GetTask(t *testing.T) {
 	tg := taskgroup.NewTaskGroup(ctx)
 
 	var taskID string
-	tg.GoWithName("get-task", func() error {
+	tg.GoWithName("get-task", func(context.Context) error {
 		// Find the task ID
 		tasks := tg.GetTasksByName("get-task")
 		if len(tasks) > 0 {
@@ -621,7 +621,7 @@ func BenchmarkTaskGroup_BasicUsage(b *testing.B) {
 		tg := taskgroup.NewTaskGroup(ctx, taskgroup.WithLogStart(false), taskgroup.WithLogEnd(false))
 
 		for j := 0; j < 10; j++ {
-			tg.Go(func() error {
+			tg.Go(func(context.Context) error {
 				return nil
 			})
 		}
@@ -644,7 +644,7 @@ func BenchmarkTaskGroup_WithLimit(b *testing.B) {
 		)
 
 		for j := 0; j < 20; j++ {
-			tg.Go(func() error {
+			tg.Go(func(context.Context) error {
 				return nil
 			})
 		}
@@ -665,7 +665,7 @@ func BenchmarkTaskGroup_WithRegistry(b *testing.B) {
 		)
 
 		for j := 0; j < 10; j++ {
-			tg.GoWithName("bench-task", func() error {
+			tg.GoWithName("bench-task", func(context.Context) error {
 				return nil
 			})
 		}
@@ -695,7 +695,7 @@ func TestTaskGroup_PprofIntegration(t *testing.T) {
 	tg.GoWithNameAndMeta("pprof-task", map[string]any{
 		"priority": "high",
 		"timeout":  30,
-	}, func() error {
+	}, func(context.Context) error {
 		// Capture labels from within the task
 		helper := tg.GetPprofHelper()
 		// Note: We need to get the labeled context from the goroutine,
@@ -730,7 +730,7 @@ func TestTaskGroup_PprofDisabled(t *testing.T) {
 	)
 
 	var taskCompleted bool
-	tg.GoWithName("no-pprof-task", func() error {
+	tg.GoWithName("no-pprof-task", func(context.Context) error {
 		taskCompleted = true
 		return nil
 	})
@@ -753,7 +753,7 @@ func TestTaskGroup_PprofHelper(t *testing.T) {
 	var taskID, taskName string
 	var foundLabels bool
 
-	tg.GoWithName("helper-task", func() error {
+	tg.GoWithName("helper-task", func(context.Context) error {
 		// Test helper methods
 		if id, ok := helper.GetTaskIDFromLabels(tg.Context()); ok {
 			taskID = id
@@ -784,7 +784,7 @@ func TestTaskGroup_PprofWithAdditionalLabels(t *testing.T) {
 	var stageLabels map[string]string
 	helper := tg.GetPprofHelper()
 
-	tg.GoWithName("staged-task", func() error {
+	tg.GoWithName("staged-task", func(context.Context) error {
 		// Add additional labels for a specific stage
 		helper.WithAdditionalLabels(ctx, map[string]string{
 			"stage": "processing",
@@ -811,10 +811,10 @@ func TestTaskGroup_PprofChildTaskLabels(t *testing.T) {
 
 	helper := tg.GetPprofHelper()
 
-	tg.GoWithName("parent-task", func() error {
+	tg.GoWithName("parent-task", func(context.Context) error {
 		// Create child task labels
 		childLabels := helper.CreateChildTaskLabels(ctx, "child-operation")
-		
+
 		// Simulate child task execution with labels
 		pprof.Do(ctx, childLabels, func(childCtx context.Context) {
 			labels := helper.GetCurrentLabels(childCtx)
@@ -822,7 +822,7 @@ func TestTaskGroup_PprofChildTaskLabels(t *testing.T) {
 			assert.Equal(t, "child-operation", labels["child_task_name"])
 			assert.Contains(t, labels["parent_task_id"], "parent-child-")
 		})
-		
+
 		return nil
 	})
 
@@ -840,7 +840,7 @@ func TestTaskGroup_PprofUpdateTaskStage(t *testing.T) {
 	helper := tg.GetPprofHelper()
 	var stages []string
 
-	tg.GoWithName("multi-stage-task", func() error {
+	tg.GoWithName("multi-stage-task", func(context.Context) error {
 		// Simulate different task stages
 		for _, stage := range []string{"initialize", "process", "finalize"} {
 			helper.UpdateTaskStage(ctx, stage)
@@ -860,7 +860,7 @@ func TestTaskGroup_PprofUpdateTaskStage(t *testing.T) {
 
 func BenchmarkTaskGroup_WithPprof(b *testing.B) {
 	ctx := context.Background()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		tg := taskgroup.NewTaskGroup(ctx,
@@ -868,20 +868,20 @@ func BenchmarkTaskGroup_WithPprof(b *testing.B) {
 			taskgroup.WithLogStart(false),
 			taskgroup.WithLogEnd(false),
 		)
-		
+
 		for j := 0; j < 10; j++ {
-			tg.GoWithName("bench-task", func() error {
+			tg.GoWithName("bench-task", func(context.Context) error {
 				return nil
 			})
 		}
-		
+
 		_ = tg.Wait()
 	}
 }
 
 func BenchmarkTaskGroup_WithoutPprof(b *testing.B) {
 	ctx := context.Background()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		tg := taskgroup.NewTaskGroup(ctx,
@@ -889,13 +889,13 @@ func BenchmarkTaskGroup_WithoutPprof(b *testing.B) {
 			taskgroup.WithLogStart(false),
 			taskgroup.WithLogEnd(false),
 		)
-		
+
 		for j := 0; j < 10; j++ {
-			tg.GoWithName("bench-task", func() error {
+			tg.GoWithName("bench-task", func(context.Context) error {
 				return nil
 			})
 		}
-		
+
 		_ = tg.Wait()
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	slogctx "github.com/veqryn/slog-context"
 	"github.com/walteh/runm/pkg/syncmap"
 	"github.com/walteh/runm/pkg/ticker"
 )
@@ -36,103 +37,6 @@ type TaskGroupOpts struct {
 	maxTaskHistory  int           `default:"1000"`
 	enablePprof     bool          `default:"true"`
 	pprofLabels     map[string]string
-}
-
-type TaskStatus int
-
-const (
-	TaskStatusPending TaskStatus = iota
-	TaskStatusRunning
-	TaskStatusCompleted
-	TaskStatusFailed
-	TaskStatusPanicked
-	TaskStatusCanceled
-)
-
-func (s TaskStatus) String() string {
-	switch s {
-	case TaskStatusPending:
-		return "pending"
-	case TaskStatusRunning:
-		return "running"
-	case TaskStatusCompleted:
-		return "completed"
-	case TaskStatusFailed:
-		return "failed"
-	case TaskStatusPanicked:
-		return "panicked"
-	case TaskStatusCanceled:
-		return "canceled"
-	default:
-		return "unknown"
-	}
-}
-
-type TaskState struct {
-	ID          string
-	Name        string
-	Status      TaskStatus
-	StartTime   time.Time
-	EndTime     time.Time
-	Duration    time.Duration
-	Error       error
-	PanicInfo   *PanicInfo
-	Metadata    map[string]any
-	GoroutineID uint64
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-}
-
-type PanicInfo struct {
-	Value       any
-	Stack       string
-	Timestamp   time.Time
-	GoroutineID uint64
-}
-
-func (t *TaskState) IsRunning() bool {
-	return t.Status == TaskStatusRunning
-}
-
-func (t *TaskState) IsCompleted() bool {
-	return t.Status == TaskStatusCompleted || t.Status == TaskStatusFailed || t.Status == TaskStatusPanicked
-}
-
-func (t *TaskState) LogValue() slog.Value {
-	attrs := []slog.Attr{
-		slog.String("id", t.ID),
-		slog.String("name", t.Name),
-		slog.String("status", t.Status.String()),
-		slog.Time("start_time", t.StartTime),
-		slog.Duration("duration", t.Duration),
-		slog.Uint64("goroutine_id", t.GoroutineID),
-	}
-
-	if t.IsCompleted() {
-		attrs = append(attrs, slog.Time("end_time", t.EndTime))
-	}
-
-	if t.Error != nil {
-		attrs = append(attrs, slog.String("error", t.Error.Error()))
-	}
-
-	if t.PanicInfo != nil {
-		attrs = append(attrs, slog.Group("panic",
-			slog.String("value", fmt.Sprintf("%v", t.PanicInfo.Value)),
-			slog.Time("timestamp", t.PanicInfo.Timestamp),
-			slog.String("stack", t.PanicInfo.Stack),
-		))
-	}
-
-	if len(t.Metadata) > 0 {
-		var metaAttrs []any
-		for k, v := range t.Metadata {
-			metaAttrs = append(metaAttrs, slog.Any(k, v))
-		}
-		attrs = append(attrs, slog.Group("metadata", metaAttrs...))
-	}
-
-	return slog.GroupValue(attrs...)
 }
 
 type TaskRegistry interface {
@@ -268,15 +172,15 @@ func (tg *TaskGroup) Start() {
 	}
 }
 
-func (tg *TaskGroup) Go(fn func() error) {
+func (tg *TaskGroup) Go(fn TaskFunc) {
 	tg.GoWithName("", fn)
 }
 
-func (tg *TaskGroup) GoWithName(name string, fn func() error) {
+func (tg *TaskGroup) GoWithName(name string, fn TaskFunc) {
 	tg.GoWithNameAndMeta(name, nil, fn)
 }
 
-func (tg *TaskGroup) GoWithNameAndMeta(name string, metadata map[string]any, fn func() error) {
+func (tg *TaskGroup) GoWithNameAndMeta(name string, metadata map[string]any, fn TaskFunc) {
 	tg.Start()
 
 	tg.mu.Lock()
@@ -349,10 +253,10 @@ func (tg *TaskGroup) GoWithNameAndMeta(name string, metadata map[string]any, fn 
 				tg.pprofContexts.Store(goroutineID, labeledCtx)
 				defer tg.pprofContexts.Delete(goroutineID)
 
-				tg.executeTaskWithRecovery(taskID, name, fn, &err, &panicInfo)
+				tg.executeTaskWithRecovery(labeledCtx, taskState, fn, &err, &panicInfo)
 			})
 		} else {
-			tg.executeTaskWithRecovery(taskID, name, fn, &err, &panicInfo)
+			tg.executeTaskWithRecovery(tg.ctx, taskState, fn, &err, &panicInfo)
 		}
 
 		duration := time.Since(start)
@@ -478,15 +382,15 @@ func (tg *TaskGroup) Wait() error {
 	return tg.err
 }
 
-func (tg *TaskGroup) TryGo(fn func() error) bool {
+func (tg *TaskGroup) TryGo(fn TaskFunc) bool {
 	return tg.TryGoWithName("", fn)
 }
 
-func (tg *TaskGroup) TryGoWithName(name string, fn func() error) bool {
+func (tg *TaskGroup) TryGoWithName(name string, fn TaskFunc) bool {
 	return tg.TryGoWithNameAndMeta(name, nil, fn)
 }
 
-func (tg *TaskGroup) TryGoWithNameAndMeta(name string, metadata map[string]any, fn func() error) bool {
+func (tg *TaskGroup) TryGoWithNameAndMeta(name string, metadata map[string]any, fn TaskFunc) bool {
 	tg.Start()
 
 	tg.mu.Lock()
@@ -560,10 +464,10 @@ func (tg *TaskGroup) TryGoWithNameAndMeta(name string, metadata map[string]any, 
 				tg.pprofContexts.Store(goroutineID, labeledCtx)
 				defer tg.pprofContexts.Delete(goroutineID)
 
-				tg.executeTaskWithRecovery(taskID, name, fn, &err, &panicInfo)
+				tg.executeTaskWithRecovery(labeledCtx, taskState, fn, &err, &panicInfo)
 			})
 		} else {
-			tg.executeTaskWithRecovery(taskID, name, fn, &err, &panicInfo)
+			tg.executeTaskWithRecovery(tg.ctx, taskState, fn, &err, &panicInfo)
 		}
 
 		duration := time.Since(start)
@@ -780,7 +684,7 @@ func (tg *TaskGroup) createPprofLabels(taskID, name string, metadata map[string]
 }
 
 // executeTaskWithRecovery executes the task function with panic recovery
-func (tg *TaskGroup) executeTaskWithRecovery(taskID, name string, fn func() error, err *error, panicInfo **PanicInfo) {
+func (tg *TaskGroup) executeTaskWithRecovery(ctx context.Context, taskState *TaskState, fn TaskFunc, err *error, panicInfo **PanicInfo) {
 	defer func() {
 		if r := recover(); r != nil {
 			*panicInfo = &PanicInfo{
@@ -793,148 +697,19 @@ func (tg *TaskGroup) executeTaskWithRecovery(taskID, name string, fn func() erro
 
 			if tg.opts.logTaskPanic {
 				tg.log(slog.LevelError, "task panicked",
-					slog.String("task_id", taskID),
-					slog.String("task_name", name),
+					slog.String("task_id", taskState.ID),
+					slog.String("task_name", taskState.Name),
 					slog.Any("panic_value", r),
 					slog.String("stack", (*panicInfo).Stack),
 				)
 			}
 		}
 	}()
-	*err = fn()
-}
-
-// PprofHelper provides utilities for working with pprof labels
-type PprofHelper struct {
-	tg *TaskGroup
+	ctx = slogctx.With(ctx, taskState)
+	*err = fn(ctx)
 }
 
 // GetPprofHelper returns a helper for pprof operations
 func (tg *TaskGroup) GetPprofHelper() *PprofHelper {
 	return &PprofHelper{tg: tg}
-}
-
-// GetCurrentLabels returns the current goroutine's pprof labels
-// This works when called from within a task with pprof enabled
-func (ph *PprofHelper) GetCurrentLabels(ctx context.Context) map[string]string {
-	labels := make(map[string]string)
-
-	// First try the passed context (it might be a labeled context)
-	hasLabels := false
-	pprof.ForLabels(ctx, func(key, value string) bool {
-		labels[key] = value
-		hasLabels = true
-		return true
-	})
-
-	// If the passed context doesn't have labels, try the stored context
-	if !hasLabels {
-		goroutineID := getGoroutineID()
-		if labeledCtx, ok := ph.tg.pprofContexts.Load(goroutineID); ok {
-			pprof.ForLabels(labeledCtx, func(key, value string) bool {
-				labels[key] = value
-				return true
-			})
-		}
-	}
-
-	return labels
-}
-
-// GetTaskLabel returns a specific label value for the current task
-// This must be called from within a pprof.Do context
-func (ph *PprofHelper) GetTaskLabel(ctx context.Context, key string) (string, bool) {
-	// First try the passed context (it might be a labeled context)
-	if value, ok := pprof.Label(ctx, key); ok && value != "" {
-		return value, true
-	}
-
-	// If the passed context doesn't have the label, try the stored context
-	goroutineID := getGoroutineID()
-	if labeledCtx, ok := ph.tg.pprofContexts.Load(goroutineID); ok {
-		return pprof.Label(labeledCtx, key)
-	}
-	return "", false
-}
-
-// GetTaskIDFromLabels returns the task ID from pprof labels
-// This must be called from within a pprof.Do context
-func (ph *PprofHelper) GetTaskIDFromLabels(ctx context.Context) (string, bool) {
-	// First try the passed context (it might be a labeled context)
-	if value, ok := pprof.Label(ctx, "task_id"); ok && value != "" {
-		return value, true
-	}
-
-	// If the passed context doesn't have the label, try the stored context
-	goroutineID := getGoroutineID()
-	if labeledCtx, ok := ph.tg.pprofContexts.Load(goroutineID); ok {
-		return pprof.Label(labeledCtx, "task_id")
-	}
-	return "", false
-}
-
-// GetTaskNameFromLabels returns the task name from pprof labels
-// This must be called from within a pprof.Do context
-func (ph *PprofHelper) GetTaskNameFromLabels(ctx context.Context) (string, bool) {
-	// First try the passed context (it might be a labeled context)
-	if value, ok := pprof.Label(ctx, "task_name"); ok && value != "" {
-		return value, true
-	}
-
-	// If the passed context doesn't have the label, try the stored context
-	goroutineID := getGoroutineID()
-	if labeledCtx, ok := ph.tg.pprofContexts.Load(goroutineID); ok {
-		return pprof.Label(labeledCtx, "task_name")
-	}
-	return "", false
-}
-
-// WithAdditionalLabels executes a function with additional pprof labels
-func (ph *PprofHelper) WithAdditionalLabels(ctx context.Context, additionalLabels map[string]string, fn func(context.Context)) {
-	if len(additionalLabels) == 0 {
-		fn(ctx)
-		return
-	}
-
-	labelSlice := make([]string, 0, len(additionalLabels)*2)
-	for k, v := range additionalLabels {
-		labelSlice = append(labelSlice, k, v)
-	}
-
-	labels := pprof.Labels(labelSlice...)
-	pprof.Do(ctx, labels, fn)
-}
-
-// UpdateTaskStage updates the task stage in pprof labels
-func (ph *PprofHelper) UpdateTaskStage(ctx context.Context, stage string) {
-	goroutineID := getGoroutineID()
-	if labeledCtx, ok := ph.tg.pprofContexts.Load(goroutineID); ok {
-		// Create new labels with the stage added to the existing labels
-		labels := pprof.Labels("task_stage", stage)
-		newCtx := pprof.WithLabels(labeledCtx, labels)
-		ph.tg.pprofContexts.Store(goroutineID, newCtx)
-	}
-}
-
-// CreateChildTaskLabels creates labels for child tasks that inherit parent context
-func (ph *PprofHelper) CreateChildTaskLabels(parentCtx context.Context, childTaskName string) pprof.LabelSet {
-	return pprof.Labels(
-		"task_type", "child",
-		"child_task_name", childTaskName,
-		"parent_task_id", func() string {
-			// First try the passed context
-			if id, ok := pprof.Label(parentCtx, "task_id"); ok && id != "" {
-				return id
-			}
-
-			// If the passed context doesn't have the label, try the stored context
-			goroutineID := getGoroutineID()
-			if labeledCtx, ok := ph.tg.pprofContexts.Load(goroutineID); ok {
-				if id, ok := pprof.Label(labeledCtx, "task_id"); ok {
-					return id
-				}
-			}
-			return "unknown"
-		}(),
-	)
 }
