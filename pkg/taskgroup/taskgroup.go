@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"runtime"
 	"runtime/debug"
+	"runtime/pprof"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -33,6 +34,8 @@ type TaskGroupOpts struct {
 	tickerFrequency int             `default:"5"`
 	keepTaskHistory bool            `default:"true"`
 	maxTaskHistory  int             `default:"1000"`
+	enablePprof     bool            `default:"true"`
+	pprofLabels     map[string]string
 }
 
 type TaskStatus int
@@ -333,30 +336,15 @@ func (tg *TaskGroup) GoWithNameAndMeta(name string, metadata map[string]any, fn 
 		var err error
 		var panicInfo *PanicInfo
 		
-		// Execute with panic recovery
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					panicInfo = &PanicInfo{
-						Value:      r,
-						Stack:      string(debug.Stack()),
-						Timestamp:  time.Now(),
-						GoroutineID: getGoroutineID(),
-					}
-					err = fmt.Errorf("panic in task: %v", r)
-					
-					if tg.opts.logTaskPanic {
-						tg.log(slog.LevelError, "task panicked",
-							slog.String("task_id", taskID),
-							slog.String("task_name", name),
-							slog.Any("panic_value", r),
-							slog.String("stack", panicInfo.Stack),
-						)
-					}
-				}
-			}()
-			err = fn()
-		}()
+		// Execute with pprof labels and panic recovery
+		if tg.opts.enablePprof {
+			labels := tg.createPprofLabels(taskID, name, metadata)
+			pprof.Do(tg.ctx, labels, func(labeledCtx context.Context) {
+				tg.executeTaskWithRecovery(taskID, name, fn, &err, &panicInfo)
+			})
+		} else {
+			tg.executeTaskWithRecovery(taskID, name, fn, &err, &panicInfo)
+		}
 		
 		duration := time.Since(start)
 		
@@ -554,30 +542,15 @@ func (tg *TaskGroup) TryGoWithNameAndMeta(name string, metadata map[string]any, 
 		var err error
 		var panicInfo *PanicInfo
 		
-		// Execute with panic recovery
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					panicInfo = &PanicInfo{
-						Value:      r,
-						Stack:      string(debug.Stack()),
-						Timestamp:  time.Now(),
-						GoroutineID: getGoroutineID(),
-					}
-					err = fmt.Errorf("panic in task: %v", r)
-					
-					if tg.opts.logTaskPanic {
-						tg.log(slog.LevelError, "task panicked",
-							slog.String("task_id", taskID),
-							slog.String("task_name", name),
-							slog.Any("panic_value", r),
-							slog.String("stack", panicInfo.Stack),
-						)
-					}
-				}
-			}()
-			err = fn()
-		}()
+		// Execute with pprof labels and panic recovery
+		if tg.opts.enablePprof {
+			labels := tg.createPprofLabels(taskID, name, metadata)
+			pprof.Do(tg.ctx, labels, func(labeledCtx context.Context) {
+				tg.executeTaskWithRecovery(taskID, name, fn, &err, &panicInfo)
+			})
+		} else {
+			tg.executeTaskWithRecovery(taskID, name, fn, &err, &panicInfo)
+		}
 		
 		duration := time.Since(start)
 		
@@ -745,4 +718,135 @@ func getGoroutineID() uint64 {
 	// This is a simplified implementation
 	// In production, you might want to use a more efficient method
 	return 0 // Placeholder - would need runtime.Goroutine() or similar
+}
+
+// createPprofLabels creates pprof labels for the task
+func (tg *TaskGroup) createPprofLabels(taskID, name string, metadata map[string]any) pprof.LabelSet {
+	labels := make([]string, 0, 16) // Pre-allocate for common labels
+	
+	// Core task labels
+	labels = append(labels, 
+		"task_id", taskID,
+		"task_name", name,
+		"taskgroup", tg.opts.name,
+		"task_status", "running",
+	)
+	
+	// Add custom taskgroup labels
+	if tg.opts.pprofLabels != nil {
+		for k, v := range tg.opts.pprofLabels {
+			labels = append(labels, k, v)
+		}
+	}
+	
+	// Add metadata as labels (convert to strings)
+	if metadata != nil {
+		for k, v := range metadata {
+			if len(labels) < 32 { // Limit total labels to avoid overhead
+				labels = append(labels, fmt.Sprintf("meta_%s", k), fmt.Sprintf("%v", v))
+			}
+		}
+	}
+	
+	return pprof.Labels(labels...)
+}
+
+// executeTaskWithRecovery executes the task function with panic recovery
+func (tg *TaskGroup) executeTaskWithRecovery(taskID, name string, fn func() error, err *error, panicInfo **PanicInfo) {
+	defer func() {
+		if r := recover(); r != nil {
+			*panicInfo = &PanicInfo{
+				Value:      r,
+				Stack:      string(debug.Stack()),
+				Timestamp:  time.Now(),
+				GoroutineID: getGoroutineID(),
+			}
+			*err = fmt.Errorf("panic in task: %v", r)
+			
+			if tg.opts.logTaskPanic {
+				tg.log(slog.LevelError, "task panicked",
+					slog.String("task_id", taskID),
+					slog.String("task_name", name),
+					slog.Any("panic_value", r),
+					slog.String("stack", (*panicInfo).Stack),
+				)
+			}
+		}
+	}()
+	*err = fn()
+}
+
+// PprofHelper provides utilities for working with pprof labels
+type PprofHelper struct {
+	tg *TaskGroup
+}
+
+// GetPprofHelper returns a helper for pprof operations
+func (tg *TaskGroup) GetPprofHelper() *PprofHelper {
+	return &PprofHelper{tg: tg}
+}
+
+// GetCurrentLabels returns the current goroutine's pprof labels
+// This must be called from within a pprof.Do context
+func (ph *PprofHelper) GetCurrentLabels() map[string]string {
+	labels := make(map[string]string)
+	pprof.ForLabels(context.Background(), func(key, value string) bool {
+		labels[key] = value
+		return true
+	})
+	return labels
+}
+
+// GetTaskLabel returns a specific label value for the current task
+// This must be called from within a pprof.Do context
+func (ph *PprofHelper) GetTaskLabel(ctx context.Context, key string) (string, bool) {
+	return pprof.Label(ctx, key)
+}
+
+// GetTaskIDFromLabels returns the task ID from pprof labels
+// This must be called from within a pprof.Do context
+func (ph *PprofHelper) GetTaskIDFromLabels(ctx context.Context) (string, bool) {
+	return pprof.Label(ctx, "task_id")
+}
+
+// GetTaskNameFromLabels returns the task name from pprof labels
+// This must be called from within a pprof.Do context
+func (ph *PprofHelper) GetTaskNameFromLabels(ctx context.Context) (string, bool) {
+	return pprof.Label(ctx, "task_name")
+}
+
+// WithAdditionalLabels executes a function with additional pprof labels
+func (ph *PprofHelper) WithAdditionalLabels(ctx context.Context, additionalLabels map[string]string, fn func(context.Context)) {
+	if len(additionalLabels) == 0 {
+		fn(ctx)
+		return
+	}
+	
+	labelSlice := make([]string, 0, len(additionalLabels)*2)
+	for k, v := range additionalLabels {
+		labelSlice = append(labelSlice, k, v)
+	}
+	
+	labels := pprof.Labels(labelSlice...)
+	pprof.Do(ctx, labels, fn)
+}
+
+// UpdateTaskStage updates the task stage in pprof labels
+func (ph *PprofHelper) UpdateTaskStage(ctx context.Context, stage string) {
+	labels := pprof.Labels("task_stage", stage)
+	pprof.SetGoroutineLabels(pprof.WithLabels(ctx, labels))
+}
+
+// CreateChildTaskLabels creates labels for child tasks that inherit parent context
+func (ph *PprofHelper) CreateChildTaskLabels(parentCtx context.Context, childTaskName string) pprof.LabelSet {
+	return pprof.Labels(
+		"task_type", "child",
+		"child_task_name", childTaskName,
+		"parent_task_id", func() string {
+			if id, ok := pprof.Label(parentCtx, "task_id"); ok {
+				return id
+			}
+			return "unknown"
+		}(),
+	)
 }

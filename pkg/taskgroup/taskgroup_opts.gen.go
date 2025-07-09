@@ -30,6 +30,7 @@ func newTaskGroupOpts(
 	o.tickerFrequency = 5
 	o.keepTaskHistory = true
 	o.maxTaskHistory = 1000
+	o.enablePprof = true
 
 	for _, opt := range options {
 		opt(&o)
@@ -105,6 +106,14 @@ func WithMaxTaskHistory(opt int) TaskGroupOpt {
 	return func(o *TaskGroupOpts) { o.maxTaskHistory = opt }
 }
 
+func WithEnablePprof(opt bool) TaskGroupOpt {
+	return func(o *TaskGroupOpts) { o.enablePprof = opt }
+}
+
+func WithPprofLabels(opt map[string]string) TaskGroupOpt {
+	return func(o *TaskGroupOpts) { o.pprofLabels = opt }
+}
+
 func (o *TaskGroupOpts) Validate() error {
 	return nil
 }
@@ -144,3 +153,7 @@ func (o TaskGroupOpts) TickerFrequency() int { return o.tickerFrequency }
 func (o TaskGroupOpts) KeepTaskHistory() bool { return o.keepTaskHistory }
 
 func (o TaskGroupOpts) MaxTaskHistory() int { return o.maxTaskHistory }
+
+func (o TaskGroupOpts) EnablePprof() bool { return o.enablePprof }
+
+func (o TaskGroupOpts) PprofLabels() map[string]string { return o.pprofLabels }

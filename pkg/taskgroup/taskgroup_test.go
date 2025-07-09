@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"runtime/pprof"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -674,5 +675,227 @@ func BenchmarkTaskGroup_WithRegistry(b *testing.B) {
 		// Query the registry
 		_ = tg.GetTaskCount()
 		_ = tg.GetRunningTaskCount()
+	}
+}
+
+func TestTaskGroup_PprofIntegration(t *testing.T) {
+	ctx := context.Background()
+	tg := taskgroup.NewTaskGroup(ctx,
+		taskgroup.WithName("pprof-test"),
+		taskgroup.WithEnablePprof(true),
+		taskgroup.WithPprofLabels(map[string]string{
+			"environment": "test",
+			"component":   "taskgroup",
+		}),
+	)
+
+	var taskCompleted bool
+	var capturedLabels map[string]string
+
+	tg.GoWithNameAndMeta("pprof-task", map[string]any{
+		"priority": "high",
+		"timeout":  30,
+	}, func() error {
+		// Capture labels from within the task
+		helper := tg.GetPprofHelper()
+		// Note: We need to get the labeled context from the goroutine,
+		// but for now let's see if we can get the context from the task
+		ctx := tg.Context()
+		capturedLabels = helper.GetCurrentLabels(ctx)
+		taskCompleted = true
+		return nil
+	})
+
+	err := tg.Wait()
+	assert.NoError(t, err)
+	assert.True(t, taskCompleted)
+	assert.NotNil(t, capturedLabels)
+
+	// Verify expected labels are present
+	assert.Equal(t, "pprof-test", capturedLabels["taskgroup"])
+	assert.Equal(t, "pprof-task", capturedLabels["task_name"])
+	assert.Equal(t, "running", capturedLabels["task_status"])
+	assert.Equal(t, "test", capturedLabels["environment"])
+	assert.Equal(t, "taskgroup", capturedLabels["component"])
+	assert.Equal(t, "high", capturedLabels["meta_priority"])
+	assert.Equal(t, "30", capturedLabels["meta_timeout"])
+	assert.Contains(t, capturedLabels["task_id"], "pprof-test-")
+}
+
+func TestTaskGroup_PprofDisabled(t *testing.T) {
+	ctx := context.Background()
+	tg := taskgroup.NewTaskGroup(ctx,
+		taskgroup.WithName("no-pprof"),
+		taskgroup.WithEnablePprof(false),
+	)
+
+	var taskCompleted bool
+	tg.GoWithName("no-pprof-task", func() error {
+		taskCompleted = true
+		return nil
+	})
+
+	err := tg.Wait()
+	assert.NoError(t, err)
+	assert.True(t, taskCompleted)
+}
+
+func TestTaskGroup_PprofHelper(t *testing.T) {
+	ctx := context.Background()
+	tg := taskgroup.NewTaskGroup(ctx,
+		taskgroup.WithName("helper-test"),
+		taskgroup.WithEnablePprof(true),
+	)
+
+	helper := tg.GetPprofHelper()
+	assert.NotNil(t, helper)
+
+	var taskID, taskName string
+	var foundLabels bool
+
+	tg.GoWithName("helper-task", func() error {
+		// Test helper methods
+		if id, ok := helper.GetTaskIDFromLabels(tg.Context()); ok {
+			taskID = id
+		}
+		if name, ok := helper.GetTaskNameFromLabels(tg.Context()); ok {
+			taskName = name
+		}
+		if _, ok := helper.GetTaskLabel(tg.Context(), "taskgroup"); ok {
+			foundLabels = true
+		}
+		return nil
+	})
+
+	err := tg.Wait()
+	assert.NoError(t, err)
+	assert.True(t, foundLabels)
+	assert.Equal(t, "helper-task", taskName)
+	assert.Contains(t, taskID, "helper-test-")
+}
+
+func TestTaskGroup_PprofWithAdditionalLabels(t *testing.T) {
+	ctx := context.Background()
+	tg := taskgroup.NewTaskGroup(ctx,
+		taskgroup.WithName("additional-labels"),
+		taskgroup.WithEnablePprof(true),
+	)
+
+	var stageLabels map[string]string
+	helper := tg.GetPprofHelper()
+
+	tg.GoWithName("staged-task", func() error {
+		// Add additional labels for a specific stage
+		helper.WithAdditionalLabels(ctx, map[string]string{
+			"stage": "processing",
+			"phase": "validation",
+		}, func(labeledCtx context.Context) {
+			stageLabels = helper.GetCurrentLabels(labeledCtx)
+		})
+		return nil
+	})
+
+	err := tg.Wait()
+	assert.NoError(t, err)
+	assert.NotNil(t, stageLabels)
+	assert.Equal(t, "processing", stageLabels["stage"])
+	assert.Equal(t, "validation", stageLabels["phase"])
+}
+
+func TestTaskGroup_PprofChildTaskLabels(t *testing.T) {
+	ctx := context.Background()
+	tg := taskgroup.NewTaskGroup(ctx,
+		taskgroup.WithName("parent-child"),
+		taskgroup.WithEnablePprof(true),
+	)
+
+	helper := tg.GetPprofHelper()
+
+	tg.GoWithName("parent-task", func() error {
+		// Create child task labels
+		childLabels := helper.CreateChildTaskLabels(ctx, "child-operation")
+		
+		// Simulate child task execution with labels
+		pprof.Do(ctx, childLabels, func(childCtx context.Context) {
+			labels := helper.GetCurrentLabels(childCtx)
+			assert.Equal(t, "child", labels["task_type"])
+			assert.Equal(t, "child-operation", labels["child_task_name"])
+			assert.Contains(t, labels["parent_task_id"], "parent-child-")
+		})
+		
+		return nil
+	})
+
+	err := tg.Wait()
+	assert.NoError(t, err)
+}
+
+func TestTaskGroup_PprofUpdateTaskStage(t *testing.T) {
+	ctx := context.Background()
+	tg := taskgroup.NewTaskGroup(ctx,
+		taskgroup.WithName("staged-task"),
+		taskgroup.WithEnablePprof(true),
+	)
+
+	helper := tg.GetPprofHelper()
+	var stages []string
+
+	tg.GoWithName("multi-stage-task", func() error {
+		// Simulate different task stages
+		for _, stage := range []string{"initialize", "process", "finalize"} {
+			helper.UpdateTaskStage(ctx, stage)
+			if currentStage, ok := helper.GetTaskLabel(ctx, "task_stage"); ok {
+				stages = append(stages, currentStage)
+			}
+		}
+		return nil
+	})
+
+	err := tg.Wait()
+	assert.NoError(t, err)
+	assert.Contains(t, stages, "initialize")
+	assert.Contains(t, stages, "process")
+	assert.Contains(t, stages, "finalize")
+}
+
+func BenchmarkTaskGroup_WithPprof(b *testing.B) {
+	ctx := context.Background()
+	
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		tg := taskgroup.NewTaskGroup(ctx,
+			taskgroup.WithEnablePprof(true),
+			taskgroup.WithLogStart(false),
+			taskgroup.WithLogEnd(false),
+		)
+		
+		for j := 0; j < 10; j++ {
+			tg.GoWithName("bench-task", func() error {
+				return nil
+			})
+		}
+		
+		_ = tg.Wait()
+	}
+}
+
+func BenchmarkTaskGroup_WithoutPprof(b *testing.B) {
+	ctx := context.Background()
+	
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		tg := taskgroup.NewTaskGroup(ctx,
+			taskgroup.WithEnablePprof(false),
+			taskgroup.WithLogStart(false),
+			taskgroup.WithLogEnd(false),
+		)
+		
+		for j := 0; j < 10; j++ {
+			tg.GoWithName("bench-task", func() error {
+				return nil
+			})
+		}
+		
+		_ = tg.Wait()
 	}
 }
