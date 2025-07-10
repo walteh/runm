@@ -69,9 +69,6 @@ type TaskGroup struct {
 
 	// Ticker for periodic status logging
 	statusTicker *ticker.Ticker
-
-	// Pprof labeled contexts by goroutine ID
-	pprofContexts *syncmap.Map[uint64, context.Context]
 }
 
 func NewTaskGroup(ctx context.Context, opts ...TaskGroupOpt) *TaskGroup {
@@ -94,14 +91,13 @@ func NewTaskGroup(ctx context.Context, opts ...TaskGroupOpt) *TaskGroup {
 	}
 
 	tg := &TaskGroup{
-		ctx:           ctx,
-		cancel:        cancel,
-		opts:          options,
-		caller:        caller,
-		semaphore:     semaphore,
-		tasks:         syncmap.NewMap[string, *TaskState](),
-		taskHistory:   syncmap.NewMap[string, *TaskState](),
-		pprofContexts: syncmap.NewMap[uint64, context.Context](),
+		ctx:         ctx,
+		cancel:      cancel,
+		opts:        options,
+		caller:      caller,
+		semaphore:   semaphore,
+		tasks:       syncmap.NewMap[string, *TaskState](),
+		taskHistory: syncmap.NewMap[string, *TaskState](),
 	}
 
 	// Setup ticker for periodic status logging
@@ -248,11 +244,6 @@ func (tg *TaskGroup) GoWithNameAndMeta(name string, metadata map[string]any, fn 
 		if tg.opts.enablePprof {
 			labels := tg.createPprofLabels(taskID, name, metadata)
 			pprof.Do(tg.ctx, labels, func(labeledCtx context.Context) {
-				// Store the labeled context for the current goroutine
-				goroutineID := getGoroutineID()
-				tg.pprofContexts.Store(goroutineID, labeledCtx)
-				defer tg.pprofContexts.Delete(goroutineID)
-
 				tg.executeTaskWithRecovery(labeledCtx, taskState, fn, &err, &panicInfo)
 			})
 		} else {
@@ -459,11 +450,6 @@ func (tg *TaskGroup) TryGoWithNameAndMeta(name string, metadata map[string]any, 
 		if tg.opts.enablePprof {
 			labels := tg.createPprofLabels(taskID, name, metadata)
 			pprof.Do(tg.ctx, labels, func(labeledCtx context.Context) {
-				// Store the labeled context for the current goroutine
-				goroutineID := getGoroutineID()
-				tg.pprofContexts.Store(goroutineID, labeledCtx)
-				defer tg.pprofContexts.Delete(goroutineID)
-
 				tg.executeTaskWithRecovery(labeledCtx, taskState, fn, &err, &panicInfo)
 			})
 		} else {
@@ -705,7 +691,14 @@ func (tg *TaskGroup) executeTaskWithRecovery(ctx context.Context, taskState *Tas
 			}
 		}
 	}()
+
+	// Enhance slog context with essential taskgroup information
 	ctx = slogctx.With(ctx, taskState)
+	ctx = slogctx.Append(ctx,
+		slog.String("taskgroup", tg.opts.name),
+		slog.String("task", taskState.Name),
+	)
+
 	*err = fn(ctx)
 }
 

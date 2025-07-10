@@ -695,12 +695,9 @@ func TestTaskGroup_PprofIntegration(t *testing.T) {
 	tg.GoWithNameAndMeta("pprof-task", map[string]any{
 		"priority": "high",
 		"timeout":  30,
-	}, func(context.Context) error {
-		// Capture labels from within the task
+	}, func(ctx context.Context) error {
+		// Capture labels from within the task using the passed context
 		helper := tg.GetPprofHelper()
-		// Note: We need to get the labeled context from the goroutine,
-		// but for now let's see if we can get the context from the task
-		ctx := tg.Context()
 		capturedLabels = helper.GetCurrentLabels(ctx)
 		taskCompleted = true
 		return nil
@@ -753,15 +750,15 @@ func TestTaskGroup_PprofHelper(t *testing.T) {
 	var taskID, taskName string
 	var foundLabels bool
 
-	tg.GoWithName("helper-task", func(context.Context) error {
-		// Test helper methods
-		if id, ok := helper.GetTaskIDFromLabels(tg.Context()); ok {
+	tg.GoWithName("helper-task", func(ctx context.Context) error {
+		// Test helper methods using the passed labeled context
+		if id, ok := helper.GetTaskIDFromLabels(ctx); ok {
 			taskID = id
 		}
-		if name, ok := helper.GetTaskNameFromLabels(tg.Context()); ok {
+		if name, ok := helper.GetTaskNameFromLabels(ctx); ok {
 			taskName = name
 		}
-		if _, ok := helper.GetTaskLabel(tg.Context(), "taskgroup"); ok {
+		if _, ok := helper.GetTaskLabel(ctx, "taskgroup"); ok {
 			foundLabels = true
 		}
 		return nil
@@ -811,8 +808,8 @@ func TestTaskGroup_PprofChildTaskLabels(t *testing.T) {
 
 	helper := tg.GetPprofHelper()
 
-	tg.GoWithName("parent-task", func(context.Context) error {
-		// Create child task labels
+	tg.GoWithName("parent-task", func(ctx context.Context) error {
+		// Create child task labels using the passed labeled context
 		childLabels := helper.CreateChildTaskLabels(ctx, "child-operation")
 
 		// Simulate child task execution with labels
@@ -840,13 +837,17 @@ func TestTaskGroup_PprofUpdateTaskStage(t *testing.T) {
 	helper := tg.GetPprofHelper()
 	var stages []string
 
-	tg.GoWithName("multi-stage-task", func(context.Context) error {
-		// Simulate different task stages
-		for _, stage := range []string{"initialize", "process", "finalize"} {
-			helper.UpdateTaskStage(ctx, stage)
-			if currentStage, ok := helper.GetTaskLabel(ctx, "task_stage"); ok {
-				stages = append(stages, currentStage)
-			}
+	tg.GoWithName("multi-stage-task", func(taskCtx context.Context) error {
+		// Simulate different task stages using WithAdditionalLabels
+		stageNames := []string{"initialize", "process", "finalize"}
+		for _, stage := range stageNames {
+			helper.WithAdditionalLabels(taskCtx, map[string]string{
+				"task_stage": stage,
+			}, func(stageCtx context.Context) {
+				if currentStage, ok := helper.GetTaskLabel(stageCtx, "task_stage"); ok {
+					stages = append(stages, currentStage)
+				}
+			})
 		}
 		return nil
 	})
