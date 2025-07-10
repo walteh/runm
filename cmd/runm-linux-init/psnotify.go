@@ -105,7 +105,7 @@ func (p *pidInfo) LogValue() slog.Value {
 	attrs = append(attrs, slog.Int("pid", p.pid),
 		slog.String("cgroup", p.cgroup),
 		slog.String("argc", p.argc),
-		slog.String("argv", strings.Join(p.argv, " ")),
+		// slog.String("argv", strings.Join(p.argv, " ")),
 	)
 
 	if p.exitEvent != nil {

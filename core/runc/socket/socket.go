@@ -29,21 +29,23 @@ func (b *breakOnZeroReader) Read(p []byte) (int, error) {
 type logWriter struct {
 	ctx           context.Context
 	name          string
-	count         uint64
+	ncount        uint64
+	callCount     uint64
 	buf           []byte
 	hasBeenClosed bool
 }
 
 func (l *logWriter) Write(p []byte) (int, error) {
 	l.buf = append(l.buf, p...)
+	l.ncount += uint64(len(p))
+	l.callCount++
 	for {
 		idx := bytes.IndexByte(l.buf, '\n')
 		if idx < 0 {
 			break
 		}
 		line := string(l.buf[:idx])
-		slog.DebugContext(l.ctx, fmt.Sprintf("COPY:LINE:%s[DATA]", l.name), "data", line, "count", l.count)
-		l.count++
+		slog.DebugContext(l.ctx, fmt.Sprintf("%s[DATA]", l.name), "data", line, "ncount", l.ncount, "call_count", l.callCount)
 		l.buf = l.buf[idx+1:]
 	}
 	return len(p), nil
@@ -51,11 +53,12 @@ func (l *logWriter) Write(p []byte) (int, error) {
 
 func (l *logWriter) Close() error {
 	l.hasBeenClosed = true
-	slog.InfoContext(l.ctx, fmt.Sprintf("COPY:LINE:%s[CLOSED]", l.name), "count", l.count)
+	slog.InfoContext(l.ctx, fmt.Sprintf("%s:LOGWRITER[CLOSED]", l.name), "ncount", l.ncount, "call_count", l.callCount)
 	return nil
 }
 
 type allocatedSocketIO struct {
+	ctx              context.Context
 	allocatedSockets [3]runtime.AllocatedSocket
 
 	extraClosers []io.Closer
@@ -100,24 +103,31 @@ func (a *allocatedSocketIO) Close() error {
 
 func (a *allocatedSocketIO) Set(cmd *exec.Cmd) {
 	if a.allocatedSockets[0] != nil {
-		pr, closers := pipeProxyReader("stdin", a.allocatedSockets[0].Conn())
+		pr, closers := pipeProxyReader(a.ctx, "stdin", a.allocatedSockets[0].Conn())
 		a.extraClosers = append(a.extraClosers, closers...)
 		cmd.Stdin = pr
 	}
 	if a.allocatedSockets[1] != nil {
-		pw, closers := pipeProxyWriter("stdout", a.allocatedSockets[1].Conn())
+		pw, closers := pipeProxyWriter(a.ctx, "stdout", a.allocatedSockets[1].Conn())
 		a.extraClosers = append(a.extraClosers, closers...)
 		cmd.Stdout = pw
 	}
 	if a.allocatedSockets[2] != nil {
-		pw, closers := pipeProxyWriter("stderr", a.allocatedSockets[2].Conn())
+		pw, closers := pipeProxyWriter(a.ctx, "stderr", a.allocatedSockets[2].Conn())
 		a.extraClosers = append(a.extraClosers, closers...)
 		cmd.Stderr = pw
 	}
 
 }
 
-func bind(name string, w io.WriteCloser, r io.ReadCloser) {
+func bind(ctx context.Context, name string, w io.WriteCloser, r io.ReadCloser) {
+
+	startTime := time.Now()
+
+	id := "COPY:BIND:" + name
+
+	lw := &logWriter{ctx: ctx, name: id}
+	cr := &countReader{r: r, ncount: 0, callCount: 0}
 
 	go func() {
 		defer w.Close()
@@ -125,24 +135,28 @@ func bind(name string, w io.WriteCloser, r io.ReadCloser) {
 		defer ticker.NewTicker(
 			ticker.WithLogLevel(slog.LevelDebug),
 			ticker.WithFrequency(15),
-			ticker.WithCallerSkip(2),
+			ticker.WithSlogBaseContext(ctx),
 			ticker.WithAttrFunc(func() []slog.Attr {
 				return []slog.Attr{
 					slog.String("name", name),
+					slog.Uint64("read_ncount", cr.ncount),
+					slog.Uint64("write_ncount", lw.ncount),
+					slog.Uint64("read_call_count", cr.callCount),
+					slog.Uint64("write_call_count", lw.callCount),
 				}
 			}),
 			ticker.WithMessageFunc(func() string {
-				return fmt.Sprintf("COPY:BIND:LINE:%s[RUNNING]", name)
+				return fmt.Sprintf("%s[RUNNING]", id)
 			}),
 			ticker.WithStartBurst(5),
 		).RunAsDefer()()
-		mr := io.TeeReader(r, &logWriter{ctx: context.Background(), name: name})
-		n, err := io.Copy(w, mr)
-		slog.Debug(fmt.Sprintf("COPY:BIND:LINE:%s[DONE]", name), "name", name, "copy_err", err, "bytes", n)
+		mw := io.MultiWriter(w, lw)
+		n, err := io.Copy(mw, cr)
+		slog.Debug(fmt.Sprintf("%s[DONE]", id), "name", name, "copy_err", err, "bytes", n, "duration", time.Since(startTime), "rncount", cr.ncount, "rcall_count", cr.callCount, "wncount", lw.ncount, "wcall_count", lw.callCount)
 	}()
 }
 
-func pipeProxyReader(name string, r runtime.FileConn) (io.ReadCloser, []io.Closer) {
+func pipeProxyReader(ctx context.Context, name string, r runtime.FileConn) (io.ReadCloser, []io.Closer) {
 	pr, pw, err := os.Pipe()
 	if err != nil {
 		panic(fmt.Sprintf("failed to create pipe: %v", err))
@@ -150,38 +164,72 @@ func pipeProxyReader(name string, r runtime.FileConn) (io.ReadCloser, []io.Close
 
 	startTime := time.Now()
 
+	id := "COPY:PIPEPROXY:READER:" + name
+
+	lw := &logWriter{ctx: ctx, name: id}
+	cr := &countReader{r: r, ncount: 0, callCount: 0}
+
 	go func() {
 		defer pr.Close()
 		defer r.Close()
 		defer ticker.NewTicker(
 			ticker.WithLogLevel(slog.LevelDebug),
 			ticker.WithFrequency(15),
-			ticker.WithCallerSkip(2),
+			ticker.WithSlogBaseContext(ctx),
 			ticker.WithAttrFunc(func() []slog.Attr {
 				return []slog.Attr{
 					slog.String("name", name),
+					slog.Uint64("read_ncount", cr.ncount),
+					slog.Uint64("write_ncount", lw.ncount),
+					slog.Uint64("read_call_count", cr.callCount),
+					slog.Uint64("write_call_count", lw.callCount),
 				}
 			}),
 			ticker.WithMessageFunc(func() string {
-				return fmt.Sprintf("COPY:LINE:%s[RUNNING]", name)
+				return fmt.Sprintf("%s[RUNNING]", id)
 			}),
 			ticker.WithStartBurst(5),
 		).RunAsDefer()()
-		mr := io.TeeReader(r, &logWriter{ctx: context.Background(), name: name})
-		n, err := io.Copy(pw, mr)
-		slog.Debug(fmt.Sprintf("COPY:LINE:%s[DONE]", name), "name", name, "duration", time.Since(startTime), "copy_err", err, "bytes", n)
+		mw := io.MultiWriter(pw, lw)
+		n, err := io.Copy(mw, cr)
+		slog.Debug(fmt.Sprintf("%s[DONE]", id), "name", name, "duration", time.Since(startTime), "copy_err", err, "bytes", n, "rncount", cr.ncount, "rcall_count", cr.callCount, "wncount", lw.ncount, "wcall_count", lw.callCount)
 	}()
 
 	return pr, []io.Closer{pw, r}
 }
 
-func pipeProxyWriter(name string, w runtime.FileConn) (io.WriteCloser, []io.Closer) {
+type countReader struct {
+	r         io.Reader
+	ncount    uint64
+	callCount uint64
+}
+
+func (c *countReader) Read(p []byte) (int, error) {
+	n, err := c.r.Read(p)
+	c.ncount += uint64(n)
+	c.callCount++
+	return n, err
+}
+
+func (c *countReader) Close() error {
+	if closer, ok := c.r.(io.Closer); ok {
+		return closer.Close()
+	}
+	return nil
+}
+
+func pipeProxyWriter(ctx context.Context, name string, w runtime.FileConn) (io.WriteCloser, []io.Closer) {
 	startTime := time.Now()
+
+	id := "COPY:PIPEPROXY:WRITER:" + name
 
 	pr, pw, err := os.Pipe()
 	if err != nil {
 		panic(fmt.Sprintf("failed to create pipe: %v", err))
 	}
+
+	lw := &logWriter{ctx: ctx, name: id}
+	cr := &countReader{r: pr, ncount: 0, callCount: 0}
 
 	go func() {
 		defer pr.Close()
@@ -189,28 +237,33 @@ func pipeProxyWriter(name string, w runtime.FileConn) (io.WriteCloser, []io.Clos
 		defer ticker.NewTicker(
 			ticker.WithLogLevel(slog.LevelDebug),
 			ticker.WithFrequency(15),
-			ticker.WithCallerSkip(2),
+			ticker.WithSlogBaseContext(ctx),
 			ticker.WithAttrFunc(func() []slog.Attr {
 				return []slog.Attr{
 					slog.String("name", name),
+					slog.Uint64("read_ncount", cr.ncount),
+					slog.Uint64("write_ncount", lw.ncount),
+					slog.Uint64("read_call_count", cr.callCount),
+					slog.Uint64("write_call_count", lw.callCount),
 				}
 			}),
 			ticker.WithMessageFunc(func() string {
-				return fmt.Sprintf("COPY:LINE:%s[RUNNING]", name)
+				return fmt.Sprintf("%s[RUNNING]", id)
 			}),
 			ticker.WithStartBurst(5),
 		).RunAsDefer()()
-		mw := io.MultiWriter(w, &logWriter{ctx: context.Background(), name: name})
-		n, err := io.Copy(mw, pr)
-		slog.Debug(fmt.Sprintf("COPY:LINE:%s[DONE]", name), "name", name, "duration", time.Since(startTime), "copy_err", err, "bytes", n)
+		mw := io.MultiWriter(w, lw)
+		n, err := io.Copy(mw, cr)
+		slog.Debug(fmt.Sprintf("%s[DONE]", id), "name", name, "duration", time.Since(startTime), "copy_err", err, "bytes", n, "rncount", cr.ncount, "rcall_count", cr.callCount, "wncount", lw.ncount, "wcall_count", lw.callCount)
 	}()
 
 	return pw, []io.Closer{pr, w, pw}
 
 }
 
-func NewAllocatedSocketIO(stdin, stdout, stderr runtime.AllocatedSocket) runtime.IO {
+func NewAllocatedSocketIO(ctx context.Context, stdin, stdout, stderr runtime.AllocatedSocket) runtime.IO {
 	return &allocatedSocketIO{
+		ctx:              ctx,
 		allocatedSockets: [3]runtime.AllocatedSocket{stdin, stdout, stderr},
 		extraClosers:     []io.Closer{},
 	}

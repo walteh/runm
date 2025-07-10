@@ -78,7 +78,10 @@ func init() {
 
 	os.Setenv("NERDCTL_TOML", env.NerdctlConfigTomlPath())
 
-	container.AddHackedClientOpts(client.WithExtraDialOpts([]grpc.DialOption{grpc.WithChainUnaryInterceptor(grpcerr.UnaryClientInterceptor)}))
+	container.AddHackedClientOpts(client.WithExtraDialOpts([]grpc.DialOption{
+		grpc.WithChainUnaryInterceptor(grpcerr.NewUnaryClientInterceptor(context.Background())),
+		grpc.WithChainStreamInterceptor(grpcerr.NewStreamClientInterceptor(context.Background())),
+	}))
 
 	// os.Args = append(os.Args, "run", "--platform=linux/arm64", "--runtime=containerd.shim.harpoon.v2", "--network=host", "--rm", "alpine:latest", "echo", "'hi'")
 }

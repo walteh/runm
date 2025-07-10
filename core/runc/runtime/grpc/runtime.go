@@ -77,7 +77,7 @@ func (c *GRPCClientRuntime) NewTempConsoleSocket(ctx context.Context) (runtime.C
 
 	slog.InfoContext(ctx, "binding console to socket - B")
 
-	consock, err := runmsocket.NewHostUnixConsoleSocket(ctx, cons.GetConsoleReferenceId(), allocatedSock)
+	consock, err := runmsocket.NewHostUnixConsoleSocketV2(ctx, cons.GetConsoleReferenceId(), allocatedSock)
 	if err != nil {
 		return nil, errors.Errorf("creating host console socket: %w", err)
 	}

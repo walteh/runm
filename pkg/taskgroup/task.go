@@ -76,9 +76,7 @@ func (t *TaskState) LogValue() slog.Value {
 		slog.String("id", t.ID),
 		slog.String("name", t.Name),
 		slog.String("status", t.Status.String()),
-		slog.Time("start_time", t.StartTime),
-		slog.Duration("duration", t.Duration),
-		slog.Uint64("goroutine_id", t.GoroutineID),
+		slog.Duration("duration", time.Since(t.StartTime)),
 	}
 
 	if t.IsCompleted() {
@@ -102,7 +100,7 @@ func (t *TaskState) LogValue() slog.Value {
 		for k, v := range t.Metadata {
 			metaAttrs = append(metaAttrs, slog.Any(k, v))
 		}
-		attrs = append(attrs, slog.Group("metadata", metaAttrs...))
+		attrs = append(attrs, slog.Group("_metadata", metaAttrs...))
 	}
 
 	return slog.GroupValue(attrs...)

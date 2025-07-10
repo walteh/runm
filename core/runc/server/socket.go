@@ -188,7 +188,7 @@ func (s *Server) BindConsoleToSocket(ctx context.Context, req *runmv1.BindConsol
 		return nil, errors.Errorf("cannot bind console to socket: socket not found: %w", err)
 	}
 
-	err = socket.BindRuncConsoleToSocket(ctx, cs, as)
+	err = socket.BindGuestConsoleToSocket(ctx, cs, as)
 	if err != nil {
 		return nil, errors.Errorf("cannot bind console to socket: %w", err)
 	}
@@ -277,7 +277,7 @@ func (s *Server) BindIOToSockets(ctx context.Context, req *runmv1.BindIOToSocket
 
 	io.Close()
 
-	ios := socket.NewAllocatedSocketIO(iosocks[0], iosocks[1], iosocks[2])
+	ios := socket.NewAllocatedSocketIO(ctx, iosocks[0], iosocks[1], iosocks[2])
 	s.state.StoreOpenIO(req.GetIoReferenceId(), ios)
 
 	// err = socket.BindIOToSockets(ctx, io, ios)

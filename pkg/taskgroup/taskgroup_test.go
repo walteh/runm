@@ -426,6 +426,9 @@ func TestTaskGroup_TaskRegistry(t *testing.T) {
 	err := tg.Wait()
 	assert.Error(t, err)
 
+	// Brief wait to ensure all status updates are complete
+	time.Sleep(10 * time.Millisecond)
+
 	// Check final status
 	assert.Equal(t, 0, tg.GetRunningTaskCount())
 

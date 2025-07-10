@@ -71,6 +71,27 @@ func CreateUnixConnProxy(ctx context.Context, conn net.Conn) (*net.UnixConn, err
 	return unixConn.(*net.UnixConn), nil
 }
 
+// func CreateUnixListenerProxy(ctx context.Context, establishedConn net.Conn) (net.Listener, error) {
+// 	listener, err := net.Listen("unix", "")
+// 	if err != nil {
+// 		return nil, errors.Errorf("creating listener: %w", err)
+// 	}
+
+// 	go func() {
+// 		defer establishedConn.Close()
+// 		defer listener.Close()
+// 		CopyLoggingErrors(ctx, listener, establishedConn)
+// 	}()
+
+// 	go func() {
+// 		defer establishedConn.Close()
+// 		defer listener.Close()
+// 		CopyLoggingErrors(ctx, establishedConn, listener)
+// 	}()
+
+// 	return listener, nil
+// }
+
 func ListenAndAcceptSingleNetConn(ctx context.Context, listenerCallback func(ctx context.Context) (net.Listener, error), dialCallback func(ctx context.Context) error) (net.Conn, error) {
 	listener, err := listenerCallback(ctx)
 	if err != nil {

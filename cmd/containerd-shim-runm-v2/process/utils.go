@@ -22,10 +22,8 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -55,22 +53,11 @@ func (s *safePid) get() int {
 }
 
 func (s *safePid) Lock() {
-	tm := time.Now()
-	lockLog(context.Background(), "safePid.Lock ATTEMPT")
 	s.mu.Lock()
-	lockLog(context.Background(), "safePid.Lock TAKEN", slog.Duration("duration", time.Since(tm)))
 }
 
 func (s *safePid) Unlock() {
 	s.mu.Unlock()
-	lockLog(context.Background(), "safePid.Unlock")
-}
-
-func lockLog(ctx context.Context, msg string, args ...slog.Attr) {
-	ptr, _, _, _ := runtime.Caller(2)
-	rec := slog.NewRecord(time.Now(), slog.LevelDebug, msg, ptr)
-	rec.AddAttrs(args...)
-	slog.Default().Handler().Handle(ctx, rec)
 }
 
 // TODO(mlaventure): move to runc package?

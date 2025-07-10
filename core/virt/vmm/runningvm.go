@@ -93,7 +93,7 @@ func (r *RunningVM[VM]) GuestVsockConnOLD(ctx context.Context) (*grpc.ClientConn
 					}
 					return conn, nil
 				}),
-				grpc.WithUnaryInterceptor(grpcerr.UnaryClientInterceptor),
+				grpc.WithUnaryInterceptor(grpcerr.NewUnaryClientInterceptor(ctx)),
 				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*10), grpc.WaitForReady(true)),
 			}
 			if logging.GetGlobalOtelInstances() != nil {
@@ -158,7 +158,8 @@ func (r *RunningVM[VM]) buildGuestGrpcConn(ctx context.Context) (*grpc.ClientCon
 			}
 			return conn, nil
 		}),
-		grpc.WithUnaryInterceptor(grpcerr.UnaryClientInterceptor),
+		grpc.WithUnaryInterceptor(grpcerr.NewUnaryClientInterceptor(ctx)),
+		grpc.WithStreamInterceptor(grpcerr.NewStreamClientInterceptor(ctx)),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*10), grpc.WaitForReady(true)),
 	}
 	if logging.GetGlobalOtelInstances() != nil {
@@ -495,8 +496,8 @@ func (rvm *RunningVM[VM]) SetupHostService(ctx context.Context) error {
 
 	grpcServer := grpc.NewServer(
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
-		grpc.ChainUnaryInterceptor(grpcerr.UnaryServerInterceptor),
-		grpc.ChainStreamInterceptor(grpcerr.StreamServerInterceptor()),
+		grpc.ChainUnaryInterceptor(grpcerr.NewUnaryServerInterceptor(ctx)),
+		grpc.ChainStreamInterceptor(grpcerr.NewStreamServerInterceptor(ctx)),
 	)
 
 	runmv1.RegisterHostServiceServer(grpcServer, rvm)

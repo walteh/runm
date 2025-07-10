@@ -23,7 +23,6 @@ import (
 	"strings"
 	"syscall"
 
-	"golang.org/x/sync/errgroup"
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/v2/pkg/oci"
@@ -41,7 +40,7 @@ import (
 	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/pkg/logging"
-	"github.com/walteh/runm/pkg/reap"
+	"github.com/walteh/runm/pkg/taskgroup"
 	"github.com/walteh/runm/pkg/ticker"
 
 	goruncruntime "github.com/walteh/runm/core/runc/runtime/gorunc"
@@ -146,7 +145,7 @@ func main() {
 
 	pid := os.Getpid()
 
-	reap.SetSubreaper(os.Getpid())
+	// reap.SetSubreaper(os.Getpid())
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -204,7 +203,8 @@ func (r *runmLinuxInit) configureRuntimeServer(ctx context.Context) (*grpc.Serve
 	})
 
 	serveropts := []grpc.ServerOption{
-		grpc.ChainUnaryInterceptor(grpcerr.UnaryServerInterceptor),
+		grpc.ChainUnaryInterceptor(grpcerr.NewUnaryServerInterceptor(ctx)),
+		grpc.ChainStreamInterceptor(grpcerr.NewStreamServerInterceptor(ctx)),
 	}
 
 	if enableOtel {
@@ -241,22 +241,10 @@ func (r *runmLinuxInit) configureRuntimeServer(ctx context.Context) (*grpc.Serve
 	return grpcVsockServer, serverz, nil
 }
 
-func WrapErrGroupGoWithLogging(ctx context.Context, name string, egroup *errgroup.Group, f func() error) {
-	egroup.Go(func() (err error) {
-		slog.DebugContext(ctx, "starting goroutine", "name", name)
-		defer func() {
-			if r := recover(); r != nil {
-				slog.ErrorContext(ctx, "panic in goroutine", "name", name, "error", r, "stack", string(debug.Stack()))
-				err = errors.Errorf("panic in goroutine: %v", r)
-			}
-			if err != nil {
-				slog.DebugContext(ctx, "goroutine finished", "name", name, "error", err)
-			} else {
-				slog.DebugContext(ctx, "goroutine finished", "name", name)
-			}
-		}()
-		err = f()
-		return
+func WrapTaskGroupGoWithLogging(name string, tg *taskgroup.TaskGroup, f func(context.Context) error) {
+	tg.GoWithNameAndMeta(name, map[string]any{}, func(ctx context.Context) (err error) {
+		slog.DebugContext(ctx, "starting task", "name", name)
+		return f(ctx)
 	})
 }
 
@@ -377,36 +365,39 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	go handleExitSignals(ctx, cancel)
 
-	errgroupz, ctx := errgroup.WithContext(ctx)
+	// Create TaskGroup with pprof enabled and custom labels
+	taskgroupz := taskgroup.NewTaskGroup(ctx,
+		taskgroup.WithName("runm-linux-init"),
+		taskgroup.WithEnablePprof(true),
+		taskgroup.WithPprofLabels(map[string]string{
+			"service":      serviceName,
+			"container-id": containerId,
+			"runm-mode":    runmMode,
+		}),
+		taskgroup.WithLogStart(true),
+		taskgroup.WithLogEnd(true),
+		taskgroup.WithLogTaskStart(false),
+		taskgroup.WithLogTaskEnd(false),
+		taskgroup.WithSlogBaseContext(ctx),
+	)
 
 	r.exitChan = make(chan gorunc.Exit, 32*100)
 
-	WrapErrGroupGoWithLogging(ctx, "reaper", errgroupz, func() error {
+	WrapTaskGroupGoWithLogging("reaper", taskgroupz, func(ctx context.Context) error {
 		return reapOnSignals(ctx, signals)
 	})
 
-	WrapErrGroupGoWithLogging(ctx, "psnotify", errgroupz, func() error {
+	WrapTaskGroupGoWithLogging("psnotify", taskgroupz, func(ctx context.Context) error {
 		return r.runPsnotify(ctx, r.exitChan)
 	})
 
-	WrapErrGroupGoWithLogging(ctx, "delim-writer-unix-proxy", errgroupz, func() error {
+	WrapTaskGroupGoWithLogging("delim-writer-unix-proxy", taskgroupz, func(ctx context.Context) error {
 		return r.runVsockUnixProxy(ctx, constants.DelimitedWriterProxyGuestUnixPath, r.logWriter)
 	})
 
-	WrapErrGroupGoWithLogging(ctx, "raw-writer-unix-proxy", errgroupz, func() error {
+	WrapTaskGroupGoWithLogging("raw-writer-unix-proxy", taskgroupz, func(ctx context.Context) error {
 		return r.runVsockUnixProxy(ctx, constants.RawWriterProxyGuestUnixPath, r.rawWriter)
 	})
-
-	// WrapErrGroupGoWithLogging(ctx, "ticker", errgroupz, func() error {
-	// 	ticker.NewTicker(
-	// 		ticker.WithMessage("RUNM:INIT[RUNNING]"),
-	// 		ticker.WithDoneMessage("RUNM:INIT[DONE]"),
-	// 		ticker.WithLogLevel(slog.LevelDebug),
-	// 		ticker.WithFrequency(15),
-	// 		ticker.WithStartBurst(5),
-	// 	).RunWithWaitOnContext(ctx)
-	// 	return nil
-	// })
 
 	go func() {
 		err := runProxyHooks(ctx)
@@ -427,15 +418,20 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 		return errors.Errorf("problem listing bundleSource/rootfs: %w", err)
 	}
 
-	WrapErrGroupGoWithLogging(ctx, "grpc-vsock-server", errgroupz, func() error {
+	WrapTaskGroupGoWithLogging("grpc-vsock-server", taskgroupz, func(ctx context.Context) error {
 		return r.runGrpcVsockServer(ctx)
 	})
 
-	WrapErrGroupGoWithLogging(ctx, "pprof-vsock-server", errgroupz, func() error {
+	WrapTaskGroupGoWithLogging("pprof-vsock-server", taskgroupz, func(ctx context.Context) error {
 		return r.runPprofVsockServer(ctx)
 	})
 
-	return errgroupz.Wait()
+	// // Demonstrate pprof helper functionality
+	// WrapTaskGroupGoWithLogging("pprof-demo", taskgroupz, func(ctx context.Context) error {
+	// 	return r.demonstratePprofHelper(ctx, taskgroupz)
+	// })
+
+	return taskgroupz.Wait()
 }
 
 func runProxyHooks(ctx context.Context) error {
@@ -473,6 +469,53 @@ func runProxyHooks(ctx context.Context) error {
 		return errors.Errorf("failed to marshal spec: %w", err)
 	}
 	slog.InfoContext(ctx, "spec", "spec", string(specBytes))
+
+	return nil
+}
+
+// demonstratePprofHelper shows how to use the taskgroup pprof helper functionality
+func (r *runmLinuxInit) demonstratePprofHelper(ctx context.Context, tg *taskgroup.TaskGroup) error {
+	helper := tg.GetPprofHelper()
+
+	// Get current pprof labels
+	currentLabels := helper.GetCurrentLabels(ctx)
+	slog.InfoContext(ctx, "pprof demo - current labels", "labels", currentLabels)
+
+	if taskID, ok := helper.GetTaskIDFromLabels(ctx); ok {
+		slog.InfoContext(ctx, "pprof demo - task ID", "task_id", taskID)
+	}
+
+	if taskName, ok := helper.GetTaskNameFromLabels(ctx); ok {
+		slog.InfoContext(ctx, "pprof demo - task name", "task_name", taskName)
+	}
+
+	// Demonstrate different task stages using WithAdditionalLabels
+	helper.WithAdditionalLabels(ctx, map[string]string{
+		"task_stage": "initializing",
+	}, func(labeledCtx context.Context) {
+		slog.InfoContext(ctx, "pprof demo - updated stage to initializing")
+	})
+
+	helper.WithAdditionalLabels(ctx, map[string]string{
+		"task_stage": "processing",
+	}, func(labeledCtx context.Context) {
+		slog.InfoContext(ctx, "pprof demo - updated stage to processing")
+	})
+
+	// Use additional labels for a specific operation
+	helper.WithAdditionalLabels(ctx, map[string]string{
+		"operation":    "demo-operation",
+		"demo-counter": "1",
+	}, func(labeledCtx context.Context) {
+		demoLabels := helper.GetCurrentLabels(labeledCtx)
+		slog.InfoContext(ctx, "pprof demo - labels with additional context", "labels", demoLabels)
+	})
+
+	helper.WithAdditionalLabels(ctx, map[string]string{
+		"task_stage": "completed",
+	}, func(labeledCtx context.Context) {
+		slog.InfoContext(ctx, "pprof demo - completed")
+	})
 
 	return nil
 }
@@ -556,8 +599,10 @@ func ExecCmdForwardingStdioChroot(ctx context.Context, chroot string, cmds ...st
 	}
 	argv := cmds
 
-	slog.DebugContext(ctx, "executing command", "argc", argc, "argv", argv)
 	cmd := exec.CommandContext(ctx, argc, argv...)
+
+	slog.DebugContext(ctx, "executing command '"+strings.Join(cmds, " ")+"'", "argc", argc, "argv", argv)
+
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		// Cloneflags: syscall.CLONE_NEWNS,
 		Chroot: chroot,
@@ -567,13 +612,18 @@ func ExecCmdForwardingStdioChroot(ctx context.Context, chroot string, cmds ...st
 
 	cmd.Env = append([]string{"PATH=" + path + ":/hbin"}, os.Environ()...)
 
+	stdoutBuf := bytes.NewBuffer(nil)
+	stderrBuf := bytes.NewBuffer(nil)
+
 	cmd.Stdin = bytes.NewBuffer(nil) // set to avoid reading /dev/null since it may not be mounted
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stdout = stdoutBuf
+	cmd.Stderr = stderrBuf
 	err := cmd.Run()
 	if err != nil {
 		return errors.Errorf("running busybox command (stdio was copied to the parent process): %v: %w", cmds, err)
 	}
+
+	slog.DebugContext(ctx, "finished running command '"+strings.Join(cmds, " ")+"'", "stdout", stdoutBuf.String(), "stderr", stderrBuf.String())
 
 	return nil
 }

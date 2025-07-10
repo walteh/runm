@@ -67,9 +67,9 @@ func NewHostUnixConsoleSocket(ctx context.Context, referenceId string, socket ru
 		return nil, errors.Errorf("failed to dial unix socket: %w", err)
 	}
 
-	bind("runcConsole->hostConsole", runcUnixConn, socket.Conn())
+	bind(ctx, "runcConsole->hostConsole", runcUnixConn, socket.Conn())
 
-	bind("hostConsole->runcConsole", socket.Conn(), runcUnixConn)
+	bind(ctx, "hostConsole->runcConsole", socket.Conn(), runcUnixConn)
 
 	return &HostConsoleSocket{
 		socket:       socket,
@@ -80,7 +80,7 @@ func NewHostUnixConsoleSocket(ctx context.Context, referenceId string, socket ru
 	// return &HostConsoleSocket{socket: socket, path: tmp.Path(), conn: tmp.Conn().(*net.UnixConn)}, nil
 }
 
-func BindRuncConsoleToSocket(ctx context.Context, cons runtime.ConsoleSocket, sock runtime.AllocatedSocket) error {
+func BindGuestConsoleToSocket(ctx context.Context, cons runtime.ConsoleSocket, sock runtime.AllocatedSocket) error {
 
 	// // open up the console socket path, and create a pipe to it
 
@@ -88,10 +88,10 @@ func BindRuncConsoleToSocket(ctx context.Context, cons runtime.ConsoleSocket, so
 	sockConn := sock.Conn()
 
 	// create a goroutine to read from the pipe and write to the socket
-	bind("socket->console", consConn, sockConn)
+	bind(ctx, "socket->console", consConn, sockConn)
 
 	// create a goroutine to read from the socket and write to the console
-	bind("console->socket", sockConn, consConn)
+	bind(ctx, "console->socket", sockConn, consConn)
 
 	return nil
 }

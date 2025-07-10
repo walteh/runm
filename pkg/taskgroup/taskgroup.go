@@ -177,12 +177,32 @@ func (tg *TaskGroup) GoWithName(name string, fn TaskFunc) {
 }
 
 func (tg *TaskGroup) GoWithNameAndMeta(name string, metadata map[string]any, fn TaskFunc) {
+	tg.executeTask(name, metadata, fn, false)
+}
+
+func (tg *TaskGroup) updateTaskStatus(taskID string, status TaskStatus) {
+	tg.mu.Lock()
+	defer tg.mu.Unlock()
+
+	if task, exists := tg.tasks.Load(taskID); exists {
+		task.Status = status
+		task.UpdatedAt = time.Now()
+
+		if status == TaskStatusRunning {
+			task.StartTime = time.Now()
+			task.GoroutineID = getGoroutineID()
+		}
+	}
+}
+
+// executeTask is the common implementation for Go and TryGo methods
+func (tg *TaskGroup) executeTask(name string, metadata map[string]any, fn TaskFunc, tryMode bool) bool {
 	tg.Start()
 
 	tg.mu.Lock()
 	if tg.finished {
 		tg.mu.Unlock()
-		return
+		return !tryMode // Go() doesn't return, TryGo() returns false
 	}
 
 	taskID := fmt.Sprintf("%s-%d", tg.opts.name, atomic.AddInt64(&tg.taskCounter, 1))
@@ -205,219 +225,27 @@ func (tg *TaskGroup) GoWithNameAndMeta(name string, metadata map[string]any, fn 
 
 	// Check if we can acquire semaphore
 	if tg.semaphore != nil {
-		select {
-		case tg.semaphore <- struct{}{}:
-			// Successfully acquired
-		case <-tg.ctx.Done():
-			tg.updateTaskStatus(taskID, TaskStatusCanceled)
-			tg.setError(tg.ctx.Err())
-			return
-		}
-	}
-
-	tg.wg.Add(1)
-
-	go func() {
-		defer tg.wg.Done()
-		defer func() {
-			if tg.semaphore != nil {
-				<-tg.semaphore
+		if tryMode {
+			// Non-blocking semaphore acquisition for TryGo
+			select {
+			case tg.semaphore <- struct{}{}:
+				// Successfully acquired
+			default:
+				// Could not acquire semaphore, remove task and return false
+				tg.tasks.Delete(taskID)
+				atomic.AddInt64(&tg.taskCounter, -1)
+				return false
 			}
-		}()
-
-		// Update task status to running
-		tg.updateTaskStatus(taskID, TaskStatusRunning)
-
-		start := time.Now()
-		if tg.opts.logTaskStart {
-			tg.log(slog.LevelDebug, "task started",
-				slog.String("task_id", taskID),
-				slog.String("task_name", name),
-				slog.Uint64("goroutine_id", getGoroutineID()),
-			)
-		}
-
-		var err error
-		var panicInfo *PanicInfo
-
-		// Execute with pprof labels and panic recovery
-		if tg.opts.enablePprof {
-			labels := tg.createPprofLabels(taskID, name, metadata)
-			pprof.Do(tg.ctx, labels, func(labeledCtx context.Context) {
-				tg.executeTaskWithRecovery(labeledCtx, taskState, fn, &err, &panicInfo)
-			})
 		} else {
-			tg.executeTaskWithRecovery(tg.ctx, taskState, fn, &err, &panicInfo)
-		}
-
-		duration := time.Since(start)
-
-		// Update task state
-		tg.mu.Lock()
-		if task, exists := tg.tasks.Load(taskID); exists {
-			task.EndTime = time.Now()
-			task.Duration = duration
-			task.UpdatedAt = time.Now()
-			task.Error = err
-			task.PanicInfo = panicInfo
-
-			if panicInfo != nil {
-				task.Status = TaskStatusPanicked
-			} else if err != nil {
-				task.Status = TaskStatusFailed
-			} else {
-				task.Status = TaskStatusCompleted
+			// Blocking semaphore acquisition for Go
+			select {
+			case tg.semaphore <- struct{}{}:
+				// Successfully acquired
+			case <-tg.ctx.Done():
+				tg.updateTaskStatus(taskID, TaskStatusCanceled)
+				tg.setError(tg.ctx.Err())
+				return true
 			}
-
-			// Move to history if enabled
-			if tg.opts.keepTaskHistory {
-				tg.taskHistory.Store(taskID, task)
-				// TODO: Implement history cleanup based on maxTaskHistory
-			}
-		}
-		tg.mu.Unlock()
-
-		if tg.opts.logTaskEnd {
-			attrs := []slog.Attr{
-				slog.String("task_id", taskID),
-				slog.String("task_name", name),
-				slog.Duration("duration", duration),
-				slog.Uint64("goroutine_id", getGoroutineID()),
-			}
-			if err != nil {
-				attrs = append(attrs, slog.String("error", err.Error()))
-			}
-			if panicInfo != nil {
-				attrs = append(attrs, slog.String("panic", fmt.Sprintf("%v", panicInfo.Value)))
-			}
-			tg.log(slog.LevelDebug, "task finished", attrs...)
-		}
-
-		if err != nil {
-			tg.setError(err)
-		}
-	}()
-}
-
-func (tg *TaskGroup) updateTaskStatus(taskID string, status TaskStatus) {
-	tg.mu.Lock()
-	defer tg.mu.Unlock()
-
-	if task, exists := tg.tasks.Load(taskID); exists {
-		task.Status = status
-		task.UpdatedAt = time.Now()
-
-		if status == TaskStatusRunning {
-			task.StartTime = time.Now()
-			task.GoroutineID = getGoroutineID()
-		}
-	}
-}
-
-func (tg *TaskGroup) Wait() error {
-	tg.Start()
-
-	// Use a channel to signal when WaitGroup is done
-	done := make(chan struct{})
-	go func() {
-		tg.wg.Wait()
-		close(done)
-	}()
-
-	// Wait for either completion or context cancellation
-	select {
-	case <-done:
-		// All tasks completed normally
-	case <-tg.ctx.Done():
-		// Context was cancelled (timeout or manual cancellation)
-		tg.setError(tg.ctx.Err())
-	}
-
-	tg.mu.Lock()
-	defer tg.mu.Unlock()
-
-	if tg.finished {
-		return tg.err
-	}
-
-	tg.finished = true
-	tg.cancel()
-
-	// Stop ticker if enabled
-	if tg.statusTicker != nil {
-		tg.statusTicker.Stop()
-	}
-
-	if tg.opts.logEnd {
-		runningTasks := tg.GetRunningTasks()
-		completedTasks := tg.GetTasksByStatus(TaskStatusCompleted)
-		failedTasks := tg.GetTasksByStatus(TaskStatusFailed)
-		panickedTasks := tg.GetTasksByStatus(TaskStatusPanicked)
-
-		attrs := []slog.Attr{
-			slog.String("name", tg.opts.name),
-			slog.Int("total_tasks", int(tg.taskCounter)),
-			slog.Int("running_tasks", len(runningTasks)),
-			slog.Int("completed_tasks", len(completedTasks)),
-			slog.Int("failed_tasks", len(failedTasks)),
-			slog.Int("panicked_tasks", len(panickedTasks)),
-		}
-
-		if tg.err != nil {
-			attrs = append(attrs, slog.String("error", tg.err.Error()))
-		}
-
-		tg.log(slog.LevelInfo, "taskgroup finished", attrs...)
-	}
-
-	return tg.err
-}
-
-func (tg *TaskGroup) TryGo(fn TaskFunc) bool {
-	return tg.TryGoWithName("", fn)
-}
-
-func (tg *TaskGroup) TryGoWithName(name string, fn TaskFunc) bool {
-	return tg.TryGoWithNameAndMeta(name, nil, fn)
-}
-
-func (tg *TaskGroup) TryGoWithNameAndMeta(name string, metadata map[string]any, fn TaskFunc) bool {
-	tg.Start()
-
-	tg.mu.Lock()
-	if tg.finished {
-		tg.mu.Unlock()
-		return false
-	}
-
-	taskID := fmt.Sprintf("%s-%d", tg.opts.name, atomic.AddInt64(&tg.taskCounter, 1))
-	if name == "" {
-		name = fmt.Sprintf("task-%d", tg.taskCounter)
-	}
-
-	taskState := &TaskState{
-		ID:          taskID,
-		Name:        name,
-		Status:      TaskStatusPending,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
-		GoroutineID: getGoroutineID(),
-		Metadata:    metadata,
-	}
-
-	tg.tasks.Store(taskID, taskState)
-	tg.mu.Unlock()
-
-	// Check if we can acquire semaphore without blocking
-	if tg.semaphore != nil {
-		select {
-		case tg.semaphore <- struct{}{}:
-			// Successfully acquired
-		default:
-			// Could not acquire semaphore, remove task and return false
-			tg.tasks.Delete(taskID)
-			atomic.AddInt64(&tg.taskCounter, -1)
-			return false
 		}
 	}
 
@@ -504,6 +332,77 @@ func (tg *TaskGroup) TryGoWithNameAndMeta(name string, metadata map[string]any, 
 	}()
 
 	return true
+}
+
+func (tg *TaskGroup) Wait() error {
+	tg.Start()
+
+	// Use a channel to signal when WaitGroup is done
+	done := make(chan struct{})
+	go func() {
+		tg.wg.Wait()
+		close(done)
+	}()
+
+	// Wait for either completion or context cancellation
+	select {
+	case <-done:
+		// All tasks completed normally
+	case <-tg.ctx.Done():
+		// Context was cancelled (timeout or manual cancellation)
+		tg.setError(tg.ctx.Err())
+	}
+
+	tg.mu.Lock()
+	defer tg.mu.Unlock()
+
+	if tg.finished {
+		return tg.err
+	}
+
+	tg.finished = true
+	tg.cancel()
+
+	// Stop ticker if enabled
+	if tg.statusTicker != nil {
+		tg.statusTicker.Stop()
+	}
+
+	if tg.opts.logEnd {
+		runningTasks := tg.GetRunningTasks()
+		completedTasks := tg.GetTasksByStatus(TaskStatusCompleted)
+		failedTasks := tg.GetTasksByStatus(TaskStatusFailed)
+		panickedTasks := tg.GetTasksByStatus(TaskStatusPanicked)
+
+		attrs := []slog.Attr{
+			slog.String("name", tg.opts.name),
+			slog.Int("total_tasks", int(tg.taskCounter)),
+			slog.Int("running_tasks", len(runningTasks)),
+			slog.Int("completed_tasks", len(completedTasks)),
+			slog.Int("failed_tasks", len(failedTasks)),
+			slog.Int("panicked_tasks", len(panickedTasks)),
+		}
+
+		if tg.err != nil {
+			attrs = append(attrs, slog.String("error", tg.err.Error()))
+		}
+
+		tg.log(slog.LevelInfo, "taskgroup finished", attrs...)
+	}
+
+	return tg.err
+}
+
+func (tg *TaskGroup) TryGo(fn TaskFunc) bool {
+	return tg.TryGoWithName("", fn)
+}
+
+func (tg *TaskGroup) TryGoWithName(name string, fn TaskFunc) bool {
+	return tg.TryGoWithNameAndMeta(name, nil, fn)
+}
+
+func (tg *TaskGroup) TryGoWithNameAndMeta(name string, metadata map[string]any, fn TaskFunc) bool {
+	return tg.executeTask(name, metadata, fn, true)
 }
 
 func (tg *TaskGroup) Status() (started, finished bool, taskCount int, err error) {
@@ -692,12 +591,9 @@ func (tg *TaskGroup) executeTaskWithRecovery(ctx context.Context, taskState *Tas
 		}
 	}()
 
-	// Enhance slog context with essential taskgroup information
-	ctx = slogctx.With(ctx, taskState)
-	ctx = slogctx.Append(ctx,
-		slog.String("taskgroup", tg.opts.name),
-		slog.String("task", taskState.Name),
-	)
+	// Enhance slog context with task information using groups
+	ctx = slogctx.Append(ctx, "task", taskState)
+	ctx = slogctx.Append(ctx, slog.String("taskgroup", tg.opts.name))
 
 	*err = fn(ctx)
 }

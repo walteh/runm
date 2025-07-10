@@ -31,8 +31,8 @@ func (s *service) serveGrpc(ctx context.Context, cid string) (func() error, func
 
 	grpcServer := grpc.NewServer(
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
-		grpc.ChainUnaryInterceptor(grpcerr.UnaryServerInterceptor),
-		grpc.ChainStreamInterceptor(grpcerr.StreamServerInterceptor()),
+		grpc.ChainUnaryInterceptor(grpcerr.NewUnaryServerInterceptor(ctx)),
+		grpc.ChainStreamInterceptor(grpcerr.NewStreamServerInterceptor(ctx)),
 	)
 
 	runmv1.RegisterShimServiceServer(grpcServer, s)

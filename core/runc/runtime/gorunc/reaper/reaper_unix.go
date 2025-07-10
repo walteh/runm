@@ -134,14 +134,14 @@ func (m *Monitor) Wait(c *exec.Cmd, ec chan runc.Exit) (int, error) {
 	slog.Info(fmt.Sprintf("REAPER:WAIT:STARTED[%d]", c.Process.Pid))
 
 	for e := range ec {
-		slog.Info(fmt.Sprintf("REAPER:WAIT:RECEIVED[%d]", e.Pid))
+		slog.Debug(fmt.Sprintf("REAPER:WAIT:RECEIVED[%d]", e.Pid))
 
 		if e.Pid == c.Process.Pid {
 			// make sure we flush all IO
-			slog.Info(fmt.Sprintf("REAPER:WAIT:FLUSHING[%d]", c.Process.Pid))
-			os.Setenv("EXEC_DEBUG", "1")
+			slog.Debug(fmt.Sprintf("REAPER:WAIT:FLUSHING[%d]", c.Process.Pid))
+			os.Setenv("EXEC_DEBUG", "")
 			c.Wait()
-			slog.Info(fmt.Sprintf("REAPER:WAIT:FLUSHED[%d]", c.Process.Pid))
+			slog.Debug(fmt.Sprintf("REAPER:WAIT:FLUSHED[%d]", c.Process.Pid))
 			m.Unsubscribe(ec)
 			return e.Status, nil
 		}
