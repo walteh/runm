@@ -391,6 +391,11 @@ func (r *TaskRegistry) createTaskAsTool(ctx context.Context, taskName string, ta
 
 	toolOpts := []mcp.ToolOption{
 		mcp.WithDescription(description),
+		mcp.WithDestructiveHintAnnotation(false),
+		mcp.WithTitleAnnotation(taskName),
+		mcp.WithOpenWorldHintAnnotation(false),
+		mcp.WithReadOnlyHintAnnotation(false),
+		mcp.WithIdempotentHintAnnotation(false),
 	}
 
 	// Add parameters for vars if any
@@ -408,6 +413,7 @@ func (r *TaskRegistry) createTaskAsTool(ctx context.Context, taskName string, ta
 			toolOpts = append(toolOpts, mcp.WithString(
 				varName,
 				mcp.Description(fmt.Sprintf("Variable '%s' for task '%s'", varName, taskName)),
+				mcp.DefaultString(varsFromTask[varName]),
 			))
 		}
 	}
