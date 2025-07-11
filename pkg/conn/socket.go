@@ -17,8 +17,8 @@ func DebugCopy(ctx context.Context, name string, w io.WriteCloser, r io.ReadClos
 
 	id := "DEBUGCOPY:" + name
 
-	lw := &logWriter{ctx: ctx, name: id}
-	cr := &countReader{r: r, ncount: 0, callCount: 0}
+	lw := NewDebugWriter(ctx, id, w)
+	lr := NewDebugReader(ctx, id, r)
 
 	done = make(chan struct{})
 
@@ -33,10 +33,8 @@ func DebugCopy(ctx context.Context, name string, w io.WriteCloser, r io.ReadClos
 			ticker.WithAttrFunc(func() []slog.Attr {
 				return []slog.Attr{
 					slog.String("name", name),
-					slog.Uint64("read_ncount", cr.ncount),
-					slog.Uint64("write_ncount", lw.ncount),
-					slog.Uint64("read_call_count", cr.callCount),
-					slog.Uint64("write_call_count", lw.callCount),
+					slog.Any("read_stats", lr),
+					slog.Any("write_stats", lw),
 				}
 			}),
 			ticker.WithMessageFunc(func() string {
@@ -45,8 +43,8 @@ func DebugCopy(ctx context.Context, name string, w io.WriteCloser, r io.ReadClos
 			ticker.WithStartBurst(5),
 		).RunAsDefer()()
 		mw := io.MultiWriter(w, lw)
-		n, err := io.Copy(mw, cr)
-		slog.Debug(fmt.Sprintf("%s[DONE]", id), "name", name, "copy_err", err, "bytes", n, "duration", time.Since(startTime), "rncount", cr.ncount, "rcall_count", cr.callCount, "wncount", lw.ncount, "wcall_count", lw.callCount)
+		n, err := io.Copy(mw, lr)
+		slog.Debug(fmt.Sprintf("%s[DONE]", id), "name", name, "copy_err", err, "bytes", n, "duration", time.Since(startTime), "read_stats", lr, "write_stats", lw)
 	}()
 
 	return done
@@ -62,8 +60,8 @@ func OsPipeProxyReader(ctx context.Context, name string, r io.ReadCloser) (*os.F
 
 	id := "COPY:PIPEPROXY:READER:" + name
 
-	lw := &logWriter{ctx: ctx, name: id}
-	cr := &countReader{r: r, ncount: 0, callCount: 0}
+	lw := NewDebugWriter(ctx, id, pw)
+	lr := NewDebugReader(ctx, id, r)
 
 	go func() {
 		defer pr.Close()
@@ -75,10 +73,8 @@ func OsPipeProxyReader(ctx context.Context, name string, r io.ReadCloser) (*os.F
 			ticker.WithAttrFunc(func() []slog.Attr {
 				return []slog.Attr{
 					slog.String("name", name),
-					slog.Uint64("read_ncount", cr.ncount),
-					slog.Uint64("write_ncount", lw.ncount),
-					slog.Uint64("read_call_count", cr.callCount),
-					slog.Uint64("write_call_count", lw.callCount),
+					slog.Any("read_stats", lr),
+					slog.Any("write_stats", lw),
 				}
 			}),
 			ticker.WithMessageFunc(func() string {
@@ -86,9 +82,8 @@ func OsPipeProxyReader(ctx context.Context, name string, r io.ReadCloser) (*os.F
 			}),
 			ticker.WithStartBurst(5),
 		).RunAsDefer()()
-		mw := io.MultiWriter(pw, lw)
-		n, err := io.Copy(mw, cr)
-		slog.Debug(fmt.Sprintf("%s[DONE]", id), "name", name, "duration", time.Since(startTime), "copy_err", err, "bytes", n, "rncount", cr.ncount, "rcall_count", cr.callCount, "wncount", lw.ncount, "wcall_count", lw.callCount)
+		n, err := io.Copy(lw, lr)
+		slog.Debug(fmt.Sprintf("%s[DONE]", id), "name", name, "duration", time.Since(startTime), "copy_err", err, "bytes", n, "read_stats", lr, "write_stats", lw)
 	}()
 
 	return pr, []io.Closer{pw, r}
@@ -104,8 +99,8 @@ func OsPipeProxyWriter(ctx context.Context, name string, w io.WriteCloser) (*os.
 		panic(fmt.Sprintf("failed to create pipe: %v", err))
 	}
 
-	lw := &logWriter{ctx: ctx, name: id}
-	cr := &countReader{r: pr, ncount: 0, callCount: 0}
+	lw := NewDebugWriter(ctx, id, w)
+	lr := NewDebugReader(ctx, id, pr)
 
 	go func() {
 		defer pr.Close()
@@ -117,10 +112,8 @@ func OsPipeProxyWriter(ctx context.Context, name string, w io.WriteCloser) (*os.
 			ticker.WithAttrFunc(func() []slog.Attr {
 				return []slog.Attr{
 					slog.String("name", name),
-					slog.Uint64("read_ncount", cr.ncount),
-					slog.Uint64("write_ncount", lw.ncount),
-					slog.Uint64("read_call_count", cr.callCount),
-					slog.Uint64("write_call_count", lw.callCount),
+					slog.Any("read_stats", lr),
+					slog.Any("write_stats", lw),
 				}
 			}),
 			ticker.WithMessageFunc(func() string {
@@ -128,9 +121,8 @@ func OsPipeProxyWriter(ctx context.Context, name string, w io.WriteCloser) (*os.
 			}),
 			ticker.WithStartBurst(5),
 		).RunAsDefer()()
-		mw := io.MultiWriter(w, lw)
-		n, err := io.Copy(mw, cr)
-		slog.Debug(fmt.Sprintf("%s[DONE]", id), "name", name, "duration", time.Since(startTime), "copy_err", err, "bytes", n, "rncount", cr.ncount, "rcall_count", cr.callCount, "wncount", lw.ncount, "wcall_count", lw.callCount)
+		n, err := io.Copy(lw, lr)
+		slog.Debug(fmt.Sprintf("%s[DONE]", id), "name", name, "duration", time.Since(startTime), "copy_err", err, "bytes", n, "read_stats", lr, "write_stats", lw)
 	}()
 
 	return pw, []io.Closer{pr, w, pw}

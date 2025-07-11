@@ -47,9 +47,9 @@ func NewRemotePTYConsoleAdapter(ctx context.Context, wrcon io.ReadWriteCloser) (
 		return nil, errors.Errorf("failed to create console: %w", err)
 	}
 
-	if err := consoleInstance.SetRaw(); err != nil {
-		slog.Error("failed to set raw mode", "error", err)
-	}
+	// if err := consoleInstance.SetRaw(); err != nil {
+	// 	slog.Error("failed to set raw mode", "error", err)
+	// }
 
 	adapter := &PTYConsoleAdapter{
 		conn:      wrcon,
@@ -64,14 +64,14 @@ func NewRemotePTYConsoleAdapter(ctx context.Context, wrcon io.ReadWriteCloser) (
 	// Network -> PTY (stdin from network to container)
 	go func() {
 		defer adapter.wg.Done()
-		<-conn.DebugCopy(ctx, "network(read)->pty(write)", adapter.ptyMaster, adapter.conn)
+		<-conn.DebugCopy(ctx, "network(read)->pty(write)", consoleInstance, adapter.conn)
 		adapter.ptyMaster.Close() // Signal EOF to container
 	}()
 
 	// PTY -> Network (stdout/stderr from container to network)
 	go func() {
 		defer adapter.wg.Done()
-		<-conn.DebugCopy(ctx, "pty(read)->network(write)", adapter.conn, adapter.ptyMaster)
+		<-conn.DebugCopy(ctx, "pty(read)->network(write)", adapter.conn, consoleInstance)
 	}()
 	return consoleInstance, nil
 }

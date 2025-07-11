@@ -543,7 +543,7 @@ tasks:
             COMMAND: '{{.COMMAND | default "sh"}}'
             FLAGS: '{{.FLAGS | default "-it"}}'
 
-        interactive: true
+        # interactive: true
         cmds:
           - cmd: |-
                 {{.TIMEOUT_CMD}} {{.TIMEOUT}} sudo -A -E {{.TEST_BIN_DIR}}/nerdctl-test exec \
@@ -609,7 +609,7 @@ tasks:
     dev:2025-07-05:01:
         desc: runs the shim for 2025-07-05 - detached mode
         deps: ['test:linux:runtime', 'test:binaries']
-        interactive: true
+        # interactive: true
         vars:
             TMP_DIR:
                 sh: mktemp -d -t runm-2025-07-05-XXXXXX
@@ -637,7 +637,7 @@ tasks:
                 CONTAINER_ID:
                     sh: cat {{.TMP_DIR}}/stdout.txt
                 FLAGS: '--tty'
-                TIMEOUT: '10s'
+                # TIMEOUT: '10s'
           - task: dev:nerdctl-test:stop
             vars:
                 CONTAINER_ID:
