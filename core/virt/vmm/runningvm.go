@@ -14,8 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/nxadm/tail"
 	"gitlab.com/tozd/go/errors"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -28,6 +26,7 @@ import (
 	"github.com/walteh/runm/pkg/conn"
 	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/pkg/logging"
+	"github.com/walteh/runm/pkg/taskgroup"
 
 	runmv1 "github.com/walteh/runm/proto/v1"
 )
@@ -46,6 +45,8 @@ type RunningVM[VM VirtualMachine] struct {
 	start        time.Time
 	rawWriter    io.Writer
 	delimWriter  io.Writer
+	taskGroup    *taskgroup.TaskGroup
+	stderrUndoFn func() error
 }
 
 func (r *RunningVM[VM]) GuestService(ctx context.Context) (runmv1.GuestManagementServiceClient, error) {
@@ -126,7 +127,7 @@ func (r *RunningVM[VM]) GuestVsockConnOLD(ctx context.Context) (*grpc.ClientConn
 	}
 }
 
-func (r *RunningVM[VM]) ListenAndAcceptSingleVsockConnection(ctx context.Context, port uint32, dialCallback func(ctx context.Context) error) (*net.UnixConn, error) {
+func (r *RunningVM[VM]) ListenAndAcceptSingleVsockConnection(ctx context.Context, port uint32, dialCallback func(ctx context.Context) error) (net.Conn, error) {
 
 	lfunc := func(ctx context.Context) (net.Listener, error) {
 		return r.vm.VSockListen(ctx, uint32(port))
@@ -137,14 +138,14 @@ func (r *RunningVM[VM]) ListenAndAcceptSingleVsockConnection(ctx context.Context
 		return nil, errors.Errorf("listening and accepting vsock connection: %w", err)
 	}
 
-	unixConn, err := conn.CreateUnixConnProxy(ctx, cz)
-	if err != nil {
-		return nil, errors.Errorf("creating unix conn proxy: %w", err)
-	}
+	// unixConn, err := conn.CreateUnixConnProxy(ctx, cz)
+	// if err != nil {
+	// 	return nil, errors.Errorf("creating unix conn proxy: %w", err)
+	// }
 
 	// open a new unix socket pair
 
-	return unixConn, nil
+	return cz, nil
 }
 
 func (r *RunningVM[VM]) buildGuestGrpcConn(ctx context.Context) (*grpc.ClientConn, error) {
@@ -173,7 +174,25 @@ func (r *RunningVM[VM]) buildGuestGrpcConn(ctx context.Context) (*grpc.ClientCon
 }
 
 func (r *RunningVM[VM]) Close(ctx context.Context) error {
+	slog.InfoContext(ctx, "closing RunningVM")
 	r.closeCancel()
+
+	// Wait for all tasks to finish or timeout
+	if r.taskGroup != nil {
+		slog.InfoContext(ctx, "waiting for taskgroup to finish")
+		if err := r.taskGroup.Wait(); err != nil {
+			slog.ErrorContext(ctx, "error waiting for taskgroup", "error", err)
+		}
+	}
+
+	// Restore stderr redirection
+	if r.stderrUndoFn != nil {
+		slog.InfoContext(ctx, "restoring stderr redirection")
+		if err := r.stderrUndoFn(); err != nil {
+			slog.ErrorContext(ctx, "error restoring stderr", "error", err)
+		}
+	}
+
 	if r.vm.CurrentState() == VirtualMachineStateTypeStopped {
 		return nil
 	}
@@ -185,36 +204,36 @@ func (r *RunningVM[VM]) Close(ctx context.Context) error {
 	return nil
 }
 
-func (r *RunningVM[VM]) ProxyVsock(ctx context.Context, port uint32) (*net.UnixConn, string, error) {
+func (r *RunningVM[VM]) ProxyVsock(ctx context.Context, port uint32) (net.Conn, error) {
 	conn, err := r.vm.VSockConnect(ctx, uint32(port))
 	if err != nil {
-		return nil, "", errors.Errorf("connecting to vsock: %w", err)
+		return nil, errors.Errorf("connecting to vsock: %w", err)
 	}
 
-	unixSocketPath := filepath.Join(r.workingDir, fmt.Sprintf("vsock-%d.sock", port))
+	// unixSocketPath := filepath.Join(r.workingDir, fmt.Sprintf("vsock-%d.sock", port))
 
-	// open a unix socket to the connection in a working directory
-	unixConn, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: unixSocketPath, Net: "unix"})
-	if err != nil {
-		return nil, "", errors.Errorf("dialing unix socket: %w", err)
-	}
+	// // open a unix socket to the connection in a working directory
+	// unixConn, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: unixSocketPath, Net: "unix"})
+	// if err != nil {
+	// 	return nil, "", errors.Errorf("dialing unix socket: %w", err)
+	// }
 
-	// copy the connection to the unix socket
-	go func() {
-		_, err := io.Copy(unixConn, conn)
-		if err != nil && !errors.Is(err, net.ErrClosed) && !errors.Is(err, io.EOF) {
-			slog.ErrorContext(ctx, "error copying connection to unix socket", "error", err)
-		}
-	}()
+	// // copy the connection to the unix socket
+	// go func() {
+	// 	_, err := io.Copy(unixConn, conn)
+	// 	if err != nil && !errors.Is(err, net.ErrClosed) && !errors.Is(err, io.EOF) {
+	// 		slog.ErrorContext(ctx, "error copying connection to unix socket", "error", err)
+	// 	}
+	// }()
 
-	go func() {
-		_, err := io.Copy(conn, unixConn)
-		if err != nil && !errors.Is(err, net.ErrClosed) && !errors.Is(err, io.EOF) {
-			slog.ErrorContext(ctx, "error copying connection to vsock", "error", err)
-		}
-	}()
+	// go func() {
+	// 	_, err := io.Copy(conn, unixConn)
+	// 	if err != nil && !errors.Is(err, net.ErrClosed) && !errors.Is(err, io.EOF) {
+	// 		slog.ErrorContext(ctx, "error copying connection to vsock", "error", err)
+	// 	}
+	// }()
 
-	return unixConn, unixSocketPath, nil
+	return conn, nil
 }
 
 func (r *RunningVM[VM]) ForwardStdio(ctx context.Context, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
@@ -271,9 +290,16 @@ func (r *RunningVM[VM]) RunCommandSimple(ctx context.Context, command string) ([
 func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 
 	ctx, closeCancel := context.WithCancel(ctx)
-	errgrp, _ := errgroup.WithContext(ctx)
-
 	rvm.closeCancel = closeCancel
+
+	// Initialize taskgroup
+	rvm.taskGroup = taskgroup.NewTaskGroup(ctx,
+		taskgroup.WithName("runningvm"),
+		taskgroup.WithEnablePprof(true),
+		taskgroup.WithLogStart(true),
+		taskgroup.WithLogEnd(true),
+		taskgroup.WithSlogBaseContext(ctx),
+	)
 
 	if rvm.cachedGuestGrpcConn == nil {
 		conn, err := rvm.buildGuestGrpcConn(ctx)
@@ -283,7 +309,7 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 		rvm.cachedGuestGrpcConn = conn
 	}
 
-	errgrp.Go(func() error {
+	rvm.taskGroup.GoWithName("netdev-wait", func(ctx context.Context) error {
 		err := rvm.netdev.Wait(ctx)
 		if err != nil {
 			slog.ErrorContext(ctx, "error waiting for netdev", "error", err)
@@ -305,7 +331,7 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 
 	}()
 
-	errgrp.Go(func() error {
+	rvm.taskGroup.GoWithName("vsock-raw-writer-proxy", func(ctx context.Context) error {
 		var writer io.Writer
 		if rvm.rawWriter == nil {
 			slog.WarnContext(ctx, "raw writer is nil, using default raw writer")
@@ -322,7 +348,7 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 		return nil
 	})
 
-	errgrp.Go(func() error {
+	rvm.taskGroup.GoWithName("vsock-delimited-writer-proxy", func(ctx context.Context) error {
 		var writer io.Writer
 		if rvm.delimWriter == nil {
 			slog.WarnContext(ctx, "delim writer is nil, using default delim writer")
@@ -339,7 +365,7 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 		return nil
 	})
 
-	errgrp.Go(func() error {
+	rvm.taskGroup.GoWithName("vsock-debug-proxy", func(ctx context.Context) error {
 		// open up a tcp port (lets just do 2017)
 		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", 2017))
 		if err != nil {
@@ -356,7 +382,7 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 		return nil
 	})
 
-	errgrp.Go(func() error {
+	rvm.taskGroup.GoWithName("vsock-pprof-proxy", func(ctx context.Context) error {
 		// open up a tcp port for pprof (port 6060)
 		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", 6060))
 		if err != nil {
@@ -374,7 +400,7 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 	})
 
 	if rvm.hostOtlpPort != 0 {
-		errgrp.Go(func() error {
+		rvm.taskGroup.GoWithName("otel-forwarder", func(ctx context.Context) error {
 			err = rvm.SetupOtelForwarder(ctx)
 			if err != nil {
 				slog.ErrorContext(ctx, "error setting up otel forwarder", "error", err)
@@ -384,7 +410,7 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 		})
 	}
 
-	errgrp.Go(func() error {
+	rvm.taskGroup.GoWithName("vm-background-tasks", func(ctx context.Context) error {
 		err = rvm.VM().ServeBackgroundTasks(ctx)
 		if err != nil {
 			slog.ErrorContext(ctx, "error serving background tasks", "error", err)
@@ -393,7 +419,7 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 		return nil
 	})
 
-	errgrp.Go(func() error {
+	rvm.taskGroup.GoWithName("host-service", func(ctx context.Context) error {
 		err = rvm.SetupHostService(ctx)
 		if err != nil {
 			slog.ErrorContext(ctx, "error setting up host service", "error", err)
@@ -412,13 +438,7 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 
 	// Create an error channel that will receive VM state changes
 
-	go func() {
-
-		// Wait for errgroup to finish (this handles cleanup when context is cancelled)
-		if err := errgrp.Wait(); err != nil && err != context.Canceled {
-			slog.ErrorContext(ctx, "error running gvproxy", "error", err)
-		}
-
+	rvm.taskGroup.GoWithName("vm-state-monitor", func(ctx context.Context) error {
 		// Only send error if VM actually encounters an error state
 		stateNotify := rvm.VM().StateChangeNotify(ctx)
 		for {
@@ -426,19 +446,19 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 			case state := <-stateNotify:
 				if state.StateType == VirtualMachineStateTypeError {
 					rvm.wait <- errors.Errorf("VM entered error state")
-					return
+					return nil
 				}
 				if state.StateType == VirtualMachineStateTypeStopped {
 					slog.InfoContext(ctx, "VM stopped")
 					rvm.wait <- nil
-					return
+					return nil
 				}
 				slog.InfoContext(ctx, "VM state changed", "state", state.StateType, "metadata", state.Metadata)
 			case <-ctx.Done():
-				return
+				return ctx.Err()
 			}
 		}
-	}()
+	})
 
 	err = rvm.RunInitalTimesyncRequests(ctx)
 	if err != nil {
@@ -495,6 +515,7 @@ func (rvm *RunningVM[VM]) SetupHostService(ctx context.Context) error {
 	defer vsockListener.Close()
 
 	grpcServer := grpc.NewServer(
+
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 		grpc.ChainUnaryInterceptor(grpcerr.NewUnaryServerInterceptor(ctx)),
 		grpc.ChainStreamInterceptor(grpcerr.NewStreamServerInterceptor(ctx)),
@@ -569,7 +590,6 @@ func proxy(ctx context.Context, src net.Conn, dst net.Conn) {
 
 func bootVM[VM VirtualMachine](ctx context.Context, vm VM) error {
 	bootCtx, bootCancel := context.WithCancel(ctx)
-	errGroup, ctx := errgroup.WithContext(bootCtx)
 	defer func() {
 		if r := recover(); r != nil {
 			slog.ErrorContext(ctx, "panic in bootContainerVM", "panic", r)
@@ -577,9 +597,6 @@ func bootVM[VM VirtualMachine](ctx context.Context, vm VM) error {
 		}
 		// clean up the boot provisioners - this shouldn't throw an error because they prob are going to throw something
 		bootCancel()
-		if err := errGroup.Wait(); err != nil {
-			slog.DebugContext(ctx, "error running boot provisioners", "error", err)
-		}
 
 	}()
 

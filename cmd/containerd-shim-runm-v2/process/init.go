@@ -25,7 +25,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -34,7 +33,6 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/console"
-	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/stdio"
 	"github.com/containerd/fifo"
 	"github.com/containerd/log"
@@ -317,6 +315,13 @@ func (p *Init) setExited(status int) {
 
 // Delete the init process
 func (p *Init) Delete(ctx context.Context) error {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.ErrorContext(ctx, "panic in Delete", "error", r)
+			panic(r)
+		}
+	}()
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -349,25 +354,17 @@ func (p *Init) delete(ctx context.Context) error {
 		p.io.Close()
 	}
 
-	// if runtime has a closer, close it
-	if closer, ok := p.runtime.(interface {
-		Close(context.Context) error
-	}); ok {
-		slog.InfoContext(ctx, "closing runtime", "runtime", p.runtime)
-		if err := closer.Close(ctx); err != nil {
-			slog.ErrorContext(ctx, "failed to close runtime", "error", err)
-		}
-	} else {
-		slog.InfoContext(ctx, "not closing runtime, not io.Closer", "type", reflect.TypeOf(p.runtime))
-	}
+	slog.DebugContext(ctx, "closing runtime", "runtime", p.runtime)
+	err = p.runtime.Close(ctx)
+	slog.DebugContext(ctx, "runtime closed", "error", err)
 
 	// // TODO: MAKE SURE WE DON"T NEED THIS
-	if err2 := mount.UnmountRecursive(p.Rootfs, 0); err2 != nil {
-		log.G(ctx).WithError(err2).Warn("failed to cleanup rootfs mount")
-		if err == nil {
-			err = errors.Errorf("failed rootfs umount: %w", err2)
-		}
-	}
+	// if err2 := mount.UnmountRecursive(p.Rootfs, 0); err2 != nil {
+	// 	log.G(ctx).WithError(err2).Warn("failed to cleanup rootfs mount")
+	// 	if err == nil {
+	// 		err = errors.Errorf("failed rootfs umount: %w", err2)
+	// 	}
+	// }
 
 	return err
 }

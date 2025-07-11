@@ -236,11 +236,11 @@ func (vm *VirtualMachine) VSockConnect(ctx context.Context, port uint32) (net.Co
 	if err != nil {
 		return nil, errors.Errorf("getting vsock device port[%d]: %w", port, err)
 	}
-	conn, err := vsockDev.Connect(port)
+	connz, err := vsockDev.Connect(port)
 	if err != nil {
 		return nil, errors.Errorf("connecting to vsock device port[%d]: %w", port, formatNSError(err))
 	}
-	return conn, nil
+	return connz, nil
 }
 
 // VSockListen implements vmm.VirtualMachine.
@@ -253,6 +253,7 @@ func (vm *VirtualMachine) VSockListen(ctx context.Context, port uint32) (net.Lis
 	if err != nil {
 		return nil, errors.Errorf("listening to vsock device port[%d]: %w", port, err)
 	}
+
 	return lstn, nil
 }
 

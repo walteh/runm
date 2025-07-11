@@ -14,23 +14,21 @@ import (
 type debugWriter struct {
 	ctx            context.Context
 	name           string
-	inCount        uint64
 	writeCount     uint64
 	callCount      uint64
 	buf            []byte
 	hasBeenClosed  bool
-	w              io.WriteCloser
+	w              io.Writer
 	sessionManager *sessionManager
 }
 
-func NewDebugWriter(ctx context.Context, name string, w io.WriteCloser) io.WriteCloser {
+func NewDebugWriter(ctx context.Context, name string, w io.Writer) io.Writer {
 	return &debugWriter{
 		ctx:           ctx,
 		name:          name,
 		buf:           []byte{},
 		hasBeenClosed: false,
 		writeCount:    0,
-		inCount:       0,
 		callCount:     0,
 		w:             w,
 		sessionManager: &sessionManager{
@@ -43,39 +41,33 @@ func NewDebugWriter(ctx context.Context, name string, w io.WriteCloser) io.Write
 
 func (l *debugWriter) LogValue() slog.Value {
 	return slog.GroupValue(
-		slog.Int64("bytes_in", int64(l.inCount)),
 		slog.Int64("bytes_written", int64(l.writeCount)),
 		slog.Int64("calls", int64(l.callCount)),
 		slog.Any("sessions", l.sessionManager),
+		slog.String("write_target", getNameFromReadWriter(l.w)),
 	)
 }
 
 func (l *debugWriter) Write(p []byte) (int, error) {
-	defer l.sessionManager.Start()()
-
 	l.callCount++
-	l.inCount += uint64(len(p))
 
-	pcopy := make([]byte, len(p))
-	copy(pcopy, p)
-
-	// l.buf = append(l.buf, p...)
+	defer l.sessionManager.Start()()
 
 	n, err := l.w.Write(p)
 	l.writeCount += uint64(n)
 
 	if err != nil {
 		var failedWriteData, successfulWriteData string
-		if len(pcopy) > n {
-			failedWriteData = escapeString(pcopy[n:])
-			successfulWriteData = escapeString(pcopy[:n])
+		if len(p) > n {
+			failedWriteData = escapeString(p[n:])
+			successfulWriteData = escapeString(p[:n])
 		} else {
 			failedWriteData = ""
-			successfulWriteData = escapeString(pcopy)
+			successfulWriteData = escapeString(p)
 		}
-		slog.ErrorContext(l.ctx, fmt.Sprintf("%s[WRITER-ERROR]", l.name), "error", err, "stats", l, "current_write_data", successfulWriteData, "failed_write_data", failedWriteData)
+		slog.ErrorContext(l.ctx, fmt.Sprintf("%s[WRITE-ERROR]", l.name), "error", err, "stats", l, "current_write_data", successfulWriteData, "failed_write_data", failedWriteData)
 	} else {
-		slog.DebugContext(l.ctx, fmt.Sprintf("%s[WRITE]", l.name), "data", escapeString(pcopy[:n]), "stats", l)
+		slog.DebugContext(l.ctx, fmt.Sprintf("%s[WRITE]", l.name), "data", escapeString(p[:n]), "stats", l)
 	}
 
 	// for {
@@ -95,6 +87,9 @@ func (l *debugWriter) Write(p []byte) (int, error) {
 func (l *debugWriter) Close() error {
 	l.hasBeenClosed = true
 	slog.InfoContext(l.ctx, fmt.Sprintf("%s[WRITER-CLOSED]", l.name), "stats", l)
+	if closer, ok := l.w.(io.Closer); ok {
+		return closer.Close()
+	}
 	return nil
 }
 
@@ -102,14 +97,13 @@ type debugReader struct {
 	ctx            context.Context
 	name           string
 	r              io.Reader
-	inCount        uint64
 	readCount      uint64
 	callCount      uint64
 	hasBeenClosed  bool
 	sessionManager *sessionManager
 }
 
-func NewDebugReader(ctx context.Context, name string, r io.Reader) io.ReadCloser {
+func NewDebugReader(ctx context.Context, name string, r io.Reader) io.Reader {
 	if strings.Contains(name, "network(read)->pty(write)") {
 		// log a stack trace
 		slog.DebugContext(ctx, "stack trace", "stack", string(debug.Stack()))
@@ -118,7 +112,6 @@ func NewDebugReader(ctx context.Context, name string, r io.Reader) io.ReadCloser
 		ctx:           ctx,
 		name:          name,
 		r:             r,
-		inCount:       0,
 		readCount:     0,
 		callCount:     0,
 		hasBeenClosed: false,
@@ -130,38 +123,50 @@ func NewDebugReader(ctx context.Context, name string, r io.Reader) io.ReadCloser
 	}
 }
 
+func chainString(w any) string {
+	chain := []string{}
+	for w != nil {
+		chain = append(chain, getNameFromReadWriter(w))
+		switch wtr := any(w).(type) {
+		case *debugWriter:
+			w = wtr.w
+		case *debugReader:
+			w = wtr.r
+		default:
+			w = nil
+		}
+	}
+	return strings.Join(chain, " -> ")
+}
+
 func (l *debugReader) LogValue() slog.Value {
 	return slog.GroupValue(
-		slog.Int64("bytes_in", int64(l.inCount)),
 		slog.Int64("bytes_read", int64(l.readCount)),
 		slog.Int64("calls", int64(l.callCount)),
 		slog.Any("sessions", l.sessionManager),
+		slog.String("read_target", getNameFromReadWriter(l.r)),
 	)
 }
 
 func (l *debugReader) Read(p []byte) (int, error) {
-	defer l.sessionManager.Start()()
-
 	l.callCount++
-	l.inCount += uint64(len(p))
-	pcopy := make([]byte, len(p))
-	copy(pcopy, p)
+	defer l.sessionManager.Start()()
 
 	n, err := l.r.Read(p)
 	l.readCount += uint64(n)
 
 	if err != nil {
 		var failedReadData, successfulReadData string
-		if len(pcopy) > n {
-			failedReadData = escapeString(pcopy[n:])
-			successfulReadData = escapeString(pcopy[:n])
+		if len(p) > n {
+			failedReadData = escapeString(p[n:])
+			successfulReadData = escapeString(p[:n])
 		} else {
 			failedReadData = ""
-			successfulReadData = escapeString(pcopy)
+			successfulReadData = escapeString(p)
 		}
-		slog.ErrorContext(l.ctx, fmt.Sprintf("%s[READER-ERROR]", l.name), "error", err, "stats", l, "current_read_data", successfulReadData, "failed_read_data", failedReadData)
+		slog.ErrorContext(l.ctx, fmt.Sprintf("%s[READ-ERROR]", l.name), "error", err, "stats", l, "current_read_data", successfulReadData, "failed_read_data", failedReadData)
 	} else {
-		slog.DebugContext(l.ctx, fmt.Sprintf("%s[READ]", l.name), "data", escapeString(pcopy[:n]), "stats", l)
+		slog.DebugContext(l.ctx, fmt.Sprintf("%s[READ]", l.name), "data", escapeString(p[:n]), "stats", l)
 	}
 
 	return n, err

@@ -63,7 +63,7 @@ func (g *GuestAllocatedVsockSocket) Close() error {
 	return g.conn.Close()
 }
 
-func (g *GuestAllocatedVsockSocket) Conn() runtime.FileConn {
+func (g *GuestAllocatedVsockSocket) Conn() net.Conn {
 	return g.conn
 }
 

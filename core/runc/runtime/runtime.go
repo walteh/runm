@@ -116,6 +116,7 @@ type Runtime interface {
 	Ps(ctx context.Context, id string) ([]int, error)
 	ReadPidFile(ctx context.Context, path string) (int, error)
 	SubscribeToReaperExits(ctx context.Context) (<-chan gorunc.Exit, error)
+	Close(ctx context.Context) error
 }
 
 type Platform interface {
@@ -209,7 +210,7 @@ type AllocatedSocket interface {
 	// isAllocatedSocket()
 	proxy.ContextDialer
 	io.Closer
-	Conn() FileConn
+	Conn() net.Conn
 	Ready() error
 }
 
@@ -246,8 +247,8 @@ type ReferableByReferenceId interface {
 }
 
 type VsockProxier interface {
-	ProxyVsock(ctx context.Context, port uint32) (*net.UnixConn, string, error)
-	ListenAndAcceptSingleVsockConnection(ctx context.Context, port uint32, dialCallback func(ctx context.Context) error) (*net.UnixConn, error)
+	ProxyVsock(ctx context.Context, port uint32) (net.Conn, error)
+	ListenAndAcceptSingleVsockConnection(ctx context.Context, port uint32, dialCallback func(ctx context.Context) error) (net.Conn, error)
 }
 
 type VsockFdProxier interface {

@@ -66,7 +66,7 @@ func TestBasicClientServer(t *testing.T) {
 	// Create a client
 	runcClient, err := grpcruntime.NewGRPCClientRuntimeFromConn(conn)
 	require.NoError(t, err)
-	defer runcClient.Close()
+	defer runcClient.Close(ctx)
 
 	// Test the Ping method
 	err = runcClient.Create(ctx, "test", "test", &gorunc.CreateOpts{})

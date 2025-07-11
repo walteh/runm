@@ -5,11 +5,13 @@ package virt
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/containers/common/pkg/strongunits"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/walteh/run"
 	"gitlab.com/tozd/go/errors"
+	"google.golang.org/grpc"
 
 	"github.com/walteh/runm/core/runc/oom"
 	"github.com/walteh/runm/core/runc/runtime"
@@ -35,6 +37,7 @@ type RunmVMRuntime[VM vmm.VirtualMachine] struct {
 	runtime.EventHandler
 	runtime.GuestManagement
 
+	grpcConn   *grpc.ClientConn
 	spec       *specs.Spec
 	vm         *vmm.RunningVM[VM]
 	oomWatcher *oom.Watcher
@@ -73,10 +76,6 @@ func NewRunmVMRuntime[VM vmm.VirtualMachine](
 	if err != nil {
 		return nil, err
 	}
-
-	closers = append(closers, func() error {
-		return vm.Close(ctx)
-	})
 
 	slog.InfoContext(ctx, "created oci vm, starting it", "id", vm.VM().ID(), "rawWriter==nil", cfg.RawWriter == nil, "delimWriter==nil", cfg.DelimWriter == nil)
 
@@ -132,14 +131,35 @@ func (r *RunmVMRuntime[VM]) Alive() bool {
 
 // Close implements run.Runnable.
 func (r *RunmVMRuntime[VM]) Close(ctx context.Context) error {
-	errs := []error{}
-	for _, closer := range r.closers {
-		if err := closer(); err != nil {
-			slog.ErrorContext(ctx, "error closing vm", "error", err)
-			errs = append(errs, err)
+	slog.InfoContext(ctx, "about to close vm")
+	ticker := time.NewTicker(100 * time.Microsecond)
+
+	tickstart := make(chan struct{})
+	go func() {
+		close(tickstart)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				slog.DebugContext(ctx, "closing vm")
+			case <-ctx.Done():
+				slog.DebugContext(ctx, "context done, stopping ticker")
+				return
+			}
 		}
-	}
-	return errors.Join(errs...)
+	}()
+
+	<-tickstart
+
+	err := r.Runtime.Close(ctx)
+	slog.DebugContext(ctx, "closed runtime", "err", err)
+
+	// err = r.grpcConn.Close()
+	// slog.DebugContext(ctx, "closed grpc conn", "err", err)
+
+	err = r.vm.Close(ctx)
+	slog.InfoContext(ctx, "closed vm", "err", err)
+	return nil
 }
 
 // Fields implements run.Runnable.

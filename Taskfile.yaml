@@ -561,6 +561,17 @@ tasks:
                 {{.TIMEOUT}} sudo -A -E {{.TEST_BIN_DIR}}/nerdctl-test stop \
                     {{.FLAGS}} {{.CONTAINER_ID}}
 
+    dev:nerdctl-test:rm:
+        desc: deletes a container
+        deps: ['test:binary:nerdctl-test']
+        requires: {vars: [CONTAINER_ID]}
+        vars:
+            CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
+        cmds:
+          - cmd: |-
+                sudo -A -E {{.TEST_BIN_DIR}}/nerdctl-test rm \
+                    {{.FLAGS}} {{.CONTAINER_ID}}
+
     dev:nerdctl-test:ps:
         desc: lists running containers
         deps: ['test:binary:nerdctl-test']
@@ -642,8 +653,18 @@ tasks:
             vars:
                 CONTAINER_ID:
                     sh: cat {{.TMP_DIR}}/stdout.txt
+          - task: dev:nerdctl-test:ps
+            vars:
+                FLAGS: ''
+          - task: dev:nerdctl-test:rm
+            vars:
+                CONTAINER_ID:
+                    sh: cat {{.TMP_DIR}}/stdout.txt
+          - task: dev:nerdctl-test:ps
+            vars:
+                FLAGS: ''
 
-    containerd:2025-07-01:01:
+    dev:containerd-test:
         desc: runs the shim for 2025-07-01
         deps:
           - test:linux:runtime
@@ -656,6 +677,22 @@ tasks:
         cmds:
           - task: test:cleanup-running-shims
           - cmd: sudo -A -E {{.TEST_BIN_DIR}}/containerd-test
+
+    dev:containerd-test:pipe-to-file:
+        desc: runs the shim for 2025-07-01
+        deps:
+          - test:linux:runtime
+          - test:binaries
+        env:
+            SHIM_BINARY_PATH:
+                sh: echo $(pwd)/{{.TEST_BIN_DIR}}/containerd-shim-runm-v2-test
+            LINUX_RUNTIME_DIR:
+                sh: echo $(pwd)/{{.LINUX_RUNTIME_DIR}}
+        vars:
+            FILE: '{{.CLI_ARGS | default "./.logs/containerd-test-pipe-to-file.log"}}'
+        cmds:
+          - task: test:cleanup-running-shims
+          - cmd: sudo -A -E {{.TEST_BIN_DIR}}/containerd-test > {{.FILE}}
 
     setup:
         desc: sets up the environment

@@ -259,6 +259,12 @@ func NewContainer(
 	}
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.ErrorContext(ctx, "panic in SubscribeToReaperExits", "error", r)
+				panic(r)
+			}
+		}()
 		exits, err := rt.SubscribeToReaperExits(ctx)
 		if err != nil {
 			slog.ErrorContext(ctx, "failed to subscribe to reaper exits", "id", r.ID, "error", err)

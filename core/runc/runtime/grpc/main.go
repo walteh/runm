@@ -3,6 +3,9 @@
 package grpcruntime
 
 import (
+	"context"
+	"log/slog"
+
 	"gitlab.com/tozd/go/errors"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
@@ -107,9 +110,32 @@ func (me *GRPCClientRuntime) EventPublisher() runmv1.EventServiceClient {
 }
 
 // Close closes the client connection.
-func (c *GRPCClientRuntime) Close() error {
+func (c *GRPCClientRuntime) Close(ctx context.Context) error {
+	slog.Debug("closing grpc runtime")
+	for name, io := range c.state.OpenIOs().Range {
+		err := io.Close()
+		slog.Debug("closed io", "name", name, "err", err)
+	}
+	slog.Debug("closing consoles")
+	for name, c := range c.state.OpenConsoles().Range {
+		err := c.Close()
+		slog.Debug("closed console", "name", name, "err", err)
+	}
+	slog.Debug("closing vsock connections")
+	for name, v := range c.state.OpenVsockConnections().Range {
+		err := v.Close()
+		slog.Debug("closed vsock", "name", name, "err", err)
+	}
+	slog.Debug("closing unix connections")
+	for name, v := range c.state.OpenUnixConnections().Range {
+		err := v.Close()
+		slog.Debug("closed unix", "name", name, "err", err)
+	}
+
 	if c.conn != nil {
-		return c.conn.Close()
+		slog.Debug("closing grpc conn")
+		err := c.conn.Close()
+		slog.Debug("closed grpc conn", "err", err)
 	}
 	return nil
 }

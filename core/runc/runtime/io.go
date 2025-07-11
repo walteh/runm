@@ -3,7 +3,9 @@ package runtime
 import (
 	"context"
 	"io"
+	"log/slog"
 	"os/exec"
+	"sync"
 
 	gorunc "github.com/containerd/go-runc"
 )
@@ -15,22 +17,26 @@ var _ ReferableByReferenceId = &HostAllocatedStdio{}
 // var _ IO = &IoLogProxy{}
 
 type HostAllocatedStdio struct {
-	StdinSocket  AllocatedSocket
-	StdoutSocket AllocatedSocket
-	StderrSocket AllocatedSocket
-	ReferenceId  string
+	StdinSocket    AllocatedSocket
+	StdoutSocket   AllocatedSocket
+	StderrSocket   AllocatedSocket
+	createCtx      context.Context
+	closeCallbacks []func(ctx context.Context) error
+	ReferenceId    string
 }
 
 func (p *HostAllocatedStdio) GetReferenceId() string {
 	return p.ReferenceId
 }
 
-func NewHostAllocatedStdio(ctx context.Context, referenceId string, stdinRef, stdoutRef, stderrRef AllocatedSocket) *HostAllocatedStdio {
+func NewHostAllocatedStdio(ctx context.Context, referenceId string, stdinRef, stdoutRef, stderrRef AllocatedSocket, closeCallbacks ...func(ctx context.Context) error) *HostAllocatedStdio {
 	return &HostAllocatedStdio{
-		StdinSocket:  stdinRef,
-		StdoutSocket: stdoutRef,
-		StderrSocket: stderrRef,
-		ReferenceId:  referenceId,
+		StdinSocket:    stdinRef,
+		StdoutSocket:   stdoutRef,
+		StderrSocket:   stderrRef,
+		ReferenceId:    referenceId,
+		createCtx:      ctx,
+		closeCallbacks: closeCallbacks,
 	}
 }
 
@@ -76,6 +82,14 @@ func (p *HostAllocatedStdio) Close() error {
 	}
 	if p.StderrSocket != nil {
 		p.StderrSocket.Close()
+	}
+	for _, closer := range p.closeCallbacks {
+		sg := sync.WaitGroup{}
+		sg.Go(func() {
+			err := closer(p.createCtx)
+			slog.DebugContext(p.createCtx, "io callback closed", "err", err)
+		})
+		sg.Wait()
 	}
 	return nil
 }

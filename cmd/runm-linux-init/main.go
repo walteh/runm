@@ -82,7 +82,9 @@ type runmLinuxInit struct {
 
 	exitChan chan gorunc.Exit
 
-	logger *slog.Logger
+	logger    *slog.Logger
+	taskgroup *taskgroup.TaskGroup
+	cancel    context.CancelFunc
 }
 
 // DO NOT USE SLOG IN THIS FUNCTION - LOG TO STDOUT
@@ -224,6 +226,12 @@ func (r *runmLinuxInit) configureRuntimeServer(ctx context.Context) (*grpc.Serve
 		realEventHandler,
 		cgroupAdapter,
 		server.WithBundleSource(bundleSource),
+		server.WithCleanupFn(func() error {
+			if r.cancel != nil {
+				r.cancel()
+			}
+			return nil
+		}),
 		// server.WithCustomExitChan(r.exitChan),
 	)
 
@@ -349,6 +357,7 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	go handleExitSignals(ctx, cancel)
 
+	r.cancel = cancel
 	// Create TaskGroup with pprof enabled and custom labels
 	taskgroupz := taskgroup.NewTaskGroup(ctx,
 		taskgroup.WithName("runm-linux-init"),
@@ -409,6 +418,8 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 	taskgroupz.GoWithName("pprof-vsock-server", func(ctx context.Context) error {
 		return r.runPprofVsockServer(ctx)
 	})
+
+	r.taskgroup = taskgroupz
 
 	// // Demonstrate pprof helper functionality
 	// WrapTaskGroupGoWithLogging("pprof-demo", taskgroupz, func(ctx context.Context) error {

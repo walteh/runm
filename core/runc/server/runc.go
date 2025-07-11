@@ -136,6 +136,34 @@ func (s *Server) Delete(ctx context.Context, req *runmv1.RuncDeleteRequest) (*ru
 	if err != nil {
 		return nil, errors.Errorf("deleting container: %w", err)
 	}
+
+	for name, io := range s.state.OpenIOs().Range {
+		err := io.Close()
+		slog.Debug("closed io", "name", name, "err", err)
+	}
+	for name, c := range s.state.OpenConsoles().Range {
+		err := c.Close()
+		slog.Debug("closed console", "name", name, "err", err)
+	}
+
+	for name, v := range s.state.OpenVsockConnections().Range {
+		err := v.Close()
+		slog.Debug("closed vsock", "name", name, "err", err)
+	}
+	for name, v := range s.state.OpenUnixConnections().Range {
+		err := v.Close()
+		slog.Debug("closed unix", "name", name, "err", err)
+	}
+
+	// if s.cleanupFn != nil {
+	// 	slog.Debug("running cleanup function on delay")
+	// 	go func() {
+	// 		time.Sleep(1 * time.Second)
+	// 		err := s.cleanupFn()
+	// 		slog.Debug("cleanup", "err", err)
+	// 	}()
+	// }
+
 	return resp, nil
 }
 

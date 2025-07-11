@@ -25,6 +25,7 @@ type Server struct {
 	cgroupAdapter  runtime.CgroupAdapter
 	bundleSource   string
 	customExitChan chan gorunc.Exit
+	cleanupFn      func() error
 
 	state *state.State
 }
@@ -34,6 +35,7 @@ type ServerOpt func(*ServerOpts)
 type ServerOpts struct {
 	BundleSource   string
 	CustomExitChan chan gorunc.Exit
+	CleanupFn      func() error
 }
 
 func WithBundleSource(bundleSource string) ServerOpt {
@@ -45,6 +47,12 @@ func WithBundleSource(bundleSource string) ServerOpt {
 func WithCustomExitChan(customExitChan chan gorunc.Exit) ServerOpt {
 	return func(opts *ServerOpts) {
 		opts.CustomExitChan = customExitChan
+	}
+}
+
+func WithCleanupFn(cleanupFn func() error) ServerOpt {
+	return func(opts *ServerOpts) {
+		opts.CleanupFn = cleanupFn
 	}
 }
 
@@ -67,6 +75,7 @@ func NewServer(
 		cgroupAdapter:  cgroupAdapter,
 		bundleSource:   optz.BundleSource,
 		customExitChan: optz.CustomExitChan,
+		cleanupFn:      optz.CleanupFn,
 		state:          state.NewState(),
 	}
 

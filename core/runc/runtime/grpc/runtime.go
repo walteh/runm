@@ -77,7 +77,19 @@ func (c *GRPCClientRuntime) NewTempConsoleSocket(ctx context.Context) (runtime.C
 
 	slog.InfoContext(ctx, "binding console to socket - B")
 
-	consock, err := runmsocket.NewHostUnixConsoleSocketV2(ctx, cons.GetConsoleReferenceId(), allocatedSock)
+	closeCallbacks := []func(ctx context.Context) error{
+		func(ctx context.Context) error {
+			req := &runmv1.CloseConsoleRequest{}
+			req.SetConsoleReferenceId(cons.GetConsoleReferenceId())
+			_, err := c.socketAllocatorGrpcService.CloseConsole(ctx, req)
+			if err != nil {
+				slog.ErrorContext(ctx, "error closing console", "error", err)
+			}
+			return nil
+		},
+	}
+
+	consock, err := runmsocket.NewHostUnixConsoleSocketV2(ctx, cons.GetConsoleReferenceId(), allocatedSock, closeCallbacks...)
 	if err != nil {
 		return nil, errors.Errorf("creating host console socket: %w", err)
 	}
@@ -122,7 +134,7 @@ func (c *GRPCClientRuntime) NewNullIO() (runtime.IO, error) {
 	return runtime.NewHostNullIo()
 }
 
-func (c *GRPCClientRuntime) listenToVsockWithDialerCallback(ctx context.Context, port uint32) (*net.UnixConn, error) {
+func (c *GRPCClientRuntime) listenToVsockWithDialerCallback(ctx context.Context, port uint32) (net.Conn, error) {
 
 	dcb := func(ctx context.Context) error {
 		return c.vsockDialer(ctx, port)
@@ -266,7 +278,19 @@ func (c *GRPCClientRuntime) NewPipeIO(ctx context.Context, ioUID, ioGID int, opt
 		stderrAllocated = allocatedSockets[stderrRef.GetVsockPort().GetPort()]
 	}
 
-	ioz := runtime.NewHostAllocatedStdio(ctx, sock.GetIoReferenceId(), stdinAllocated, stdoutAllocated, stderrAllocated)
+	extraClosers := []func(ctx context.Context) error{
+		func(ctx context.Context) error {
+			req := &runmv1.CloseIORequest{}
+			req.SetIoReferenceId(sock.GetIoReferenceId())
+			_, err := c.socketAllocatorGrpcService.CloseIO(ctx, req)
+			if err != nil {
+				slog.ErrorContext(ctx, "error closing IO", "error", err)
+			}
+			return err
+		},
+	}
+
+	ioz := runtime.NewHostAllocatedStdio(ctx, sock.GetIoReferenceId(), stdinAllocated, stdoutAllocated, stderrAllocated, extraClosers...)
 
 	return ioz, nil
 }

@@ -261,6 +261,7 @@ func (s *Server) CloseConsole(ctx context.Context, req *runmv1.CloseConsoleReque
 
 // CloseIO implements runmv1.SocketAllocatorServiceServer.
 func (s *Server) CloseIO(ctx context.Context, req *runmv1.CloseIORequest) (*runmv1.CloseIOResponse, error) {
+
 	val, ok := s.state.GetOpenIO(req.GetIoReferenceId())
 	if !ok {
 		return nil, errors.Errorf("io not found")

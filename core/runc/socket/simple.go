@@ -32,7 +32,7 @@ func (h *SimpleVsockConn) Close() error {
 	return h.conn.Close()
 }
 
-func (h *SimpleVsockConn) Conn() runtime.FileConn {
+func (h *SimpleVsockConn) Conn() net.Conn {
 	return h.conn
 }
 
@@ -45,11 +45,11 @@ func (h *SimpleVsockConn) DialContext(ctx context.Context, network, address stri
 }
 
 type SimpleVsockProxyConn struct {
-	conn *net.UnixConn
+	conn net.Conn
 	port uint32
 }
 
-func NewSimpleVsockProxyConn(ctx context.Context, conn *net.UnixConn, port uint32) *SimpleVsockProxyConn {
+func NewSimpleVsockProxyConn(ctx context.Context, conn net.Conn, port uint32) *SimpleVsockProxyConn {
 	return &SimpleVsockProxyConn{conn: conn, port: port}
 }
 
@@ -61,11 +61,7 @@ func (h *SimpleVsockProxyConn) Close() error {
 	return h.conn.Close()
 }
 
-func (h *SimpleVsockProxyConn) Conn() runtime.FileConn {
-	return h.conn
-}
-
-func (h *SimpleVsockProxyConn) UnixConn() *net.UnixConn {
+func (h *SimpleVsockProxyConn) Conn() net.Conn {
 	return h.conn
 }
 
@@ -94,7 +90,7 @@ func (h *SimpleUnixConn) Close() error {
 	return h.conn.Close()
 }
 
-func (h *SimpleUnixConn) Conn() runtime.FileConn {
+func (h *SimpleUnixConn) Conn() net.Conn {
 	return h.conn
 }
 

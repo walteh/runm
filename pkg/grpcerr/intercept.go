@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"runtime/debug"
 	"time"
 
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
@@ -132,9 +133,9 @@ func UnaryClientInterceptor(
 	id := fmt.Sprintf("GRPC:CLIENT:%s:%s", service, operation)
 	event := fmt.Sprintf("%s[START]", id)
 	slog.DebugContext(ctx, event, "service", service)
-	// if event == "containerd.services.tasks.v1.Tasks:CLIENT:START[Kill]" {
-	// 	slog.InfoContext(ctx, string(debug.Stack()))
-	// }
+	if event == "GRPC:CLIENT:runm.v1.SocketAllocatorService:CloseIO[START]" {
+		slog.InfoContext(ctx, string(debug.Stack()))
+	}
 
 	defer ticker.NewTicker(
 		ticker.WithInterval(1*time.Second),

@@ -26,6 +26,9 @@ var _ runtime.Runtime = &MockRuntime{}
 //			CheckpointFunc: func(ctx context.Context, id string, opts *runc.CheckpointOpts, actions ...runc.CheckpointAction) error {
 //				panic("mock out the Checkpoint method")
 //			},
+//			CloseFunc: func(ctx context.Context) error {
+//				panic("mock out the Close method")
+//			},
 //			CreateFunc: func(ctx context.Context, id string, bundle string, opts *runc.CreateOpts) error {
 //				panic("mock out the Create method")
 //			},
@@ -80,6 +83,9 @@ var _ runtime.Runtime = &MockRuntime{}
 type MockRuntime struct {
 	// CheckpointFunc mocks the Checkpoint method.
 	CheckpointFunc func(ctx context.Context, id string, opts *runc.CheckpointOpts, actions ...runc.CheckpointAction) error
+
+	// CloseFunc mocks the Close method.
+	CloseFunc func(ctx context.Context) error
 
 	// CreateFunc mocks the Create method.
 	CreateFunc func(ctx context.Context, id string, bundle string, opts *runc.CreateOpts) error
@@ -138,6 +144,11 @@ type MockRuntime struct {
 			Opts *runc.CheckpointOpts
 			// Actions is the actions argument value.
 			Actions []runc.CheckpointAction
+		}
+		// Close holds details about calls to the Close method.
+		Close []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
 		}
 		// Create holds details about calls to the Create method.
 		Create []struct {
@@ -262,6 +273,7 @@ type MockRuntime struct {
 		}
 	}
 	lockCheckpoint             sync.RWMutex
+	lockClose                  sync.RWMutex
 	lockCreate                 sync.RWMutex
 	lockDelete                 sync.RWMutex
 	lockExec                   sync.RWMutex
@@ -320,6 +332,38 @@ func (mock *MockRuntime) CheckpointCalls() []struct {
 	mock.lockCheckpoint.RLock()
 	calls = mock.calls.Checkpoint
 	mock.lockCheckpoint.RUnlock()
+	return calls
+}
+
+// Close calls CloseFunc.
+func (mock *MockRuntime) Close(ctx context.Context) error {
+	if mock.CloseFunc == nil {
+		panic("MockRuntime.CloseFunc: method is nil but Runtime.Close was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockClose.Lock()
+	mock.calls.Close = append(mock.calls.Close, callInfo)
+	mock.lockClose.Unlock()
+	return mock.CloseFunc(ctx)
+}
+
+// CloseCalls gets all the calls that were made to Close.
+// Check the length with:
+//
+//	len(mockedRuntime.CloseCalls())
+func (mock *MockRuntime) CloseCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockClose.RLock()
+	calls = mock.calls.Close
+	mock.lockClose.RUnlock()
 	return calls
 }
 

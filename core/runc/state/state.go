@@ -30,6 +30,22 @@ func NewState() *State {
 	}
 }
 
+func (s *State) OpenIOs() *syncmap.Map[string, runtime.IO] {
+	return s.openIOs
+}
+
+func (s *State) OpenConsoles() *syncmap.Map[string, runtime.ConsoleSocket] {
+	return s.openConsoles
+}
+
+func (s *State) OpenVsockConnections() *syncmap.Map[uint32, runtime.VsockAllocatedSocket] {
+	return s.openVsockConnections
+}
+
+func (s *State) OpenUnixConnections() *syncmap.Map[string, runtime.UnixAllocatedSocket] {
+	return s.openUnixConnections
+}
+
 func (s *State) GetOpenIO(referenceId string) (runtime.IO, bool) {
 	return s.openIOs.Load(referenceId)
 }

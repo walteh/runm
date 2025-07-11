@@ -66,7 +66,7 @@ func (g *GuestAllocatedUnixSocket) Close() error {
 	return g.conn.Close()
 }
 
-func (g *GuestAllocatedUnixSocket) Conn() runtime.FileConn {
+func (g *GuestAllocatedUnixSocket) Conn() net.Conn {
 	return g.conn
 }
 

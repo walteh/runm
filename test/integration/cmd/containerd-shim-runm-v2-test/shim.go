@@ -49,7 +49,7 @@ func ShimMain() {
 
 	ctx := context.Background()
 
-	logger, sd, err := env.SetupLogForwardingToContainerd(ctx, fmt.Sprintf("shim[%s]", mode))
+	logger, sd, err := env.SetupLogForwardingToContainerd(ctx, fmt.Sprintf("shim[%s]", mode), true)
 	if err != nil {
 		slog.Error("Failed to setup otel", "error", err)
 		os.Exit(1)
@@ -156,6 +156,16 @@ func guessShimMode() string {
 }
 
 func RunShim(ctx context.Context) error {
+
+	if mode == "primary" {
+		redirectStderr, err := env.DuplicateFdToWriter(int(os.Stderr.Fd()), logging.GetDefaultRawWriter())
+		if err != nil {
+			slog.Error("Failed to duplicate stderr", "error", err)
+		}
+		defer redirectStderr()
+
+		fmt.Fprintln(os.Stderr, "SHIM:PRIMARY:START:TEST:TEST:TEST")
+	}
 
 	sloglogrus.SetLogrusLevel(logrus.DebugLevel)
 

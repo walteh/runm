@@ -352,19 +352,21 @@ func (r *TaskRegistry) loadTaskfileFromPath(ctx context.Context, absPath string)
 			continue
 		}
 
+		toolID := strings.ReplaceAll(taskName, ":", "_")
+		toolID = strings.ReplaceAll(toolID, "*", "")
+
 		// Store task by name
-		r.tasksByName[taskName] = taskData
+		r.tasksByName[toolID] = taskData
 
 		// Create tool for this task
-		tool := r.createTaskAsTool(ctx, taskName, taskData)
-		tools[taskName] = tool
+		tool := r.createTaskAsTool(ctx, toolID, taskData)
+		tools[toolID] = tool
 
 		// Store tool ID
-		toolID := fmt.Sprintf("task_%s", strings.ReplaceAll(taskName, ":", "_"))
-		r.toolNames[taskName] = toolID
+		r.toolNames[toolID] = toolID
 
 		logger.Debug().
-			Str("task", taskName).
+			Str("task", toolID).
 			Str("tool_id", toolID).
 			Str("description", taskData.Desc).
 			Msg("Created tool for task")
@@ -392,7 +394,7 @@ func (r *TaskRegistry) createTaskAsTool(ctx context.Context, taskName string, ta
 	toolOpts := []mcp.ToolOption{
 		mcp.WithDescription(description),
 		mcp.WithDestructiveHintAnnotation(false),
-		mcp.WithTitleAnnotation(taskName),
+		mcp.WithTitleAnnotation(toolID),
 		mcp.WithOpenWorldHintAnnotation(false),
 		mcp.WithReadOnlyHintAnnotation(false),
 		mcp.WithIdempotentHintAnnotation(false),

@@ -145,6 +145,11 @@ func (r *GoRuncRuntime) RuncRun(ctx context.Context, id, bundle string, options 
 	return r.internal.Run(ctx, id, bundle, options)
 }
 
+func (r *GoRuncRuntime) Close(ctx context.Context) error {
+	close(r.reaperCh)
+	return nil
+}
+
 var _ runtime.RuntimeCreator = (*GoRuncRuntimeCreator)(nil)
 
 type GoRuncRuntimeCreator struct {

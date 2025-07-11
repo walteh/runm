@@ -13,8 +13,8 @@ import (
 )
 
 type HostAllocatedSocket struct {
-	conn        *net.UnixConn
-	path        string
+	conn net.Conn
+	// path        string
 	referenceId string
 }
 
@@ -24,13 +24,13 @@ func (h *HostAllocatedSocket) Close() error {
 	return h.conn.Close()
 }
 
-func (h *HostAllocatedSocket) Conn() runtime.FileConn {
+func (h *HostAllocatedSocket) Conn() net.Conn {
 	return h.conn
 }
 
-func (h *HostAllocatedSocket) Path() string {
-	return h.path
-}
+// func (h *HostAllocatedSocket) Path() string {
+// 	return h.path
+// }
 
 func (h *HostAllocatedSocket) Ready() error {
 	return nil
@@ -41,11 +41,11 @@ func (h *HostAllocatedSocket) DialContext(ctx context.Context, network, address 
 }
 
 func NewHostAllocatedVsockSocket(ctx context.Context, port uint32, refId string, proxier runtime.VsockProxier) (*HostAllocatedSocket, error) {
-	conn, path, err := proxier.ProxyVsock(ctx, port)
+	conn, err := proxier.ProxyVsock(ctx, port)
 	if err != nil {
 		return nil, errors.Errorf("proxying vsock: %w", err)
 	}
-	return &HostAllocatedSocket{conn: conn, path: path, referenceId: refId}, nil
+	return &HostAllocatedSocket{conn: conn, referenceId: refId}, nil
 }
 
 func NewHostAllocatedUnixSocket(ctx context.Context, path string, refId string) (*HostAllocatedSocket, error) {
@@ -54,7 +54,7 @@ func NewHostAllocatedUnixSocket(ctx context.Context, path string, refId string) 
 		return nil, err
 	}
 	slog.InfoContext(ctx, "new host allocated unix socket", "path", path, "refId", refId)
-	return &HostAllocatedSocket{conn: conn, path: path, referenceId: refId}, nil
+	return &HostAllocatedSocket{conn: conn, referenceId: refId}, nil
 }
 
 func NewHostAllocatedSocketFromId(ctx context.Context, id string, proxier runtime.VsockProxier) (*HostAllocatedSocket, error) {
