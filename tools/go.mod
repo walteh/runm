@@ -18,6 +18,7 @@ tool (
 	github.com/walteh/runm/tools/cmd/codesign
 	github.com/walteh/runm/tools/cmd/findcodetag
 	github.com/walteh/runm/tools/cmd/goshim
+	github.com/walteh/runm/tools/cmd/taskmcp
 )
 
 tool (
@@ -46,10 +47,14 @@ replace github.com/containerd/ttrpc => ../../ttrpc
 replace github.com/kazhuravlev/options-gen => ../../options-gen
 
 require (
+	github.com/go-task/task/v3 v3.44.0
+	github.com/mark3labs/mcp-go v0.32.0
 	github.com/nxadm/tail v1.4.11
+	github.com/rs/zerolog v1.34.0
 	github.com/stretchr/testify v1.10.0
 	github.com/veqryn/slog-context v0.8.0
 	gitlab.com/tozd/go/errors v0.10.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -293,7 +298,6 @@ require (
 	github.com/go-playground/validator/v10 v10.26.0 // indirect
 	github.com/go-restruct/restruct v1.2.0-alpha // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
-	github.com/go-task/task/v3 v3.44.0 // indirect
 	github.com/go-task/template v0.1.0 // indirect
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1 // indirect
 	github.com/go-toolsmith/astcast v1.1.0 // indirect
@@ -422,7 +426,6 @@ require (
 	github.com/manuelarte/funcorder v0.5.0 // indirect
 	github.com/maratori/testableexamples v1.0.0 // indirect
 	github.com/maratori/testpackage v1.1.1 // indirect
-	github.com/mark3labs/mcp-go v0.32.0 // indirect
 	github.com/matoous/godox v1.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -499,7 +502,6 @@ require (
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/rs/cors v1.11.1 // indirect
 	github.com/rs/xid v1.6.0 // indirect
-	github.com/rs/zerolog v1.34.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/ryancurrah/gomodguard v1.4.1 // indirect
 	github.com/ryanrolds/sqlclosecheck v0.5.1 // indirect
@@ -652,7 +654,6 @@ require (
 	gopkg.in/mail.v2 v2.3.1 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools/gotestsum v1.12.3 // indirect
 	honnef.co/go/tools v0.6.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
