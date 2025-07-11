@@ -195,21 +195,6 @@ func (vmConfig *vzVirtioDeviceApplier) applyVirtioFs(dev *virtio.VirtioFs) error
 	return nil
 }
 
-func toVzVirtioRng(dev *virtio.VirtioRng) (*vz.VirtioEntropyDeviceConfiguration, error) {
-	return vz.NewVirtioEntropyDeviceConfiguration()
-}
-
-func (vmConfig *vzVirtioDeviceApplier) applyVirtioRng(dev *virtio.VirtioRng) error {
-	slog.Info("Adding virtio-rng device")
-	entropyConfig, err := toVzVirtioRng(dev)
-	if err != nil {
-		return err
-	}
-	vmConfig.entropyDevicesToSet = append(vmConfig.entropyDevicesToSet, entropyConfig)
-
-	return nil
-}
-
 func toVzVirtioBalloon(dev *virtio.VirtioBalloon) (*vz.VirtioTraditionalMemoryBalloonDeviceConfiguration, error) {
 	return vz.NewVirtioTraditionalMemoryBalloonDeviceConfiguration()
 }

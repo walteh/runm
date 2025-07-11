@@ -14,6 +14,7 @@ import (
 
 	"gitlab.com/tozd/go/errors"
 
+	"github.com/rs/xid"
 	"github.com/walteh/runm/pkg/logging"
 )
 
@@ -69,6 +70,61 @@ func CreateUnixConnProxy(ctx context.Context, conn net.Conn) (*net.UnixConn, err
 	}()
 
 	return unixConn.(*net.UnixConn), nil
+}
+
+func CreateUnixFileProxy(ctx context.Context) (string, *net.UnixConn, error) {
+
+	fd, err := syscall.Socket(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
+	if err != nil {
+		return "", nil, errors.Errorf("creating socketpair: %w", err)
+	}
+
+	// Convert raw file descriptors to *os.File objects
+	f1 := os.NewFile(uintptr(fd), "external.socket")
+
+	// Convert one end to a UnixConn (this will be returned)
+	unixConnF, err := net.FileConn(f1)
+	if err != nil {
+		f1.Close()
+		return "", nil, errors.Errorf("converting file to UnixConn: %w", err)
+	}
+
+	unixConn, ok := unixConnF.(*net.UnixConn)
+	if !ok {
+		return "", nil, errors.Errorf("unixConn is not a *net.UnixConn")
+	}
+
+	file := "/tmp/runm-file-pipe-proxy." + xid.New().String() + ".sock"
+
+	// create a unix socket that we will forward all reads and writes too
+	listener, err := net.Listen("unix", file)
+	if err != nil {
+		return "", nil, errors.Errorf("creating listener: %w", err)
+	}
+
+	go func() {
+
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+
+			go func() {
+				defer conn.Close()
+				defer listener.Close()
+				CopyLoggingErrors(ctx, conn, unixConn)
+			}()
+
+			go func() {
+				defer conn.Close()
+				defer listener.Close()
+				CopyLoggingErrors(ctx, unixConn, conn)
+			}()
+		}
+	}()
+
+	return file, unixConn, nil
 }
 
 // func CreateUnixListenerProxy(ctx context.Context, establishedConn net.Conn) (net.Listener, error) {

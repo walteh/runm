@@ -41,6 +41,7 @@ import (
 	gorunc "github.com/containerd/go-runc"
 
 	"github.com/walteh/runm/core/runc/runtime"
+	"github.com/walteh/runm/pkg/conn"
 )
 
 const binaryIOProcTermTimeout = 12 * time.Second // Give logger process solid 10 seconds for cleanup
@@ -496,21 +497,13 @@ func wrapBinaryIO(ctx context.Context, run runtime.Runtime, binIO *binaryIO, u, 
 		return nil, errors.Errorf("failed to create pipeIO: %w", err)
 	}
 
+	cmdname := filepath.Base(binIO.cmd.Args[0])
+
 	go func() {
-		if _, err := io.Copy(binIO.err.w, pipeIO.Stderr()); err != nil {
-			if err == io.EOF {
-				return
-			}
-			slog.ErrorContext(ctx, "error copying", "error", err)
-		}
+		<-conn.DebugCopy(ctx, cmdname+":stdout:pipe(read)->binary(write)", binIO.out.w, pipeIO.Stdout())
 	}()
 	go func() {
-		if _, err := io.Copy(binIO.out.w, pipeIO.Stdout()); err != nil {
-			if err == io.EOF {
-				return
-			}
-			slog.ErrorContext(ctx, "error copying", "error", err)
-		}
+		<-conn.DebugCopy(ctx, cmdname+":stderr:pipe(read)->binary(write)", binIO.err.w, pipeIO.Stderr())
 	}()
 
 	return pipeIO, nil

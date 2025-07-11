@@ -215,6 +215,7 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 	devices = append(devices, netdev.VirtioNetDevice())
 	devices = append(devices, &virtio.VirtioVsock{})
 	devices = append(devices, &virtio.VirtioBalloon{})
+	devices = append(devices, &virtio.VirtioRng{})
 
 	opts := NewVMOptions{
 		Vcpus:         ctrconfig.VCPUs,

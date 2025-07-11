@@ -36,7 +36,7 @@
 		{
 			"name": "buildkit",
 			"path": "../buildkit"
-		}
+		},
 		// {
 		// 	"name": "ec1",
 		// 	"path": "../ec1"
@@ -45,10 +45,10 @@
 		// 	"name": "ttrpc",
 		// 	"path": "../ttrpc"
 		// },
-		// {
-		// 	"name": "vz",
-		// 	"path": "../vz"
-		// }
+		{
+			"name": "vz",
+			"path": "../vz"
+		}
 		// {
 		// 	"name": "sys",
 		// 	"path": "../sys"

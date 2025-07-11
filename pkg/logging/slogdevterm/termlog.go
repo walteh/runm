@@ -11,9 +11,11 @@ import (
 	"reflect"
 	"runtime"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
@@ -674,7 +676,17 @@ func (l *TermLogger) Handle(ctx context.Context, r slog.Record) error {
 			}
 			valStyle, ok := l.styles.Values[a.Key]
 			if !ok {
-				valStyle = l.styles.Value
+				if a.Key == "error" ||
+					a.Key == "err" ||
+					a.Key == "error.payload" ||
+					strings.HasSuffix(a.Key, "error") ||
+					strings.HasSuffix(a.Key, "err") ||
+					strings.HasPrefix(a.Key, "error") ||
+					strings.HasPrefix(a.Key, "err") {
+					valStyle = l.styles.Values["error"]
+				} else {
+					valStyle = l.styles.Value
+				}
 			}
 			l.processAttribute(a, keyStyle, valStyle, &attrBuilder, &appendageBuilder)
 			return true
@@ -1034,4 +1046,27 @@ func ValueToBox(value string, keyName string, styles *Styles, render renderFunc)
 	fullContent := header + "\n" + content
 
 	return render(boxStyle, fullContent)
+}
+
+func isPrintableASCII(s string) bool {
+	for _, r := range s {
+		if r > unicode.MaxASCII || !unicode.IsPrint(r) {
+			return false
+		}
+	}
+	return true
+}
+
+func escapeString(s string) string {
+	if isPrintableASCII(s) {
+		return s // Fast path for normal strings
+	}
+
+	// Use Go's quote function which handles all escape sequences properly
+	quoted := strconv.Quote(s)
+	// Remove the surrounding quotes that strconv.Quote adds
+	if len(quoted) >= 2 && quoted[0] == '"' && quoted[len(quoted)-1] == '"' {
+		return quoted[1 : len(quoted)-1]
+	}
+	return quoted
 }

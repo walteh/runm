@@ -55,7 +55,7 @@ func (c *GRPCClientRuntime) NewTempConsoleSocket(ctx context.Context) (runtime.C
 		return nil, errors.Errorf("allocating vsock socket: %w", err)
 	}
 
-	cons, err := c.runtimeGrpcService.NewTempConsoleSocket(ctx, &runmv1.RuncNewTempConsoleSocketRequest{})
+	cons, err := c.socketAllocatorGrpcService.AllocateConsole(ctx, &runmv1.AllocateConsoleRequest{})
 	if err != nil {
 		return nil, errors.Errorf("creating temp console socket: %w", err)
 	}

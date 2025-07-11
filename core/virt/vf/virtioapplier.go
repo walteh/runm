@@ -26,14 +26,15 @@ type vzVirtioDeviceApplier struct {
 	pointingDevicesToSet         []vz.PointingDeviceConfiguration
 	graphicsDevicesToSet         []vz.GraphicsDeviceConfiguration
 	networkDevicesToSet          []*vz.VirtioNetworkDeviceConfiguration
-	entropyDevicesToSet          []*vz.VirtioEntropyDeviceConfiguration
-	serialPortsToSet             []*vz.VirtioConsoleDeviceSerialPortConfiguration
+	// entropyDevicesToSet          []*vz.VirtioEntropyDeviceConfiguration
+	serialPortsToSet []*vz.VirtioConsoleDeviceSerialPortConfiguration
 	// socketDevicesToSet           []vz.SocketDeviceConfiguration
 	consolePortsToSet []*vz.VirtioConsolePortConfiguration
 	// memoryBalloonDevicesConfiguration    []vz.MemoryBalloonDeviceConfiguration
 
 	addSocketDevice        bool
 	addMemoryBalloonDevice bool
+	addEntropyDevice       bool
 
 	bootLoader virtio.Bootloader
 
@@ -49,12 +50,12 @@ func NewVzVirtioDeviceApplier(ctx context.Context, cfg *vz.VirtualMachineConfigu
 		keyboardToSet:                make([]vz.KeyboardConfiguration, 0),
 		graphicsDevicesToSet:         make([]vz.GraphicsDeviceConfiguration, 0),
 		networkDevicesToSet:          make([]*vz.VirtioNetworkDeviceConfiguration, 0),
-		entropyDevicesToSet:          make([]*vz.VirtioEntropyDeviceConfiguration, 0),
 		serialPortsToSet:             make([]*vz.VirtioConsoleDeviceSerialPortConfiguration, 0),
 		consolePortsToSet:            make([]*vz.VirtioConsolePortConfiguration, 0),
 		addSocketDevice:              false,
 		bootLoader:                   bootLoader,
 		addMemoryBalloonDevice:       false,
+		addEntropyDevice:             false,
 		VirtualMachineConfiguration:  cfg,
 	}
 
@@ -69,7 +70,6 @@ func (v *vzVirtioDeviceApplier) Finalize(ctx context.Context) error {
 	v.SetKeyboardsVirtualMachineConfiguration(v.keyboardToSet)
 	v.SetGraphicsDevicesVirtualMachineConfiguration(v.graphicsDevicesToSet)
 	v.SetNetworkDevicesVirtualMachineConfiguration(v.networkDevicesToSet)
-	v.SetEntropyDevicesVirtualMachineConfiguration(v.entropyDevicesToSet)
 	v.SetSerialPortsVirtualMachineConfiguration(v.serialPortsToSet)
 
 	if v.addMemoryBalloonDevice {
@@ -87,6 +87,14 @@ func (v *vzVirtioDeviceApplier) Finalize(ctx context.Context) error {
 			return errors.Errorf("creating vsock device configuration: %w", err)
 		}
 		v.SetSocketDevicesVirtualMachineConfiguration([]vz.SocketDeviceConfiguration{vzdev})
+	}
+
+	if v.addEntropyDevice {
+		vzdev, err := vz.NewVirtioEntropyDeviceConfiguration()
+		if err != nil {
+			return errors.Errorf("creating entropy device configuration: %w", err)
+		}
+		v.SetEntropyDevicesVirtualMachineConfiguration([]*vz.VirtioEntropyDeviceConfiguration{vzdev})
 	}
 
 	platformConfig, err := toVzPlatformConfiguration(v.bootLoader)
@@ -162,7 +170,8 @@ func (v *vzVirtioDeviceApplier) ApplyVirtioNetworkBlockDevice(ctx context.Contex
 
 // ApplyVirtioRng implements virtio.DeviceApplier.
 func (v *vzVirtioDeviceApplier) ApplyVirtioRng(ctx context.Context, dev *virtio.VirtioRng) error {
-	return v.applyVirtioRng(dev)
+	v.addEntropyDevice = true
+	return nil
 }
 
 // ApplyVirtioRosettaShare implements virtio.DeviceApplier.

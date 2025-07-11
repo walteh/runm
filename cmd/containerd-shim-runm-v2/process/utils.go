@@ -46,7 +46,7 @@ type safePid struct {
 	pid int
 }
 
-func (s *safePid) get() int {
+func (s *safePid) getLocked() int {
 	s.Lock()
 	defer s.Unlock()
 	return s.pid

@@ -132,7 +132,7 @@ func (p *Init) Create(ctx context.Context, r *process.CreateConfig) error {
 		if socket, err = p.runtime.NewTempConsoleSocket(ctx); err != nil {
 			return errors.Errorf("failed to create OCI runtime console socket: %w", err)
 		}
-		defer socket.Close()
+		p.closers = append(p.closers, socket)
 	} else {
 		if pio, err = createIO(ctx, p.id, p.IoUID, p.IoGID, p.stdio, p.runtime); err != nil {
 			return errors.Errorf("failed to create init process I/O: %w", err)
@@ -466,16 +466,17 @@ func (p *Init) Exec(ctx context.Context, path string, r *process.ExecConfig) (Pr
 
 // exec returns a new exec'd process
 func (p *Init) exec(ctx context.Context, path string, r *process.ExecConfig) (Process, error) {
-	// // process exec request
+	// process exec request
 	// var spec specs.Process
 	// if err := json.Unmarshal(r.Spec.Value, &spec); err != nil {
 	// 	return nil, err
 	// }
-	// spec.Terminal = r.Terminal
 
 	if r.Spec == nil {
 		return nil, errors.Errorf("spec is nil")
 	}
+
+	r.Spec.Terminal = r.Terminal
 
 	e := &execProcess{
 		id:     r.ID,

@@ -56,21 +56,23 @@ func simulatePty(ctx context.Context, sock string) error {
 
 func (s *Server) NewTempConsoleSocket(ctx context.Context, req *runmv1.RuncNewTempConsoleSocketRequest) (*runmv1.RuncNewTempConsoleSocketResponse, error) {
 
-	slog.InfoContext(ctx, "new temp console socket - A")
+	return nil, errors.New("not implemented")
 
-	socket, err := s.runtime.NewTempConsoleSocket(ctx)
-	if err != nil {
-		return nil, errors.Errorf("failed to create temp console socket: %w", err)
-	}
+	// slog.InfoContext(ctx, "new temp console socket - A")
 
-	referenceId := runtime.NewConsoleReferenceId()
-	s.state.StoreOpenConsole(referenceId, socket)
+	// socket, err := s.runtime.NewTempConsoleSocket(ctx)
+	// if err != nil {
+	// 	return nil, errors.Errorf("failed to create temp console socket: %w", err)
+	// }
 
-	// go simulatePty(ctx, socket.Path())
+	// referenceId := runtime.NewConsoleReferenceId()
+	// s.state.StoreOpenConsole(referenceId, socket)
 
-	resp := &runmv1.RuncNewTempConsoleSocketResponse{}
-	resp.SetConsoleReferenceId(referenceId)
-	return resp, nil
+	// // go simulatePty(ctx, socket.Path())
+
+	// resp := &runmv1.RuncNewTempConsoleSocketResponse{}
+	// resp.SetConsoleReferenceId(referenceId)
+	// return resp, nil
 }
 
 func (s *Server) ReadPidFile(ctx context.Context, req *runmv1.RuncReadPidFileRequest) (*runmv1.RuncReadPidFileResponse, error) {

@@ -2,99 +2,21 @@
 
 package socket
 
-import (
-	"context"
-	"log/slog"
-	"net"
-	"os"
+// func BindGuestConsoleToSocket(ctx context.Context, cons runtime.ConsoleSocket, sock runtime.AllocatedSocket) error {
 
-	"golang.org/x/sys/unix"
+// 	// // open up the console socket path, and create a pipe to it
 
-	"github.com/containerd/console"
-	"gitlab.com/tozd/go/errors"
+// 	consConn := cons.UnixConn()
+// 	sockConn := sock.Conn()
 
-	gorunc "github.com/containerd/go-runc"
+// 	// create a goroutine to read from the pipe and write to the socket
+// 	bind(ctx, "socket->console", consConn, sockConn)
 
-	"github.com/walteh/runm/core/runc/file"
-	"github.com/walteh/runm/core/runc/runtime"
-)
+// 	// create a goroutine to read from the socket and write to the console
+// 	bind(ctx, "console->socket", sockConn, consConn)
 
-var _ runtime.ConsoleSocket = &HostConsoleSocket{}
-
-type HostConsoleSocket struct {
-	socket       runtime.AllocatedSocketWithUnixConn
-	runcUnixConn *net.UnixConn
-	referenceId  string
-}
-
-func (h *HostConsoleSocket) FileConn() file.FileConn {
-	return h.socket.Conn()
-}
-
-func (h *HostConsoleSocket) Close() error {
-	return h.socket.Conn().Close() // TODO: close the other end of the socket
-}
-
-func (h *HostConsoleSocket) UnixConn() *net.UnixConn {
-	return h.socket.UnixConn()
-}
-
-func (h *HostConsoleSocket) GetReferenceId() string {
-	return h.referenceId
-}
-
-func (h *HostConsoleSocket) Path() string {
-	return h.socket.UnixConn().LocalAddr().String()
-}
-
-func (h *HostConsoleSocket) ReceiveMaster() (console.Console, error) {
-	f, err := RecvFd(h.socket.UnixConn())
-	if err != nil {
-		return nil, errors.Errorf("receiving master: %w", err)
-	}
-	return console.ConsoleFromFile(f)
-}
-
-func NewHostUnixConsoleSocket(ctx context.Context, referenceId string, socket runtime.AllocatedSocketWithUnixConn) (*HostConsoleSocket, error) {
-	tmp, err := gorunc.NewTempConsoleSocket()
-	if err != nil {
-		return nil, errors.Errorf("creating temp console socket: %w", err)
-	}
-
-	// connect to the unix socket
-	runcUnixConn, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: tmp.Path(), Net: "unix"})
-	if err != nil {
-		return nil, errors.Errorf("failed to dial unix socket: %w", err)
-	}
-
-	bind(ctx, "runcConsole->hostConsole", runcUnixConn, socket.Conn())
-
-	bind(ctx, "hostConsole->runcConsole", socket.Conn(), runcUnixConn)
-
-	return &HostConsoleSocket{
-		socket:       socket,
-		runcUnixConn: runcUnixConn,
-		referenceId:  referenceId,
-	}, nil
-
-	// return &HostConsoleSocket{socket: socket, path: tmp.Path(), conn: tmp.Conn().(*net.UnixConn)}, nil
-}
-
-func BindGuestConsoleToSocket(ctx context.Context, cons runtime.ConsoleSocket, sock runtime.AllocatedSocket) error {
-
-	// // open up the console socket path, and create a pipe to it
-
-	consConn := cons.UnixConn()
-	sockConn := sock.Conn()
-
-	// create a goroutine to read from the pipe and write to the socket
-	bind(ctx, "socket->console", consConn, sockConn)
-
-	// create a goroutine to read from the socket and write to the console
-	bind(ctx, "console->socket", sockConn, consConn)
-
-	return nil
-}
+// 	return nil
+// }
 
 // func NewHostVsockFdConsoleSocket(ctx context.Context, socket runtime.VsockAllocatedSocket, proxier runtime.VsockProxier) (*HostConsoleSocket, error) {
 // 	if
@@ -116,48 +38,63 @@ func BindGuestConsoleToSocket(ctx context.Context, cons runtime.ConsoleSocket, s
 // 	}
 // }
 
-func RecvFd(socket *net.UnixConn) (*os.File, error) {
-	const MaxNameLen = 4096
-	oobSpace := unix.CmsgSpace(4)
+// var _ runtime.ConsoleSocket = &HostConsoleSocket{}
 
-	name := make([]byte, MaxNameLen)
-	oob := make([]byte, oobSpace)
+// type HostConsoleSocket struct {
+// 	socket       runtime.AllocatedSocketWithUnixConn
+// 	runcUnixConn *net.UnixConn
+// 	referenceId  string
+// }
 
-	slog.Info("recvfd - A")
+// func (h *HostConsoleSocket) FileConn() file.FileConn {
+// 	return h.socket.Conn()
+// }
 
-	n, oobn, _, _, err := socket.ReadMsgUnix(name, oob)
-	if err != nil {
-		slog.Info("recvfd - A.1", "error", err)
-		return nil, errors.Errorf("reading unix message from socket: %w", err)
-	}
+// func (h *HostConsoleSocket) Close() error {
+// 	return h.socket.Conn().Close() // TODO: close the other end of the socket
+// }
 
-	slog.Info("recvfd - B")
+// func (h *HostConsoleSocket) UnixConn() *net.UnixConn {
+// 	return h.socket.UnixConn()
+// }
 
-	if n >= MaxNameLen || oobn != oobSpace {
-		return nil, errors.Errorf("recvfd: incorrect number of bytes read (n=%d oobn=%d)", n, oobn)
-	}
+// func (h *HostConsoleSocket) GetReferenceId() string {
+// 	return h.referenceId
+// }
 
-	// Truncate.
-	name = name[:n]
-	oob = oob[:oobn]
+// func (h *HostConsoleSocket) Path() string {
+// 	return h.socket.UnixConn().LocalAddr().String()
+// }
 
-	scms, err := unix.ParseSocketControlMessage(oob)
-	if err != nil {
-		return nil, err
-	}
-	if len(scms) != 1 {
-		return nil, errors.Errorf("recvfd: number of SCMs is not 1: %d", len(scms))
-	}
-	scm := scms[0]
+// func (h *HostConsoleSocket) ReceiveMaster() (console.Console, error) {
+// 	f, err := RecvFd(h.socket.UnixConn())
+// 	if err != nil {
+// 		return nil, errors.Errorf("receiving master: %w", err)
+// 	}
+// 	return console.ConsoleFromFile(f)
+// }
 
-	fds, err := unix.ParseUnixRights(&scm)
-	if err != nil {
-		return nil, err
-	}
-	if len(fds) != 1 {
-		return nil, errors.Errorf("recvfd: number of fds is not 1: %d", len(fds))
-	}
-	fd := uintptr(fds[0])
+// func NewHostUnixConsoleSocket(ctx context.Context, referenceId string, socket runtime.AllocatedSocketWithUnixConn) (*HostConsoleSocket, error) {
+// 	tmp, err := gorunc.NewTempConsoleSocket()
+// 	if err != nil {
+// 		return nil, errors.Errorf("creating temp console socket: %w", err)
+// 	}
 
-	return os.NewFile(fd, string(name)), nil
-}
+// 	// connect to the unix socket
+// 	runcUnixConn, err := net.DialUnix("unix", nil, &net.UnixAddr{Name: tmp.Path(), Net: "unix"})
+// 	if err != nil {
+// 		return nil, errors.Errorf("failed to dial unix socket: %w", err)
+// 	}
+
+// 	bind(ctx, "runcConsole->hostConsole", runcUnixConn, socket.Conn())
+
+// 	bind(ctx, "hostConsole->runcConsole", socket.Conn(), runcUnixConn)
+
+// 	return &HostConsoleSocket{
+// 		socket:       socket,
+// 		runcUnixConn: runcUnixConn,
+// 		referenceId:  referenceId,
+// 	}, nil
+
+// 	// return &HostConsoleSocket{socket: socket, path: tmp.Path(), conn: tmp.Conn().(*net.UnixConn)}, nil
+// }

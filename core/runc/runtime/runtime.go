@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"os/exec"
+	"sync"
 	"syscall"
 	"time"
 
@@ -117,10 +118,16 @@ type Runtime interface {
 	SubscribeToReaperExits(ctx context.Context) (<-chan gorunc.Exit, error)
 }
 
+type Platform interface {
+	CopyConsole(ctx context.Context, console io.ReadWriteCloser, id, stdin, stdout, stderr string, wg *sync.WaitGroup) (cons RuntimeConsole, retErr error)
+	ShutdownConsole(ctx context.Context, console RuntimeConsole) error
+	Close() error
+}
+
 type ConsoleSocket interface {
 	ReceiveMaster() (console.Console, error)
 	Path() string
-	UnixConn() *net.UnixConn
+	// UnixConn() *net.UnixConn
 	Close() error
 }
 

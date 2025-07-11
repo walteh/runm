@@ -4,6 +4,7 @@ package server
 
 import (
 	"context"
+	"log/slog"
 	"net"
 
 	"github.com/mdlayher/vsock"
@@ -94,13 +95,10 @@ func (s *Server) DialOpenListener(ctx context.Context, req *runmv1.DialOpenListe
 
 func (s *Server) AllocateConsole(ctx context.Context, req *runmv1.AllocateConsoleRequest) (*runmv1.AllocateConsoleResponse, error) {
 	referenceId := runtime.NewConsoleReferenceId()
-	cs, err := s.runtime.NewTempConsoleSocket(ctx)
-	if err != nil {
-		return nil, errors.Errorf("failed to allocate console: %w", err)
-	}
-	s.state.StoreOpenConsole(referenceId, cs)
+	path := socket.NewGuestPathProviderConsoleSocket()
 	res := &runmv1.AllocateConsoleResponse{}
 	res.SetConsoleReferenceId(referenceId)
+	s.state.StoreOpenConsole(referenceId, path)
 	return res, nil
 }
 
@@ -121,61 +119,6 @@ func (s *Server) AllocateIO(ctx context.Context, req *runmv1.AllocateIORequest) 
 	return res, nil
 }
 
-// // AllocateSocket implements runmv1.SocketAllocatorServiceServer.
-// func (s *Server) AllocateSocket(ctx context.Context, req *runmv1.AllocateSocketRequest) (*runmv1.AllocateSocketResponse, error) {
-// 	as, err := s.socketAllocator.AllocateSocket(ctx)
-// 	if err != nil {
-// 		return nil, errors.Errorf("failed to allocate socket: %w", err)
-// 	}
-
-// 	st, err := storeSocket(s.state, as)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	res := &runmv1.AllocateSocketResponse{}
-// 	res.SetSocketType(st)
-// 	return res, nil
-// }
-
-// // AllocateSockets implements runmv1.SocketAllocatorServiceServer.
-// func (s *Server) AllocateSockets(ctx context.Context, req *runmv1.AllocateSocketsRequest) (*runmv1.AllocateSocketsResponse, error) {
-// 	socksToClean := make([]runtime.AllocatedSocket, 0, req.GetCount())
-// 	defer func() {
-// 		if len(socksToClean) == 0 {
-// 			return
-// 		}
-// 		for _, sock := range socksToClean {
-// 			sock.Close()
-// 			deleteSocket(s.state, sock)
-// 		}
-// 	}()
-
-// 	for i := 0; i < int(req.GetCount()); i++ {
-// 		as, err := s.socketAllocator.AllocateSocket(ctx)
-// 		if err != nil {
-// 			return nil, errors.Errorf("failed to allocate socket: %w", err)
-// 		}
-// 		socksToClean = append(socksToClean, as)
-// 	}
-
-// 	res := &runmv1.AllocateSocketsResponse{}
-// 	refs := make([]*runmv1.SocketType, 0, req.GetCount())
-// 	for _, sock := range socksToClean {
-// 		st, err := storeSocket(s.state, sock)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 		refs = append(refs, st)
-// 		slog.InfoContext(ctx, "allocated socketz", "reference_id", st)
-// 	}
-// 	res.SetSocketTypes(refs)
-
-// 	socksToClean = nil
-
-// 	return res, nil
-// }
-
 // BindConsoleToSocket implements runmv1.SocketAllocatorServiceServer.
 func (s *Server) BindConsoleToSocket(ctx context.Context, req *runmv1.BindConsoleToSocketRequest) (*runmv1.BindConsoleToSocketResponse, error) {
 	cs, ok := s.state.GetOpenConsole(req.GetConsoleReferenceId())
@@ -188,10 +131,27 @@ func (s *Server) BindConsoleToSocket(ctx context.Context, req *runmv1.BindConsol
 		return nil, errors.Errorf("cannot bind console to socket: socket not found: %w", err)
 	}
 
-	err = socket.BindGuestConsoleToSocket(ctx, cs, as)
-	if err != nil {
-		return nil, errors.Errorf("cannot bind console to socket: %w", err)
-	}
+	go func() {
+		err := socket.BindAllocatedSocketConsole(ctx, as, cs)
+		if err != nil {
+			slog.Error("error binding console to socket", "error", err)
+		}
+	}()
+
+	// err = socket.BindGuestConsoleToSocket(ctx, cs, as)
+	// if err != nil {
+	// 	return nil, errors.Errorf("cannot bind console to socket: %w", err)
+	// }
+
+	// if asock, ok := as.(runtime.AllocatedSocketWithUnixConn); ok {
+	// 	consock, err := socket.NewAllocatedSocketConsole(ctx, asock)
+	// 	if err != nil {
+	// 		return nil, errors.Errorf("cannot bind console to socket: %w", err)
+	// 	}
+	// 	s.state.StoreOpenConsole(req.GetConsoleReferenceId(), consock)
+	// } else {
+	// 	return nil, errors.Errorf("cannot bind console to socket: socket is not a unix socket")
+	// }
 
 	return &runmv1.BindConsoleToSocketResponse{}, nil
 }

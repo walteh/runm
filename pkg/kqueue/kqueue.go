@@ -21,9 +21,11 @@ package kqueue
 
 import (
 	"io"
+	"log/slog"
 	"os"
 	"sync"
 
+	"gitlab.com/tozd/go/errors"
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/console"
@@ -82,9 +84,11 @@ func NewKqueuer() (*Kqueuer, error) {
 // the return console to perform I/O.
 func (e *Kqueuer) Add(console console.Console) (*KqueueConsole, error) {
 	sysfd := int(console.Fd())
+
+	slog.Info("adding console to kqueue", "sysfd", sysfd)
 	// Set sysfd to non-blocking mode
 	if err := unix.SetNonblock(sysfd, true); err != nil {
-		return nil, err
+		return nil, errors.Errorf("setting non-blocking mode: %w", err)
 	}
 
 	events := []unix.Kevent_t{
@@ -94,7 +98,7 @@ func (e *Kqueuer) Add(console console.Console) (*KqueueConsole, error) {
 
 	_, err := unix.Kevent(e.kq, events, nil, nil)
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("adding console to kqueue: %w", err)
 	}
 
 	ef := &KqueueConsole{
@@ -121,7 +125,7 @@ func (e *Kqueuer) Wait() error {
 			if err == unix.EINTR {
 				continue
 			}
-			return err
+			return errors.Errorf("waiting for kqueue events: %w", err)
 		}
 		for i := 0; i < n; i++ {
 			ev := &events[i]

@@ -7,17 +7,17 @@ import (
 	"net"
 
 	"github.com/containerd/console"
-	"gitlab.com/tozd/go/errors"
 
 	"github.com/walteh/runm/core/runc/file"
 	"github.com/walteh/runm/core/runc/runtime"
 )
 
-var _ runtime.ConsoleSocket = &HostConsoleSocket{}
+var _ runtime.ConsoleSocket = &HostConsoleSocketV2{}
 
 type HostConsoleSocketV2 struct {
 	socket      runtime.AllocatedSocketWithUnixConn
 	referenceId string
+	creationCtx context.Context
 }
 
 func (h *HostConsoleSocketV2) FileConn() file.FileConn {
@@ -41,38 +41,76 @@ func (h *HostConsoleSocketV2) Path() string {
 }
 
 func (h *HostConsoleSocketV2) ReceiveMaster() (console.Console, error) {
-	f, err := RecvFd(h.socket.UnixConn())
-	if err != nil {
-		return nil, errors.Errorf("receiving master: %w", err)
-	}
-	return console.ConsoleFromFile(f)
+	return NewRemotePTYConsoleAdapter(h.creationCtx, h.socket.Conn())
 }
 
 func NewHostUnixConsoleSocketV2(ctx context.Context, referenceId string, socket runtime.AllocatedSocketWithUnixConn) (*HostConsoleSocketV2, error) {
 	return &HostConsoleSocketV2{
 		socket:      socket,
 		referenceId: referenceId,
+		creationCtx: ctx,
 	}, nil
 
 	// return &HostConsoleSocket{socket: socket, path: tmp.Path(), conn: tmp.Conn().(*net.UnixConn)}, nil
 }
 
-// func NewHostVsockFdConsoleSocket(ctx context.Context, socket runtime.VsockAllocatedSocket, proxier runtime.VsockProxier) (*HostConsoleSocket, error) {
-// 	if
-// 	return &HostConsoleSocket{socket: socket, path: path, conn: conn}, nil
-// }
+var _ runtime.RuntimeConsole = &RemoteConsole{}
 
-// func NewHostConsoleSocket(ctx context.Context, socket ) (*HostConsoleSocket, error) {
-// 	switch v := socket.(type) {
-// 	case *SimpleVsockConn:
-// 		proxy, err := CreateLocalVsockProxyConn(ctx, v)
-// 		if err != nil {
-// 			return nil, errors.Errorf("creating local vsock proxy: %w", err)
-// 		}
-// 		return NewHostUnixConsoleSocket(ctx, proxy)
-// 	case *SimpleVsockProxyConn:
-// 		return NewHostUnixConsoleSocket(ctx, v)
-// 	default:
-// 		return nil, errors.Errorf("invalid socket type: %T", socket)
-// 	}
-// }
+type RemoteConsole struct {
+	allocatedSocket runtime.AllocatedSocket
+}
+
+// Close implements runtime.RuntimeConsole.
+func (r *RemoteConsole) Close() error {
+	return r.allocatedSocket.Close()
+}
+
+// DisableEcho implements runtime.RuntimeConsole.
+func (r *RemoteConsole) DisableEcho() error {
+	return nil
+}
+
+// Fd implements runtime.RuntimeConsole.
+func (r *RemoteConsole) Fd() uintptr {
+	panic("unimplemented")
+}
+
+// Name implements runtime.RuntimeConsole.
+func (r *RemoteConsole) Name() string {
+	panic("unimplemented")
+}
+
+// Read implements runtime.RuntimeConsole.
+func (r *RemoteConsole) Read(p []byte) (n int, err error) {
+	panic("unimplemented")
+}
+
+// Reset implements runtime.RuntimeConsole.
+func (r *RemoteConsole) Reset() error {
+	panic("unimplemented")
+}
+
+// Resize implements runtime.RuntimeConsole.
+func (r *RemoteConsole) Resize(console.WinSize) error {
+	panic("unimplemented")
+}
+
+// ResizeFrom implements runtime.RuntimeConsole.
+func (r *RemoteConsole) ResizeFrom(runtime.RuntimeConsole) error {
+	panic("unimplemented")
+}
+
+// SetRaw implements runtime.RuntimeConsole.
+func (r *RemoteConsole) SetRaw() error {
+	panic("unimplemented")
+}
+
+// Size implements runtime.RuntimeConsole.
+func (r *RemoteConsole) Size() (console.WinSize, error) {
+	panic("unimplemented")
+}
+
+// Write implements runtime.RuntimeConsole.
+func (r *RemoteConsole) Write(p []byte) (n int, err error) {
+	panic("unimplemented")
+}
