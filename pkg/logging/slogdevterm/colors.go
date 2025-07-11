@@ -45,8 +45,8 @@ var (
 
 	// gray with a little bit of green
 	MessageColor = lipgloss.CompleteAdaptiveColor{
-		Light: lipgloss.CompleteColor{TrueColor: "#4E613D", ANSI256: "0", ANSI: "0"},
-		Dark:  lipgloss.CompleteColor{TrueColor: "#C2D9B0", ANSI256: "15", ANSI: "15"},
+		Light: lipgloss.CompleteColor{TrueColor: "#181818", ANSI256: "232", ANSI: "0"},
+		Dark:  lipgloss.CompleteColor{TrueColor: "#F6F6F6", ANSI256: "255", ANSI: "15"},
 	}
 
 	// Tree styling colors - beautiful rainbow-ish palette for tree visualization

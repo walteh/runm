@@ -89,14 +89,12 @@ type runmLinuxInit struct {
 func (r *runmLinuxInit) setupLogger(ctx context.Context) (context.Context, error) {
 	var err error
 
-	fmt.Printf("connecting to vsock for raw writer\n")
+	fmt.Println("linux-runm-init: setting up logging - all future logs will be sent to vsock (pid: ", os.Getpid(), ")")
 
 	rawWriterConn, err := vsock.Dial(2, uint32(constants.VsockRawWriterProxyPort), nil)
 	if err != nil {
 		return nil, errors.Errorf("problem dialing vsock for raw writer: %w", err)
 	}
-
-	fmt.Printf("connecting to vsock for delimited writer\n")
 
 	delimitedLogProxyConn, err := vsock.Dial(2, uint32(constants.VsockDelimitedWriterProxyPort), nil)
 	if err != nil {
@@ -126,13 +124,8 @@ func (r *runmLinuxInit) setupLogger(ctx context.Context) (context.Context, error
 		r.otelWriter = otelConn
 
 	} else {
-		fmt.Printf("DEBUG: pid: %d - setting up logger without otel\n", os.Getpid())
 		logger = logging.NewDefaultDevLogger(serviceName, delimitedLogProxyConn, opts...)
 	}
-
-	go func() {
-		fmt.Fprintf(rawWriterConn, "test test 123 from raw writer\n")
-	}()
 
 	r.rawWriter = rawWriterConn
 	r.logWriter = delimitedLogProxyConn
@@ -151,8 +144,6 @@ func main() {
 	defer cancel()
 
 	runmLinuxInit := &runmLinuxInit{}
-
-	fmt.Printf("DEBUG: pid: %d - attempting to set up logger\n", pid)
 
 	ctx, err := runmLinuxInit.setupLogger(ctx)
 	if err != nil {
@@ -239,13 +230,6 @@ func (r *runmLinuxInit) configureRuntimeServer(ctx context.Context) (*grpc.Serve
 	serverz.RegisterGrpcServer(grpcVsockServer)
 
 	return grpcVsockServer, serverz, nil
-}
-
-func WrapTaskGroupGoWithLogging(name string, tg *taskgroup.TaskGroup, f func(context.Context) error) {
-	tg.GoWithNameAndMeta(name, map[string]any{}, func(ctx context.Context) (err error) {
-		slog.DebugContext(ctx, "starting task", "name", name)
-		return f(ctx)
-	})
 }
 
 func (r *runmLinuxInit) runGrpcVsockServer(ctx context.Context) error {
@@ -383,19 +367,19 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 
 	r.exitChan = make(chan gorunc.Exit, 32*100)
 
-	WrapTaskGroupGoWithLogging("reaper", taskgroupz, func(ctx context.Context) error {
+	taskgroupz.GoWithName("reaper", func(ctx context.Context) (err error) {
 		return reapOnSignals(ctx, signals)
 	})
 
-	WrapTaskGroupGoWithLogging("psnotify", taskgroupz, func(ctx context.Context) error {
+	taskgroupz.GoWithName("psnotify", func(ctx context.Context) error {
 		return r.runPsnotify(ctx, r.exitChan)
 	})
 
-	WrapTaskGroupGoWithLogging("delim-writer-unix-proxy", taskgroupz, func(ctx context.Context) error {
+	taskgroupz.GoWithName("delim-writer-unix-proxy", func(ctx context.Context) error {
 		return r.runVsockUnixProxy(ctx, constants.DelimitedWriterProxyGuestUnixPath, r.logWriter)
 	})
 
-	WrapTaskGroupGoWithLogging("raw-writer-unix-proxy", taskgroupz, func(ctx context.Context) error {
+	taskgroupz.GoWithName("raw-writer-unix-proxy", func(ctx context.Context) error {
 		return r.runVsockUnixProxy(ctx, constants.RawWriterProxyGuestUnixPath, r.rawWriter)
 	})
 
@@ -418,11 +402,11 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 		return errors.Errorf("problem listing bundleSource/rootfs: %w", err)
 	}
 
-	WrapTaskGroupGoWithLogging("grpc-vsock-server", taskgroupz, func(ctx context.Context) error {
+	taskgroupz.GoWithName("grpc-vsock-server", func(ctx context.Context) error {
 		return r.runGrpcVsockServer(ctx)
 	})
 
-	WrapTaskGroupGoWithLogging("pprof-vsock-server", taskgroupz, func(ctx context.Context) error {
+	taskgroupz.GoWithName("pprof-vsock-server", func(ctx context.Context) error {
 		return r.runPprofVsockServer(ctx)
 	})
 
@@ -563,26 +547,6 @@ func loadSpec(ctx context.Context) (spec *oci.Spec, exists bool, err error) {
 	return spec, true, nil
 }
 
-func logFile(ctx context.Context, path string) {
-	fmt.Println()
-	fmt.Println("---------------" + path + "-----------------")
-	_ = ExecCmdForwardingStdio(ctx, "ls", "-lah", path)
-	_ = ExecCmdForwardingStdio(ctx, "cat", path)
-
-}
-
-func logCommand(ctx context.Context, cmd string) {
-	fmt.Println()
-	fmt.Println("---------------" + cmd + "-----------------")
-	_ = ExecCmdForwardingStdio(ctx, "sh", "-c", cmd)
-}
-
-func logDirContents(ctx context.Context, path string) {
-	fmt.Println()
-	fmt.Println("---------------" + path + "-----------------")
-	_ = ExecCmdForwardingStdio(ctx, "ls", "-lah", path)
-}
-
 func ExecCmdForwardingStdio(ctx context.Context, cmds ...string) error {
 	return ExecCmdForwardingStdioChroot(ctx, "", cmds...)
 }
@@ -641,15 +605,6 @@ func mount(ctx context.Context) error {
 		return errors.Errorf("problem creating /proc: %w", err)
 	}
 
-	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "devtmpfs", "devtmpfs", "/dev"); err != nil {
-		return errors.Errorf("problem mounting devtmpfs: %w", err)
-	}
-
-	// mount sysfs
-	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "sysfs", "sysfs", "/sys", "-o", "nosuid,noexec,nodev"); err != nil {
-		return errors.Errorf("problem mounting sysfs: %w", err)
-	}
-
 	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "proc", "proc", "/proc"); err != nil {
 		return errors.Errorf("problem mounting proc: %w", err)
 	}
@@ -660,6 +615,15 @@ func mount(ctx context.Context) error {
 
 	if err := ExecCmdForwardingStdio(ctx, "sysctl", "-w", "user.max_user_namespaces=15000"); err != nil {
 		return errors.Errorf("problem setting user.max_user_namespaces: %w", err)
+	}
+
+	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "devtmpfs", "devtmpfs", "/dev"); err != nil {
+		return errors.Errorf("problem mounting devtmpfs: %w", err)
+	}
+
+	// mount sysfs
+	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "sysfs", "sysfs", "/sys", "-o", "nosuid,noexec,nodev"); err != nil {
+		return errors.Errorf("problem mounting sysfs: %w", err)
 	}
 
 	// Mount the unified cgroup v2 hierarchy

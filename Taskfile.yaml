@@ -537,7 +537,8 @@ tasks:
         deps: ['test:binary:nerdctl-test', 'test:binary:containerd-shim-runm-v2-test']
         requires: {vars: [CONTAINER_ID]}
         vars:
-            TIMEOUT: '{{.TIMEOUT | empty | ternary "" "timeout {{.TIMEOUT}}"}}'
+            TIMEOUT: '{{.TIMEOUT | default ""}}'
+            TIMEOUT_CMD: '{{.TIMEOUT | empty | ternary "" "timeout"}}'
             CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
             COMMAND: '{{.COMMAND | default "sh"}}'
             FLAGS: '{{.FLAGS | default "-it"}}'
@@ -545,7 +546,7 @@ tasks:
         interactive: true
         cmds:
           - cmd: |-
-                {{.TIMEOUT}} sudo -A -E {{.TEST_BIN_DIR}}/nerdctl-test exec \
+                {{.TIMEOUT_CMD}} {{.TIMEOUT}} sudo -A -E {{.TEST_BIN_DIR}}/nerdctl-test exec \
                     {{.FLAGS}} {{.CONTAINER_ID}} {{.COMMAND}}
 
     dev:nerdctl-test:stop:
@@ -636,6 +637,7 @@ tasks:
                 CONTAINER_ID:
                     sh: cat {{.TMP_DIR}}/stdout.txt
                 FLAGS: '--tty'
+                TIMEOUT: '10s'
           - task: dev:nerdctl-test:stop
             vars:
                 CONTAINER_ID:

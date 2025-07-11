@@ -52,14 +52,12 @@ type runmLinuxMounter struct {
 func (r *runmLinuxMounter) setupLogger(ctx context.Context) (context.Context, error) {
 	var err error
 
-	fmt.Printf("connecting to vsock for raw writer\n")
+	fmt.Println("linux-runm-mounter: setting up logging - all future logs will be sent to vsock (pid: ", os.Getpid(), ")")
 
 	rawWriterConn, err := vsock.Dial(2, uint32(constants.VsockRawWriterProxyPort), nil)
 	if err != nil {
 		return nil, errors.Errorf("problem dialing vsock for raw writer: %w", err)
 	}
-
-	fmt.Printf("connecting to vsock for delimited writer\n")
 
 	delimitedLogProxyConn, err := vsock.Dial(2, uint32(constants.VsockDelimitedWriterProxyPort), nil)
 	if err != nil {
@@ -89,13 +87,8 @@ func (r *runmLinuxMounter) setupLogger(ctx context.Context) (context.Context, er
 		r.otelWriter = otelConn
 
 	} else {
-		fmt.Printf("DEBUG: pid: %d - setting up logger without otel\n", os.Getpid())
 		logger = logging.NewDefaultDevLogger(serviceName, delimitedLogProxyConn, opts...)
 	}
-
-	go func() {
-		fmt.Fprintf(rawWriterConn, "test test 123 from raw writer\n")
-	}()
 
 	r.rawWriter = rawWriterConn
 	r.logWriter = delimitedLogProxyConn

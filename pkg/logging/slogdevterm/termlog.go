@@ -392,98 +392,10 @@ func (l *TermLogger) colorizeDebugPattern(message string, maxWidth int, force bo
 const (
 	timeFormat    = "15:04:05.0000 MST"
 	maxNameLength = 15
+	indentation   = "      ↳ "
 )
 
 // smartWrapText wraps text intelligently at word boundaries with visual indicators
-func smartWrapText(text string, maxWidth int) string {
-	var result strings.Builder
-	lines := strings.Split(text, "\n")
-
-	for lineIdx, line := range lines {
-		if lineIdx > 0 {
-			result.WriteString("\n")
-		}
-
-		// If line is short enough, use it as-is
-		if len(line) <= maxWidth {
-			result.WriteString(line)
-			continue
-		}
-
-		// Smart wrapping: try to break at word boundaries
-		words := strings.Fields(line)
-		if len(words) == 0 {
-			// If no words, fall back to character wrapping with proper breaks
-			for len(line) > maxWidth {
-				result.WriteString(line[:maxWidth])
-				result.WriteString("\n      ↳ ")
-				line = line[maxWidth:]
-			}
-			result.WriteString(line)
-			continue
-		}
-
-		currentLine := ""
-		for wordIdx, word := range words {
-			// If a single word is too long, break it
-			if len(word) > maxWidth {
-				// Write current line if it has content
-				if currentLine != "" {
-					result.WriteString(currentLine)
-					result.WriteString("\n")
-					currentLine = ""
-				}
-				// Break the long word
-				for len(word) > maxWidth {
-					result.WriteString("      ↳ ")
-					result.WriteString(word[:maxWidth-8]) // Account for continuation indicator
-					result.WriteString("\n")
-					word = word[maxWidth-8:]
-				}
-				// Add remaining part of word
-				if len(word) > 0 {
-					result.WriteString("      ↳ ")
-					currentLine = word
-				}
-				continue
-			}
-
-			testLine := currentLine
-			if testLine != "" {
-				testLine += " "
-			}
-			testLine += word
-
-			// If adding this word would exceed the limit
-			if len(testLine) > maxWidth {
-				// Write the current line if it has content
-				if currentLine != "" {
-					result.WriteString(currentLine)
-					result.WriteString("\n")
-					// Add continuation indicator for wrapped lines
-					result.WriteString("      ↳ ")
-					currentLine = word
-				} else {
-					// Single word is too long, break it (shouldn't happen due to check above)
-					result.WriteString(word)
-					if wordIdx < len(words)-1 {
-						result.WriteString("\n      ↳ ")
-					}
-					currentLine = ""
-				}
-			} else {
-				currentLine = testLine
-			}
-		}
-
-		// Write any remaining content
-		if currentLine != "" {
-			result.WriteString(currentLine)
-		}
-	}
-
-	return result.String()
-}
 
 // MessageToBox renders a multiline message in a box similar to error display
 func MessageToBox(message string, styles *Styles, render renderFunc) string {
@@ -589,9 +501,11 @@ func (l *TermLogger) Handle(ctx context.Context, r slog.Record) error {
 	// Check if message has newlines and should be rendered in a box
 	if HasNewlines(r.Message) && l.enableMultilineBoxes {
 		// For multiline messages, add a placeholder to the main log line
-		msg = l.render(levelStyle.UnsetString().UnsetMaxWidth().UnsetBold(), "[multiline message below]")
+		// msg = l.render(levelStyle.UnsetString().UnsetMaxWidth().UnsetBold(), "[multiline message below]")
+		msg = l.render(l.styles.ValueAppendage, "[multiline message below]")
+
 		// Add the boxed content to the appendage
-		appendageBuilder.WriteString(MessageToBox(r.Message, l.styles, l.renderFunc))
+		appendageBuilder.WriteString(ValueToBox(r.Message, "message", l.styles, l.renderFunc))
 		appendageBuilder.WriteString("\n")
 	} else if r.Level == slog.LevelDebug && l.enableDebugPatternColoring {
 		msg, _ = l.colorizeDebugPattern(r.Message, -1, false)
@@ -676,13 +590,7 @@ func (l *TermLogger) Handle(ctx context.Context, r slog.Record) error {
 			}
 			valStyle, ok := l.styles.Values[a.Key]
 			if !ok {
-				if a.Key == "error" ||
-					a.Key == "err" ||
-					a.Key == "error.payload" ||
-					strings.HasSuffix(a.Key, "error") ||
-					strings.HasSuffix(a.Key, "err") ||
-					strings.HasPrefix(a.Key, "error") ||
-					strings.HasPrefix(a.Key, "err") {
+				if isErrorKey(a.Key) {
 					valStyle = l.styles.Values["error"]
 				} else {
 					valStyle = l.styles.Value
@@ -730,6 +638,20 @@ func (l *TermLogger) Handle(ctx context.Context, r slog.Record) error {
 	}
 
 	return err
+}
+
+func isErrorKey(key string) bool {
+	if strings.Contains(key, "stderr") {
+		return false
+	}
+
+	return key == "error" ||
+		key == "err" ||
+		key == "error.payload" ||
+		strings.HasSuffix(key, "error") ||
+		strings.HasSuffix(key, "err") ||
+		strings.HasPrefix(key, "error") ||
+		strings.HasPrefix(key, "err")
 }
 
 func (l *TermLogger) WithAttrs(attrs []slog.Attr) slog.Handler {
@@ -1015,37 +937,37 @@ func (l *TermLogger) processAttribute(a slog.Attr, keyStyle lipgloss.Style, valS
 // ValueToBox renders a multiline value in a box with the attribute key as title
 func ValueToBox(value string, keyName string, styles *Styles, render renderFunc) string {
 	// Apply smart text wrapping with proper width accounting for padding
-	maxContentWidth := 140
-	wrappedValue := smartWrapText(value, maxContentWidth)
+	// maxContentWidth := 140
+	// wrappedValue := smartWrapText(value, maxContentWidth)
 
-	// Format the value with proper styling
-	content := wrappedValue
+	// // Format the value with proper styling
+	// content := wrappedValue
+
+	// // Create the title header with proper styling
+	// titleStyle := lipgloss.NewStyle().
+	// 	Foreground(TreeKeyColor).
+	// 	Bold(true)
+
+	// // Create the box style with proper dimensions
+	// boxStyle := lipgloss.NewStyle().
+	// 	Padding(1, 2).
+	// 	Margin(1, 0).
+	// 	MaxWidth(150).
+	// 	BorderForeground(TreeBorderColor).
+	// 	BorderStyle(lipgloss.RoundedBorder())
 
 	// If the value doesn't have existing styling, apply moderate styling for readability
-	if !strings.Contains(value, "\x1b[") {
-		contentStyle := lipgloss.NewStyle().Foreground(MessageColor)
-		content = render(contentStyle, wrappedValue)
-	}
+	// if !strings.Contains(value, "\x1b[") {
+	// 	contentStyle := lipgloss.NewStyle().Foreground(MessageColor)
+	// 	value = render(contentStyle, value)
+	// }
 
-	// Create the title header with proper styling
-	titleStyle := lipgloss.NewStyle().
-		Foreground(TreeKeyColor).
-		Bold(true)
+	// header := render(titleStyle, keyName)
+	// fullContent := header + "\n" + content
 
-	header := render(titleStyle, keyName)
+	box := NewDefaultBoxWithLabel(render)
 
-	// Create the box style with proper dimensions
-	boxStyle := lipgloss.NewStyle().
-		Padding(1, 2).
-		Margin(1, 0).
-		MaxWidth(150).
-		BorderForeground(TreeBorderColor).
-		BorderStyle(lipgloss.RoundedBorder())
-
-	// Combine header and content with proper separation
-	fullContent := header + "\n" + content
-
-	return render(boxStyle, fullContent)
+	return box.Render(keyName, value, 150)
 }
 
 func isPrintableASCII(s string) bool {
