@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/walteh/runm/pkg/taskgroup"
 )
 
@@ -902,4 +903,99 @@ func BenchmarkTaskGroup_WithoutPprof(b *testing.B) {
 
 		_ = tg.Wait()
 	}
+}
+
+func TestTaskGroup_ComprehensiveErrorCollection(t *testing.T) {
+	ctx := context.Background()
+	tg := taskgroup.NewTaskGroup(ctx)
+
+	err1 := errors.New("first error")
+	err2 := errors.New("second error")
+	err3 := errors.New("third error")
+
+	// Add multiple tasks with different errors
+	tg.GoWithName("task1", func(context.Context) error {
+		return err1
+	})
+
+	tg.GoWithName("task2", func(context.Context) error {
+		return err2
+	})
+
+	tg.GoWithName("task3", func(context.Context) error {
+		return nil // This one succeeds
+	})
+
+	tg.GoWithName("task4", func(context.Context) error {
+		return err3
+	})
+
+	err := tg.Wait()
+	require.Error(t, err)
+
+	// Check that we got a TaskGroupError
+	tgErr, ok := err.(*taskgroup.TaskGroupError)
+	require.True(t, ok, "Expected TaskGroupError but got %T", err)
+	
+	// Check that all three errors are captured
+	assert.Equal(t, 3, len(tgErr.TaskErrors))
+	
+	// Check specific task errors
+	task1Err, exists := tgErr.GetTaskError("task1")
+	assert.True(t, exists)
+	assert.Equal(t, err1, task1Err)
+	
+	task2Err, exists := tgErr.GetTaskError("task2")
+	assert.True(t, exists)
+	assert.Equal(t, err2, task2Err)
+	
+	_, exists = tgErr.GetTaskError("task3")
+	assert.False(t, exists) // task3 succeeded
+	
+	task4Err, exists := tgErr.GetTaskError("task4")
+	assert.True(t, exists)
+	assert.Equal(t, err3, task4Err)
+	
+	// Check failed task names
+	failedNames := tgErr.GetFailedTaskNames()
+	assert.Len(t, failedNames, 3)
+	assert.Contains(t, failedNames, "task1")
+	assert.Contains(t, failedNames, "task2")
+	assert.Contains(t, failedNames, "task4")
+	
+	// Check error message format
+	errMsg := tgErr.Error()
+	assert.Contains(t, errMsg, "taskgroup failed with 3 error(s)")
+	assert.Contains(t, errMsg, "task1: first error")
+	assert.Contains(t, errMsg, "task2: second error")
+	assert.Contains(t, errMsg, "task4: third error")
+}
+
+func TestTaskGroup_MixedErrorsAndPanics(t *testing.T) {
+	ctx := context.Background()
+	tg := taskgroup.NewTaskGroup(ctx)
+
+	// Add a task that errors
+	tg.GoWithName("error-task", func(context.Context) error {
+		return errors.New("normal error")
+	})
+
+	// Add a task that panics
+	tg.GoWithName("panic-task", func(context.Context) error {
+		panic("oh no!")
+	})
+
+	err := tg.Wait()
+	require.Error(t, err)
+
+	// Check that we got a TaskGroupError
+	tgErr, ok := err.(*taskgroup.TaskGroupError)
+	require.True(t, ok)
+	
+	// Check that both errors are captured
+	assert.Equal(t, 2, len(tgErr.TaskErrors))
+	
+	// Check error message mentions both failed and panicked
+	errMsg := tgErr.Error()
+	assert.Contains(t, errMsg, "taskgroup failed with 2 error(s) (1 failed, 1 panicked)")
 }

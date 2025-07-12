@@ -39,7 +39,7 @@ tasks:
 
         cmds:
           - cmd: bun install -g @anthropic-ai/claude-code
-          - cmd: ~/.bun/bin/claude --ide {{.CLI_ARGS}}
+          - cmd: bun --bun run claude --ide {{.CLI_ARGS}}
 
     go:tidy:
         run: once

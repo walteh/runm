@@ -31,6 +31,12 @@ import (
 )
 
 func main() {
+	// Set up debug environment first
+	// SetupDebugEnvironment()
+
+	// If debugging is enabled, exec to debug script
+	// EnableDebugging()
+
 	ShimMain()
 }
 
@@ -56,6 +62,33 @@ func ShimMain() {
 	}
 	defer sd()
 
+	if mode == "primary" {
+		slog.InfoContext(ctx, "PRIMARY_SHIM_RUNSHIM_START")
+
+		redirectStderr, err := env.DuplicateFdToWriter(int(os.Stderr.Fd()), logging.GetDefaultRawWriter())
+		if err != nil {
+			slog.Error("Failed to duplicate stderr", "error", err)
+		}
+		defer func() {
+			slog.InfoContext(ctx, "PRIMARY_SHIM_RUNSHIM_CLEANUP")
+			redirectStderr()
+		}()
+
+		redirectStdout, err := env.DuplicateFdToWriter(int(os.Stdout.Fd()), logging.GetDefaultRawWriter())
+		if err != nil {
+			slog.Error("Failed to duplicate stdout", "error", err)
+		}
+		defer func() {
+			slog.InfoContext(ctx, "PRIMARY_SHIM_RUNSHIM_CLEANUP")
+			redirectStdout()
+		}()
+
+		fmt.Fprintln(os.Stderr, "SHIM:PRIMARY:START:TEST:TEST:TEST")
+		slog.InfoContext(ctx, "PRIMARY_SHIM_STDERR_REDIRECT_DONE")
+
+		// EnableDebugging()
+	}
+
 	ctx = slogctx.NewCtx(ctx, logger)
 
 	ctx = slogctx.Append(ctx,
@@ -66,6 +99,11 @@ func ShimMain() {
 	)
 
 	slog.InfoContext(ctx, "SHIM_STARTING", "args", os.Args[1:])
+
+	// Add extra logging for primary mode
+	if mode == "primary" {
+		slog.InfoContext(ctx, "PRIMARY_SHIM_DETECTED", "will_debug", true)
+	}
 
 	// Set up panic and exit monitoring BEFORE anything else
 	defer func() {
@@ -157,16 +195,6 @@ func guessShimMode() string {
 
 func RunShim(ctx context.Context) error {
 
-	if mode == "primary" {
-		redirectStderr, err := env.DuplicateFdToWriter(int(os.Stderr.Fd()), logging.GetDefaultRawWriter())
-		if err != nil {
-			slog.Error("Failed to duplicate stderr", "error", err)
-		}
-		defer redirectStderr()
-
-		fmt.Fprintln(os.Stderr, "SHIM:PRIMARY:START:TEST:TEST:TEST")
-	}
-
 	sloglogrus.SetLogrusLevel(logrus.DebugLevel)
 
 	registry.Reset()
@@ -179,10 +207,13 @@ func RunShim(ctx context.Context) error {
 
 	os.Setenv("LINUX_RUNTIME_BUILD_DIR", env.LinuxRuntimeBuildDir())
 
+	slog.InfoContext(ctx, "PRIMARY_SHIM_ABOUT_TO_RUN_SHIM", "mode", mode)
+
 	shim.Run(ctx, manager.NewDebugManager(manager.NewShimManager("io.containerd.runc.v2")), func(c *shim.Config) {
 		c.NoReaper = true
 		c.NoSetupLogger = true
 	})
 
+	slog.InfoContext(ctx, "PRIMARY_SHIM_RUN_COMPLETED", "mode", mode)
 	return nil
 }

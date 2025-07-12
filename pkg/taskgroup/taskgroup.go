@@ -57,6 +57,7 @@ type TaskGroup struct {
 	opts        TaskGroupOpts
 	err         error
 	errOnce     sync.Once
+	groupError  *TaskGroupError
 	caller      uintptr
 	started     bool
 	finished    bool
@@ -96,6 +97,7 @@ func NewTaskGroup(ctx context.Context, opts ...TaskGroupOpt) *TaskGroup {
 		opts:        options,
 		caller:      caller,
 		semaphore:   semaphore,
+		groupError:  NewTaskGroupError(),
 		tasks:       syncmap.NewMap[string, *TaskState](),
 		taskHistory: syncmap.NewMap[string, *TaskState](),
 	}
@@ -243,7 +245,7 @@ func (tg *TaskGroup) executeTask(name string, metadata map[string]any, fn TaskFu
 				// Successfully acquired
 			case <-tg.ctx.Done():
 				tg.updateTaskStatus(taskID, TaskStatusCanceled)
-				tg.setError(tg.ctx.Err())
+				tg.setFundamentalError(tg.ctx.Err())
 				return true
 			}
 		}
@@ -327,7 +329,10 @@ func (tg *TaskGroup) executeTask(name string, metadata map[string]any, fn TaskFu
 		}
 
 		if err != nil {
-			tg.setError(err)
+			tg.addTaskError(name, err)
+			// Only set the first error for backwards compatibility with existing tg.err
+			// Don't cancel context immediately - let other tasks complete to collect all errors
+			tg.setTaskFailureError(err)
 		}
 	}()
 
@@ -350,7 +355,7 @@ func (tg *TaskGroup) Wait() error {
 		// All tasks completed normally
 	case <-tg.ctx.Done():
 		// Context was cancelled (timeout or manual cancellation)
-		tg.setError(tg.ctx.Err())
+		tg.setFundamentalError(tg.ctx.Err())
 	}
 
 	tg.mu.Lock()
@@ -383,13 +388,17 @@ func (tg *TaskGroup) Wait() error {
 			slog.Int("panicked_tasks", len(panickedTasks)),
 		}
 
-		if tg.err != nil {
-			attrs = append(attrs, slog.String("error", tg.err.Error()))
+		if tg.groupError.HasErrors() {
+			attrs = append(attrs, slog.String("error", tg.groupError.Error()))
 		}
 
 		tg.log(slog.LevelInfo, "taskgroup finished", attrs...)
 	}
 
+	// Return the comprehensive error if any tasks failed
+	if tg.groupError.HasErrors() {
+		return tg.groupError
+	}
 	return tg.err
 }
 
@@ -412,13 +421,39 @@ func (tg *TaskGroup) Status() (started, finished bool, taskCount int, err error)
 	return tg.started, tg.finished, int(tg.taskCounter), tg.err
 }
 
-func (tg *TaskGroup) setError(err error) {
+// setFundamentalError sets an error that should abort the entire taskgroup
+// This cancels the context to stop all other tasks immediately
+func (tg *TaskGroup) setFundamentalError(err error) {
 	tg.errOnce.Do(func() {
 		tg.mu.Lock()
 		tg.err = err
 		tg.mu.Unlock()
 		tg.cancel()
 	})
+}
+
+// setTaskFailureError sets an error from a failed task but allows other tasks to continue
+// This preserves the first error for backwards compatibility without cancelling the context
+func (tg *TaskGroup) setTaskFailureError(err error) {
+	tg.errOnce.Do(func() {
+		tg.mu.Lock()
+		tg.err = err
+		tg.mu.Unlock()
+		// Don't cancel context here - let all tasks complete to collect errors
+	})
+}
+
+func (tg *TaskGroup) addTaskError(taskName string, err error) {
+	tg.mu.Lock()
+	defer tg.mu.Unlock()
+	tg.groupError.AddTaskError(taskName, err)
+}
+
+// GetTaskGroupError returns the comprehensive error containing all task errors
+func (tg *TaskGroup) GetTaskGroupError() *TaskGroupError {
+	tg.mu.RLock()
+	defer tg.mu.RUnlock()
+	return tg.groupError
 }
 
 func (tg *TaskGroup) log(level slog.Level, msg string, attrs ...slog.Attr) {
@@ -557,11 +592,9 @@ func (tg *TaskGroup) createPprofLabels(taskID, name string, metadata map[string]
 	}
 
 	// Add metadata as labels (convert to strings)
-	if metadata != nil {
-		for k, v := range metadata {
-			if len(labels) < 32 { // Limit total labels to avoid overhead
-				labels = append(labels, fmt.Sprintf("meta_%s", k), fmt.Sprintf("%v", v))
-			}
+	for k, v := range metadata {
+		if len(labels) < 32 { // Limit total labels to avoid overhead
+			labels = append(labels, fmt.Sprintf("meta_%s", k), fmt.Sprintf("%v", v))
 		}
 	}
 

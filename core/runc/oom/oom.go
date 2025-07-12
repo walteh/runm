@@ -2,12 +2,13 @@ package oom
 
 import (
 	"context"
-	"io"
 	"log/slog"
 
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/walteh/run"
 	"gitlab.com/tozd/go/errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	eventstypes "github.com/containerd/containerd/api/events"
 	coreruntime "github.com/containerd/containerd/v2/core/runtime"
@@ -16,6 +17,24 @@ import (
 )
 
 var _ run.Runnable = (*Watcher)(nil)
+
+// isExpectedClosureError checks if the error indicates an expected closure condition
+// func isExpectedClosureError(err error) bool {
+// 	if errors.Is(err, io.EOF) {
+// 		return true
+// 	}
+
+// 	errStatus := status.Code(err)
+// 	if errStatus == codes.Canceled {
+// 		return true
+// 	}
+
+// 	// Check for gRPC connection closing errors
+// 	errStr := err.Error()
+// 	return strings.Contains(errStr, "grpc: the client connection is closing") ||
+// 		strings.Contains(errStr, "transport is closing") ||
+// 		strings.Contains(errStr, "connection is closing")
+// }
 
 type Watcher struct {
 	alive         bool
@@ -70,6 +89,7 @@ func (w *Watcher) Run(ctx context.Context) error {
 	itemCh := make(chan item)
 
 	defer func() {
+
 		close(itemCh)
 	}()
 
@@ -82,8 +102,8 @@ func (w *Watcher) Run(ctx context.Context) error {
 				i.ev = ev
 				itemCh <- i
 			case err := <-errCh:
-				// channel is closed when cgroup gets deleted
-				if err != nil && !errors.As(err, io.EOF) {
+				// channel is closed when cgroup gets deleted or connection closes
+				if err != nil && status.Code(err) != codes.Canceled {
 					i.err = err
 					itemCh <- i
 					// we no longer get any event/err when we got an err

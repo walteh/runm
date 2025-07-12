@@ -5,7 +5,6 @@ package virt
 import (
 	"context"
 	"log/slog"
-	"time"
 
 	"github.com/containers/common/pkg/strongunits"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -131,25 +130,6 @@ func (r *RunmVMRuntime[VM]) Alive() bool {
 
 // Close implements run.Runnable.
 func (r *RunmVMRuntime[VM]) Close(ctx context.Context) error {
-	slog.InfoContext(ctx, "about to close vm")
-	ticker := time.NewTicker(100 * time.Microsecond)
-
-	tickstart := make(chan struct{})
-	go func() {
-		close(tickstart)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				slog.DebugContext(ctx, "closing vm")
-			case <-ctx.Done():
-				slog.DebugContext(ctx, "context done, stopping ticker")
-				return
-			}
-		}
-	}()
-
-	<-tickstart
 
 	err := r.Runtime.Close(ctx)
 	slog.DebugContext(ctx, "closed runtime", "err", err)

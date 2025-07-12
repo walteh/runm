@@ -1,0 +1,25 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Attach to Shim",
+            "type": "go",
+            "request": "attach",
+            "mode": "remote",
+            "remotePath": "",
+            "port": 2346,
+            "host": "127.0.0.1",
+            "showLog": true,
+            "trace": "verbose",
+            "logOutput": "rpc",
+            "apiVersion": 2,
+            "dlvLoadConfig": {
+                "followPointers": true,
+                "maxVariableRecurse": 3,
+                "maxStringLen": 300,
+                "maxArrayValues": 64,
+                "maxStructFields": -1
+            }
+        }
+    ]
+}
