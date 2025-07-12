@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -292,7 +293,7 @@ func findMbindDevices(ctx context.Context, spec *oci.Spec, rootfsMounts []proces
 	seen := map[string]bool{}
 
 	for _, mount := range spec.Mounts {
-		if mount.Type != "bind" && mount.Type != "rbind" {
+		if mount.Type != "bind" && mount.Type != "rbind" && !slices.Contains(mount.Options, "rbind") {
 			continue
 		}
 

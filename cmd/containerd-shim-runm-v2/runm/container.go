@@ -36,7 +36,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/stdio"
 	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/walteh/run"
@@ -142,14 +141,15 @@ func NewContainer(
 	defer func() {
 		if retErr != nil {
 			slog.InfoContext(ctx, "attempting to cleanup rootfs mount", "id", r.ID, "retErr", retErr)
-			if err := mount.UnmountMounts(mounts, rootfs, 0); err != nil {
-				log.G(ctx).WithError(err).Warn("failed to cleanup rootfs mount")
-			}
+			// if err := mount.UnmountMounts(mounts, rootfs, 0); err != nil {
+			// 	log.G(ctx).WithError(err).Warn("failed to cleanup rootfs mount")
+			// }
 		}
 	}()
-	if err := mount.All(mounts, rootfs); err != nil {
-		return nil, errors.Errorf("failed to mount rootfs component: %w", err)
-	}
+
+	// if err := mount.All(mounts, rootfs); err != nil {
+	// 	return nil, errors.Errorf("failed to mount rootfs component: %w", err)
+	// }
 
 	// defer func() {
 	// 	<-ctx.Done()

@@ -38,12 +38,10 @@ import (
 
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/api/types/runc/options"
-	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"github.com/containerd/typeurl/v2"
@@ -339,9 +337,9 @@ func (m manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {
 		}
 	}
 
-	if err := mount.UnmountRecursive(filepath.Join(path, "rootfs"), 0); err != nil {
-		log.G(ctx).WithError(err).Warn("failed to cleanup rootfs mount")
-	}
+	// if err := mount.UnmountRecursive(filepath.Join(path, "rootfs"), 0); err != nil {
+	// 	log.G(ctx).WithError(err).Warn("failed to cleanup rootfs mount")
+	// }
 
 	return shim.StopStatus{
 		ExitedAt:   time.Now(),

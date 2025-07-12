@@ -34,6 +34,7 @@ import (
 	gorunc "github.com/containerd/go-runc"
 	slogctx "github.com/veqryn/slog-context"
 
+	"github.com/walteh/runm/core/runc/process"
 	"github.com/walteh/runm/core/runc/runtime"
 	"github.com/walteh/runm/core/runc/runtime/gorunc/reaper"
 	"github.com/walteh/runm/core/runc/server"
@@ -334,6 +335,13 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 		return errors.Errorf("container-id flag is required")
 	}
 
+	if err := mount(ctx); err != nil {
+		return errors.Errorf("problem mounting rootfs: %w", err)
+	}
+
+	// WARNING: after we call this it will trigger intermitent 'no child processes' errors
+	// see https://github.com/firecracker-microvm/firecracker-containerd/issues/285
+	// if we call 'mount' after this point, we run into this often because of all the processes that are running
 	signals, err := setupSignals()
 	if err != nil {
 		return errors.Errorf("problem setting up signals: %w", err)
@@ -398,18 +406,6 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 			slog.ErrorContext(ctx, "problem proxying hooks", "error", err)
 		}
 	}()
-
-	if err := mount(ctx); err != nil {
-		return errors.Errorf("problem mounting rootfs: %w", err)
-	}
-
-	if err := ExecCmdForwardingStdio(ctx, "ls", "-lahs", "/"); err != nil {
-		return errors.Errorf("problem listing /: %w", err)
-	}
-
-	if err := ExecCmdForwardingStdio(ctx, "ls", "-lahs", filepath.Join(bundleSource, "rootfs", "/usr/local/bin/docker-entrypoint.sh")); err != nil {
-		return errors.Errorf("problem listing bundleSource/rootfs: %w", err)
-	}
 
 	taskgroupz.GoWithName("grpc-vsock-server", func(ctx context.Context) error {
 		return r.runGrpcVsockServer(ctx)
@@ -558,6 +554,22 @@ func loadSpec(ctx context.Context) (spec *oci.Spec, exists bool, err error) {
 	return spec, true, nil
 }
 
+func loadRootfsMounts(ctx context.Context) (mounts []process.Mount, exists bool, err error) {
+	specd, err := os.ReadFile(filepath.Join(constants.Ec1AbsPath, constants.ContainerRootfsMountsFile))
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return nil, false, nil
+		}
+		return nil, false, errors.Errorf("reading spec: %w", err)
+	}
+
+	err = json.Unmarshal(specd, &mounts)
+	if err != nil {
+		return nil, false, errors.Errorf("unmarshalling spec: %w", err)
+	}
+
+	return mounts, true, nil
+}
 func ExecCmdForwardingStdio(ctx context.Context, cmds ...string) error {
 	return ExecCmdForwardingStdioChroot(ctx, "", cmds...)
 }
@@ -594,13 +606,15 @@ func ExecCmdForwardingStdioChroot(ctx context.Context, chroot string, cmds ...st
 	cmd.Stdout = stdoutBuf
 	cmd.Stderr = stderrBuf
 	err := cmd.Run()
+	level := slog.LevelDebug
+
 	if err != nil {
-		return errors.Errorf("running busybox command (stdio was copied to the parent process): %v: %w", cmds, err)
+		level = slog.LevelError
 	}
 
-	slog.DebugContext(ctx, "finished running command '"+strings.Join(cmds, " ")+"'", "stdout", stdoutBuf.String(), "stderr", stderrBuf.String())
+	slog.Log(ctx, level, "finished running command '"+strings.Join(cmds, " ")+"'", "stdout", stdoutBuf.String(), "stderr", stderrBuf.String(), "error", err)
 
-	return nil
+	return err
 }
 
 func mount(ctx context.Context) error {
@@ -662,6 +676,24 @@ func mount(ctx context.Context) error {
 		return errors.Errorf("problem listing proc mounts: %w", err)
 	}
 	slog.InfoContext(ctx, "cat /proc/mounts: "+string(procMounts))
+
+	rootfsMounts, exists, err := loadRootfsMounts(ctx)
+	if err != nil {
+		return errors.Errorf("problem loading rootfs mounts: %w", err)
+	}
+
+	if !exists {
+		return errors.Errorf("rootfs mounts do not exist")
+	}
+
+	for _, mount := range rootfsMounts {
+		target := filepath.Join(bundleSource, "rootfs")
+
+		if err := ExecCmdForwardingStdio(ctx, "mount", "-o", strings.Join(mount.Options, ","), mount.Source, target); err != nil {
+			return errors.Errorf("problem mounting bind mount: %w", err)
+		}
+
+	}
 
 	return nil
 }
