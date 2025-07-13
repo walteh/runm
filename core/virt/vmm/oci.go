@@ -15,8 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containers/common/pkg/strongunits"
 	"gitlab.com/tozd/go/errors"
@@ -63,7 +61,6 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 ) (*RunningVM[VM], error) {
 
 	id := "vm-oci-" + ctrconfig.ID[:8]
-	creationErrGroup, ctx := errgroup.WithContext(ctx)
 
 	ctx = appendContext(ctx, id)
 
@@ -227,11 +224,6 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 	}
 
 	waitStart := time.Now()
-
-	err = creationErrGroup.Wait()
-	if err != nil {
-		return nil, errors.Errorf("error waiting for errgroup: %w", err)
-	}
 
 	slog.InfoContext(ctx, "ready to create vm", "async_wait_duration", time.Since(waitStart))
 

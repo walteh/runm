@@ -33,6 +33,7 @@ tool (
 	github.com/oligot/go-mod-upgrade
 	github.com/solatis/mcp-gopls/cmd/mcp-gopls
 	github.com/vektra/mockery/v3
+	github.com/walteh/claude-squad
 	github.com/walteh/protoc-gen/protoc-gen-go-opaque
 	github.com/walteh/protoc-gen/protoc-gen-go-slog
 	github.com/walteh/retab/v2/cmd/retab
@@ -44,7 +45,7 @@ tool (
 
 replace github.com/containerd/ttrpc => ../../ttrpc
 
-replace github.com/kazhuravlev/options-gen => ../../options-gen
+replace github.com/kazhuravlev/options-gen => github.com/walteh/options-gen v0.0.0-20250713131630-7173908d186c
 
 require (
 	github.com/go-task/task/v3 v3.44.0
@@ -148,6 +149,7 @@ require (
 	github.com/ashanbrown/forbidigo/v2 v2.1.0 // indirect
 	github.com/ashanbrown/makezero/v2 v2.0.1 // indirect
 	github.com/atc0005/go-teams-notify/v2 v2.13.0 // indirect
+	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aws/aws-sdk-go v1.55.7 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.36.3 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.10 // indirect
@@ -211,6 +213,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chainguard-dev/git-urls v1.0.2 // indirect
 	github.com/charithe/durationcheck v0.0.10 // indirect
+	github.com/charmbracelet/bubbles v0.20.0 // indirect
 	github.com/charmbracelet/bubbletea v1.3.4 // indirect
 	github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc // indirect
 	github.com/charmbracelet/lipgloss v1.1.0 // indirect
@@ -227,6 +230,7 @@ require (
 	github.com/containerd/ttrpc v1.2.7 // indirect
 	github.com/containerd/typeurl/v2 v2.2.3 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
+	github.com/creack/pty v1.1.24 // indirect
 	github.com/curioswitch/go-reassign v0.3.0 // indirect
 	github.com/cyberphone/json-canonicalization v0.0.0-20241213102144-19d51d7fe467 // indirect
 	github.com/cyphar/filepath-securejoin v0.4.1 // indirect
@@ -453,6 +457,7 @@ require (
 	github.com/muesli/mango v0.1.0 // indirect
 	github.com/muesli/mango-cobra v1.2.0 // indirect
 	github.com/muesli/mango-pflag v0.1.0 // indirect
+	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/muesli/roff v0.1.0 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/multiformats/go-base32 v0.1.0 // indirect
@@ -571,6 +576,7 @@ require (
 	github.com/vektra/mockery/v3 v3.5.0 // indirect
 	github.com/wagoodman/go-partybus v0.0.0-20230516145632-8ccac152c651 // indirect
 	github.com/wagoodman/go-progress v0.0.0-20230925121702-07e42b3cdba0 // indirect
+	github.com/walteh/claude-squad v0.0.0-20250713133148-ad02a34e76f0 // indirect
 	github.com/walteh/goimports-reviser/v3 v3.9.2 // indirect
 	github.com/walteh/protoc-gen v0.0.0-20250625195119-16fd06a5435a // indirect
 	github.com/walteh/retab/v2 v2.10.2 // indirect

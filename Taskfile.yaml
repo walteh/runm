@@ -21,6 +21,7 @@ vars:
     BUILD_OUT_DIR: gen/build
     TEST_BIN_DIR: ./gen/build/test-bin
     LINUX_RUNTIME_DIR: ./gen/build/linux-runtime
+    CLAUDE_FLOW_PROJECT_DIR: .claude/claude-flow
 
 env:
     COMPOSE_BAKE: true
@@ -40,6 +41,58 @@ tasks:
         cmds:
           - cmd: bun install -g @anthropic-ai/claude-code
           - cmd: bun --bun run claude --ide {{.CLI_ARGS}}
+    # ---------------------------------------------------------------------------
+    # Initialise a new Claude-Flow project in ~/.cache/claude-flow/<project>
+    # Usage: task claude:flow:init:devlog         # basic
+    #        task claude:flow:init:devlog -- --sparc --neural-enhanced
+    claude:flow:init:*:
+        label: 'claude:flow:init:{{.CLAUDE_FLOW_PROJECT}}'
+        desc: initialises a Claude-Flow hive project outside the repo
+        vars:
+            CLAUDE_FLOW_PROJECT: '{{index .MATCH 0}}'
+
+        cmds:
+          - cmd: |
+                set -e
+                PROJECT_DIR="{{.CLAUDE_FLOW_PROJECT_DIR}}/{{.CLAUDE_FLOW_PROJECT}}"
+                mkdir -p "$PROJECT_DIR"
+                cd "$PROJECT_DIR"
+                # Create or refresh the hive scaffold
+                npx --yes claude-flow@alpha init --force \
+                    --project-name "{{.CLAUDE_FLOW_PROJECT}}" \
+                    {{.CLI_ARGS}}
+
+    # ---------------------------------------------------------------------------
+    # Start (or resume) a hive-mind session for an existing project
+    # Usage: task claude:flow:start:devlog -- "Devlog abstraction — phase 1" --claude
+    #        task claude:flow:start:devlog -- --resume
+    claude:flow:start:*:
+        label: 'claude:flow:start:{{.CLAUDE_FLOW_PROJECT}}'
+        desc: spawns or resumes a Claude-Flow hive for the project
+        vars:
+            CLAUDE_FLOW_PROJECT: '{{index .MATCH 0}}'
+
+        cmds:
+          - cmd: |
+                set -e
+                PROJECT_DIR="{{.CLAUDE_FLOW_PROJECT_DIR}}/{{.CLAUDE_FLOW_PROJECT}}"
+                if [ ! -d "$PROJECT_DIR" ]; then
+                    echo "🔥 Project not initialised: $PROJECT_DIR" >&2
+                    echo "Run: task claude:flow:init:{{.CLAUDE_FLOW_PROJECT}}" >&2
+                    exit 1
+                fi
+                cd "$PROJECT_DIR"
+                # If user passed --resume we just resume, otherwise default to spawn
+                if echo "{{.CLI_ARGS}}" | grep -q -- '--resume'; then
+                    npx claude-flow@alpha hive-mind resume {{.CLI_ARGS}}
+                else
+                    # First arg after -- is taken as the objective, or fallback text
+                    OBJECTIVE="${1:-\"{{.CLAUDE_FLOW_PROJECT}} work\"}"
+                    shift || true
+                    npx claude-flow@alpha hive-mind spawn "$OBJECTIVE" \
+                    --namespace "{{.CLAUDE_FLOW_PROJECT}}" \
+                    --claude "$@"
+                fi
 
     go:tidy:
         run: once

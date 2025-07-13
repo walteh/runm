@@ -12,8 +12,6 @@ import (
 	"gitlab.com/tozd/go/errors"
 	"gvisor.dev/gvisor/pkg/tcpip/stack"
 
-	slogctx "github.com/veqryn/slog-context"
-
 	"github.com/walteh/runm/core/gvnet/tapsock"
 	"github.com/walteh/runm/core/virt/virtio"
 	"github.com/walteh/runm/pkg/taskgroup"
@@ -60,12 +58,6 @@ func NewProxy(ctx context.Context, cfg *GvproxyConfig) (Proxy, error) {
 		return nil, errors.Errorf("cant start gvproxy, context cancelled: %w", ctx.Err())
 	}
 
-	defer func() {
-		slog.DebugContext(ctx, "gvproxy defer")
-	}()
-
-	ctx = slogctx.WithGroup(ctx, "gvnet")
-
 	// Create taskgroup for managing all gvproxy tasks
 	tg := taskgroup.NewTaskGroup(ctx,
 		taskgroup.WithName("gvproxy"),
@@ -104,7 +96,7 @@ func NewProxy(ctx context.Context, cfg *GvproxyConfig) (Proxy, error) {
 	// Start tasks using taskgroup
 	tg.GoWithName("tapsock-runner", func(ctx context.Context) error {
 		if ctx.Err() != nil {
-			slog.InfoContext(ctx, "context cancelled, not running runner")
+			tg.LogCancellationIfCancelled("tapsock-runner")
 			return nil
 		}
 
@@ -118,7 +110,7 @@ func NewProxy(ctx context.Context, cfg *GvproxyConfig) (Proxy, error) {
 	if cfg.MagicHostPort != "" {
 		tg.GoWithName("magic-forwarding", func(ctx context.Context) error {
 			if ctx.Err() != nil {
-				slog.InfoContext(ctx, "context cancelled, not running magic forwarding")
+				tg.LogCancellationIfCancelled("magic-forwarding")
 				return nil
 			}
 
@@ -139,7 +131,7 @@ func NewProxy(ctx context.Context, cfg *GvproxyConfig) (Proxy, error) {
 	// Add cleanup task that monitors context cancellation
 	tg.GoWithName("cleanup-monitor", func(ctx context.Context) error {
 		<-ctx.Done()
-		slog.InfoContext(ctx, "DONE, cleaning up gvproxy")
+		tg.LogCancellationIfCancelled("cleanup-monitor")
 		return nil
 	})
 

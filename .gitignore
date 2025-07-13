@@ -87,3 +87,5 @@ grafana-data
 .claude
 
 backlog
+.swarm
+memory

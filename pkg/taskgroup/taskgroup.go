@@ -74,6 +74,13 @@ type TaskGroup struct {
 	// Cleanup functions
 	cleanupFuncs []CleanupEntry
 	cleanupOnce  sync.Once
+
+	// Cancellation tracking
+	cancelReason     string
+	cancelCaller     uintptr
+	cancelTime       time.Time
+	cancelStack      string
+	manualCancelOnce sync.Once
 }
 
 func NewTaskGroup(ctx context.Context, opts ...TaskGroupOpt) *TaskGroup {
@@ -360,6 +367,21 @@ func (tg *TaskGroup) Wait() error {
 	case <-tg.ctx.Done():
 		// Context was cancelled (timeout or manual cancellation)
 		tg.setFundamentalError(tg.ctx.Err())
+		
+		// Log cancellation information
+		reason, caller, when, _ := tg.GetCancellationInfo()
+		if reason != "" {
+			tg.log(slog.LevelInfo, "taskgroup cancelled",
+				slog.String("reason", reason),
+				slog.String("caller", runtime.FuncForPC(caller).Name()),
+				slog.Time("cancelled_at", when),
+			)
+		} else {
+			// Context was cancelled externally (parent context, timeout, etc.)
+			tg.log(slog.LevelInfo, "taskgroup cancelled by external context",
+				slog.String("context_error", tg.ctx.Err().Error()),
+			)
+		}
 	}
 
 	tg.mu.Lock()
@@ -742,6 +764,27 @@ func (tg *TaskGroup) GetCleanupCount() int {
 	return len(tg.cleanupFuncs)
 }
 
+// CancelWithReason manually cancels the TaskGroup with a specific reason
+func (tg *TaskGroup) CancelWithReason(reason string) {
+	tg.manualCancelOnce.Do(func() {
+		caller, _, _, _ := runtime.Caller(1)
+		
+		tg.mu.Lock()
+		tg.cancelReason = reason
+		tg.cancelCaller = caller
+		tg.cancelTime = time.Now()
+		tg.cancelStack = string(debug.Stack())
+		tg.mu.Unlock()
+
+		tg.log(slog.LevelInfo, "taskgroup cancelled manually",
+			slog.String("reason", reason),
+			slog.String("caller", runtime.FuncForPC(caller).Name()),
+		)
+
+		tg.cancel()
+	})
+}
+
 // Close manually triggers cleanup and cancels the TaskGroup context
 func (tg *TaskGroup) Close() error {
 	tg.mu.Lock()
@@ -752,10 +795,51 @@ func (tg *TaskGroup) Close() error {
 	tg.mu.Unlock()
 
 	// Cancel context to signal shutdown
-	tg.cancel()
+	tg.CancelWithReason("Close() called")
 
 	// Execute cleanup functions
 	tg.executeCleanup(context.Background())
 
 	return nil
+}
+
+// GetCancellationInfo returns information about why/when the context was cancelled
+func (tg *TaskGroup) GetCancellationInfo() (reason string, caller uintptr, when time.Time, stack string) {
+	tg.mu.RLock()
+	defer tg.mu.RUnlock()
+	return tg.cancelReason, tg.cancelCaller, tg.cancelTime, tg.cancelStack
+}
+
+// IsCancelled returns true if the taskgroup context has been cancelled
+func (tg *TaskGroup) IsCancelled() bool {
+	select {
+	case <-tg.ctx.Done():
+		return true
+	default:
+		return false
+	}
+}
+
+// LogCancellationIfCancelled logs cancellation information if the context is cancelled
+// This is useful for tasks to call when they detect cancellation
+func (tg *TaskGroup) LogCancellationIfCancelled(taskName string) bool {
+	if !tg.IsCancelled() {
+		return false
+	}
+
+	reason, caller, when, _ := tg.GetCancellationInfo()
+	if reason != "" {
+		tg.log(slog.LevelInfo, "task detected taskgroup cancellation",
+			slog.String("task_name", taskName),
+			slog.String("cancel_reason", reason),
+			slog.String("cancel_caller", runtime.FuncForPC(caller).Name()),
+			slog.Time("cancelled_at", when),
+		)
+	} else {
+		tg.log(slog.LevelInfo, "task detected external context cancellation",
+			slog.String("task_name", taskName),
+			slog.String("context_error", tg.ctx.Err().Error()),
+		)
+	}
+	return true
 }

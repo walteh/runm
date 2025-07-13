@@ -1,0 +1,29 @@
+edition = "2023";
+
+package runm.devlog.v1;
+
+import "google/protobuf/go_features.proto";
+import "google/protobuf/timestamp.proto";
+
+option features.(pb.go).api_level = API_OPAQUE;
+option features.field_presence = IMPLICIT;  // makes everything by default required, for optional set to EXPLICIT
+
+// Devlog service for managing debug targets
+service DevlogService {
+	// Register a new debug target
+	rpc Log(stream LogRequest) returns (stream LogResponse);
+}
+
+// Target registration request
+message StructuredLog {}
+
+message RawLog {}
+
+message LogRequest {
+	oneof log {
+		StructuredLog structured = 1;
+		RawLog        raw        = 2;
+	}
+}
+
+message LogResponse {}
