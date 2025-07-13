@@ -10,11 +10,12 @@ import (
 	"github.com/mdlayher/vsock"
 	"gitlab.com/tozd/go/errors"
 
+	gorunc "github.com/containerd/go-runc"
+
 	"github.com/walteh/runm/core/runc/runtime"
 	"github.com/walteh/runm/core/runc/socket"
 	"github.com/walteh/runm/core/runc/state"
 
-	gorunc "github.com/containerd/go-runc"
 	runmv1 "github.com/walteh/runm/proto/v1"
 )
 

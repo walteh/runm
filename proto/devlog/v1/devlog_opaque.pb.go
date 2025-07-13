@@ -7,6 +7,164 @@ import (
 	protovalidate "buf.build/go/protovalidate"
 )
 
+// NewSourceInfo creates a new SourceInfo using the builder
+func NewSourceInfo(b *SourceInfo_builder) *SourceInfo {
+	return b.Build()
+}
+
+// NewSourceInfoE creates a new SourceInfo using the builder with validation
+func NewSourceInfoE(b *SourceInfo_builder) (*SourceInfo, error) {
+	m := b.Build()
+	if err := protovalidate.Validate(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// NewProcessInfo creates a new ProcessInfo using the builder
+func NewProcessInfo(b *ProcessInfo_builder) *ProcessInfo {
+	return b.Build()
+}
+
+// NewProcessInfoE creates a new ProcessInfo using the builder with validation
+func NewProcessInfoE(b *ProcessInfo_builder) (*ProcessInfo, error) {
+	m := b.Build()
+	if err := protovalidate.Validate(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// NewFileDescriptorInfo creates a new FileDescriptorInfo using the builder
+func NewFileDescriptorInfo(b *FileDescriptorInfo_builder) *FileDescriptorInfo {
+	return b.Build()
+}
+
+// NewFileDescriptorInfoE creates a new FileDescriptorInfo using the builder with validation
+func NewFileDescriptorInfoE(b *FileDescriptorInfo_builder) (*FileDescriptorInfo, error) {
+	m := b.Build()
+	if err := protovalidate.Validate(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// NewAttributeValue creates a new AttributeValue using the builder
+func NewAttributeValue(b *AttributeValue_builder) *AttributeValue {
+	return b.Build()
+}
+
+// NewAttributeValueE creates a new AttributeValue using the builder with validation
+func NewAttributeValueE(b *AttributeValue_builder) (*AttributeValue, error) {
+	m := b.Build()
+	if err := protovalidate.Validate(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// NewAttributeValue_WithArrayValue creates a new AttributeValue with the ArrayValue field set using the builder
+func NewAttributeValue_WithArrayValue(innerBuilder *AttributeArray_builder) *AttributeValue {
+	inner := NewAttributeArray(innerBuilder)
+	return NewAttributeValue(&AttributeValue_builder{
+		ArrayValue: inner,
+	})
+}
+
+// NewAttributeValue_WithArrayValueE creates a new AttributeValue with the ArrayValue field set using the builder with validation
+func NewAttributeValue_WithArrayValueE(innerBuilder *AttributeArray_builder) (*AttributeValue, error) {
+	inner, err := NewAttributeArrayE(innerBuilder)
+	if err != nil {
+		return nil, err
+	}
+	m := NewAttributeValue(&AttributeValue_builder{
+		ArrayValue: inner,
+	})
+	if err := protovalidate.Validate(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// NewAttributeValue_WithMapValue creates a new AttributeValue with the MapValue field set using the builder
+func NewAttributeValue_WithMapValue(innerBuilder *AttributeMap_builder) *AttributeValue {
+	inner := NewAttributeMap(innerBuilder)
+	return NewAttributeValue(&AttributeValue_builder{
+		MapValue: inner,
+	})
+}
+
+// NewAttributeValue_WithMapValueE creates a new AttributeValue with the MapValue field set using the builder with validation
+func NewAttributeValue_WithMapValueE(innerBuilder *AttributeMap_builder) (*AttributeValue, error) {
+	inner, err := NewAttributeMapE(innerBuilder)
+	if err != nil {
+		return nil, err
+	}
+	m := NewAttributeValue(&AttributeValue_builder{
+		MapValue: inner,
+	})
+	if err := protovalidate.Validate(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// NewAttributeArray creates a new AttributeArray using the builder
+func NewAttributeArray(b *AttributeArray_builder) *AttributeArray {
+	return b.Build()
+}
+
+// NewAttributeArrayE creates a new AttributeArray using the builder with validation
+func NewAttributeArrayE(b *AttributeArray_builder) (*AttributeArray, error) {
+	m := b.Build()
+	if err := protovalidate.Validate(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// NewAttributeMap creates a new AttributeMap using the builder
+func NewAttributeMap(b *AttributeMap_builder) *AttributeMap {
+	return b.Build()
+}
+
+// NewAttributeMapE creates a new AttributeMap using the builder with validation
+func NewAttributeMapE(b *AttributeMap_builder) (*AttributeMap, error) {
+	m := b.Build()
+	if err := protovalidate.Validate(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// NewAttribute creates a new Attribute using the builder
+func NewAttribute(b *Attribute_builder) *Attribute {
+	return b.Build()
+}
+
+// NewAttributeE creates a new Attribute using the builder with validation
+func NewAttributeE(b *Attribute_builder) (*Attribute, error) {
+	m := b.Build()
+	if err := protovalidate.Validate(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// NewErrorInfo creates a new ErrorInfo using the builder
+func NewErrorInfo(b *ErrorInfo_builder) *ErrorInfo {
+	return b.Build()
+}
+
+// NewErrorInfoE creates a new ErrorInfo using the builder with validation
+func NewErrorInfoE(b *ErrorInfo_builder) (*ErrorInfo, error) {
+	m := b.Build()
+	if err := protovalidate.Validate(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // NewStructuredLog creates a new StructuredLog using the builder
 func NewStructuredLog(b *StructuredLog_builder) *StructuredLog {
 	return b.Build()

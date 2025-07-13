@@ -43,12 +43,13 @@ func (x *CgroupEvent) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
 	}
-	attrs := make([]slog.Attr, 0, 5)
+	attrs := make([]slog.Attr, 0, 6)
 	attrs = append(attrs, slog.Uint64("low", x.GetLow()))
 	attrs = append(attrs, slog.Uint64("high", x.GetHigh()))
 	attrs = append(attrs, slog.Uint64("max", x.GetMax()))
 	attrs = append(attrs, slog.Uint64("oom", x.GetOom()))
 	attrs = append(attrs, slog.Uint64("oom_kill", x.GetOomKill()))
+	attrs = append(attrs, slog.String("cgroup_path", x.GetCgroupPath()))
 	return slog.GroupValue(attrs...)
 }
 

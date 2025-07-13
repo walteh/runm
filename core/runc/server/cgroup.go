@@ -47,14 +47,8 @@ func (s *Server) StreamCgroupEvents(_ *runmv1.StreamCgroupEventsRequest, srv grp
 		select {
 		case event := <-eventCh:
 			go func() {
-				rev := &runmv1.CgroupEvent{}
-				rev.SetHigh(event.High)
-				rev.SetMax(event.Max)
-				rev.SetOom(event.OOM)
-				rev.SetOomKill(event.OOMKill)
-				rev.SetLow(event.Low)
 				resp := &runmv1.StreamCgroupEventsResponse{}
-				resp.SetEvent(rev)
+				resp.SetEvent(event)
 				if err := srv.Send(resp); err != nil {
 					oerrch <- err
 				}

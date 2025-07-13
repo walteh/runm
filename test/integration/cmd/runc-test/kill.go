@@ -54,11 +54,24 @@ signal to the init process of the "ubuntu01" container:
 			sigstr = "SIGTERM"
 		}
 		slog.Info("KILLING RUNC - parsing signal")
+
 		signal, err := parseSignal(sigstr)
 		if err != nil {
 			return err
 		}
-		slog.Info("KILLING RUNC - sending signal")
+
+		// debugging
+		processes, err := container.Processes()
+		if err != nil {
+			slog.Error("KILLING RUNC - problem getting processes", "error", err)
+		}
+
+		status, err := container.Status()
+		if err != nil {
+			slog.Error("KILLING RUNC - problem getting status", "error", err)
+		}
+
+		slog.Info("KILLING RUNC - sending signal, sending signal to container", "signal", signal, "signal_str", sigstr, "all", context.Bool("all"), "container_id", container.ID(), "args", context.Args(), "container", container, "container_pid", status.String(), "processes", processes, "status", status)
 		err = container.Signal(signal)
 		if errors.Is(err, libcontainer.ErrNotRunning) && context.Bool("all") {
 			err = nil

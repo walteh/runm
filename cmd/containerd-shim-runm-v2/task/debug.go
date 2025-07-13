@@ -109,6 +109,12 @@ func wrap[I, O any](e *errTaskService, f func(context.Context, I) (O, error)) fu
 			ticker.WithFrequency(15),
 			ticker.WithMessage(fmt.Sprintf("%s[RUNNING]", id)),
 			ticker.WithSlogBaseContext(ctx),
+			ticker.WithAttrFunc(func() []slog.Attr {
+				return []slog.Attr{
+					slog.String("duration", time.Since(start).String()),
+					slog.Int64("req_num", reqNum),
+				}
+			}),
 			// ticker.WithDoneMessage(fmt.Sprintf("TICK:SHIM:TTRPC:DONE  :[%s]", realName)),
 		).RunAsDefer()()
 

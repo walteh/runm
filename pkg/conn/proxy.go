@@ -12,9 +12,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/rs/xid"
 	"gitlab.com/tozd/go/errors"
 
-	"github.com/rs/xid"
 	"github.com/walteh/runm/pkg/logging"
 )
 

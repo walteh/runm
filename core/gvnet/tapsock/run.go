@@ -15,7 +15,6 @@ import (
 	"github.com/walteh/runm/pkg/hack"
 )
 
-
 type VirtualNetworkRunner struct {
 	name    string
 	running bool

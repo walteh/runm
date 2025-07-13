@@ -10,7 +10,8 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	_ "google.golang.org/protobuf/types/gofeaturespb"
-	_ "google.golang.org/protobuf/types/known/timestamppb"
+	_ "google.golang.org/protobuf/types/known/structpb"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	unsafe "unsafe"
 )
@@ -22,16 +23,1155 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Target registration request
+// Log severity levels (aligned with slog and OTEL)
+type LogLevel int32
+
+const (
+	LogLevel_LOG_LEVEL_UNSPECIFIED LogLevel = 0
+	LogLevel_LOG_LEVEL_TRACE       LogLevel = 1 // Maps to slog.LevelDebug - 4 (-8)
+	LogLevel_LOG_LEVEL_DEBUG       LogLevel = 2 // Maps to slog.LevelDebug (-4)
+	LogLevel_LOG_LEVEL_INFO        LogLevel = 3 // Maps to slog.LevelInfo (0)
+	LogLevel_LOG_LEVEL_WARN        LogLevel = 4 // Maps to slog.LevelWarn (4)
+	LogLevel_LOG_LEVEL_ERROR       LogLevel = 5 // Maps to slog.LevelError (8)
+	LogLevel_LOG_LEVEL_FATAL       LogLevel = 6 // Maps to custom level (12)
+)
+
+// Enum value maps for LogLevel.
+var (
+	LogLevel_name = map[int32]string{
+		0: "LOG_LEVEL_UNSPECIFIED",
+		1: "LOG_LEVEL_TRACE",
+		2: "LOG_LEVEL_DEBUG",
+		3: "LOG_LEVEL_INFO",
+		4: "LOG_LEVEL_WARN",
+		5: "LOG_LEVEL_ERROR",
+		6: "LOG_LEVEL_FATAL",
+	}
+	LogLevel_value = map[string]int32{
+		"LOG_LEVEL_UNSPECIFIED": 0,
+		"LOG_LEVEL_TRACE":       1,
+		"LOG_LEVEL_DEBUG":       2,
+		"LOG_LEVEL_INFO":        3,
+		"LOG_LEVEL_WARN":        4,
+		"LOG_LEVEL_ERROR":       5,
+		"LOG_LEVEL_FATAL":       6,
+	}
+)
+
+func (x LogLevel) Enum() *LogLevel {
+	p := new(LogLevel)
+	*p = x
+	return p
+}
+
+func (x LogLevel) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (LogLevel) Descriptor() protoreflect.EnumDescriptor {
+	return file_devlog_v1_devlog_proto_enumTypes[0].Descriptor()
+}
+
+func (LogLevel) Type() protoreflect.EnumType {
+	return &file_devlog_v1_devlog_proto_enumTypes[0]
+}
+
+func (x LogLevel) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Source information for debugging
+type SourceInfo struct {
+	state                     protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_FilePath       string                 `protobuf:"bytes,1,opt,name=file_path,json=filePath"`
+	xxx_hidden_LineNumber     int32                  `protobuf:"varint,2,opt,name=line_number,json=lineNumber"`
+	xxx_hidden_FunctionName   string                 `protobuf:"bytes,3,opt,name=function_name,json=functionName"`
+	xxx_hidden_PackageName    string                 `protobuf:"bytes,4,opt,name=package_name,json=packageName"`
+	xxx_hidden_ModuleName     string                 `protobuf:"bytes,5,opt,name=module_name,json=moduleName"`
+	xxx_hidden_ProgramCounter uint64                 `protobuf:"varint,6,opt,name=program_counter,json=programCounter"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
+}
+
+func (x *SourceInfo) Reset() {
+	*x = SourceInfo{}
+	mi := &file_devlog_v1_devlog_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SourceInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SourceInfo) ProtoMessage() {}
+
+func (x *SourceInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_devlog_v1_devlog_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *SourceInfo) GetFilePath() string {
+	if x != nil {
+		return x.xxx_hidden_FilePath
+	}
+	return ""
+}
+
+func (x *SourceInfo) GetLineNumber() int32 {
+	if x != nil {
+		return x.xxx_hidden_LineNumber
+	}
+	return 0
+}
+
+func (x *SourceInfo) GetFunctionName() string {
+	if x != nil {
+		return x.xxx_hidden_FunctionName
+	}
+	return ""
+}
+
+func (x *SourceInfo) GetPackageName() string {
+	if x != nil {
+		return x.xxx_hidden_PackageName
+	}
+	return ""
+}
+
+func (x *SourceInfo) GetModuleName() string {
+	if x != nil {
+		return x.xxx_hidden_ModuleName
+	}
+	return ""
+}
+
+func (x *SourceInfo) GetProgramCounter() uint64 {
+	if x != nil {
+		return x.xxx_hidden_ProgramCounter
+	}
+	return 0
+}
+
+func (x *SourceInfo) SetFilePath(v string) {
+	x.xxx_hidden_FilePath = v
+}
+
+func (x *SourceInfo) SetLineNumber(v int32) {
+	x.xxx_hidden_LineNumber = v
+}
+
+func (x *SourceInfo) SetFunctionName(v string) {
+	x.xxx_hidden_FunctionName = v
+}
+
+func (x *SourceInfo) SetPackageName(v string) {
+	x.xxx_hidden_PackageName = v
+}
+
+func (x *SourceInfo) SetModuleName(v string) {
+	x.xxx_hidden_ModuleName = v
+}
+
+func (x *SourceInfo) SetProgramCounter(v uint64) {
+	x.xxx_hidden_ProgramCounter = v
+}
+
+type SourceInfo_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	FilePath       string
+	LineNumber     int32
+	FunctionName   string
+	PackageName    string
+	ModuleName     string
+	ProgramCounter uint64
+}
+
+func (b0 SourceInfo_builder) Build() *SourceInfo {
+	m0 := &SourceInfo{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_FilePath = b.FilePath
+	x.xxx_hidden_LineNumber = b.LineNumber
+	x.xxx_hidden_FunctionName = b.FunctionName
+	x.xxx_hidden_PackageName = b.PackageName
+	x.xxx_hidden_ModuleName = b.ModuleName
+	x.xxx_hidden_ProgramCounter = b.ProgramCounter
+	return m0
+}
+
+// Process and runtime metadata
+type ProcessInfo struct {
+	state               protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Pid      int32                  `protobuf:"varint,1,opt,name=pid"`
+	xxx_hidden_Hostname string                 `protobuf:"bytes,2,opt,name=hostname"`
+	xxx_hidden_Runtime  string                 `protobuf:"bytes,3,opt,name=runtime"`
+	xxx_hidden_Os       string                 `protobuf:"bytes,4,opt,name=os"`
+	xxx_hidden_Arch     string                 `protobuf:"bytes,5,opt,name=arch"`
+	xxx_hidden_Version  string                 `protobuf:"bytes,6,opt,name=version"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *ProcessInfo) Reset() {
+	*x = ProcessInfo{}
+	mi := &file_devlog_v1_devlog_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProcessInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProcessInfo) ProtoMessage() {}
+
+func (x *ProcessInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_devlog_v1_devlog_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *ProcessInfo) GetPid() int32 {
+	if x != nil {
+		return x.xxx_hidden_Pid
+	}
+	return 0
+}
+
+func (x *ProcessInfo) GetHostname() string {
+	if x != nil {
+		return x.xxx_hidden_Hostname
+	}
+	return ""
+}
+
+func (x *ProcessInfo) GetRuntime() string {
+	if x != nil {
+		return x.xxx_hidden_Runtime
+	}
+	return ""
+}
+
+func (x *ProcessInfo) GetOs() string {
+	if x != nil {
+		return x.xxx_hidden_Os
+	}
+	return ""
+}
+
+func (x *ProcessInfo) GetArch() string {
+	if x != nil {
+		return x.xxx_hidden_Arch
+	}
+	return ""
+}
+
+func (x *ProcessInfo) GetVersion() string {
+	if x != nil {
+		return x.xxx_hidden_Version
+	}
+	return ""
+}
+
+func (x *ProcessInfo) SetPid(v int32) {
+	x.xxx_hidden_Pid = v
+}
+
+func (x *ProcessInfo) SetHostname(v string) {
+	x.xxx_hidden_Hostname = v
+}
+
+func (x *ProcessInfo) SetRuntime(v string) {
+	x.xxx_hidden_Runtime = v
+}
+
+func (x *ProcessInfo) SetOs(v string) {
+	x.xxx_hidden_Os = v
+}
+
+func (x *ProcessInfo) SetArch(v string) {
+	x.xxx_hidden_Arch = v
+}
+
+func (x *ProcessInfo) SetVersion(v string) {
+	x.xxx_hidden_Version = v
+}
+
+type ProcessInfo_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	Pid      int32
+	Hostname string
+	Runtime  string
+	Os       string
+	Arch     string
+	Version  string
+}
+
+func (b0 ProcessInfo_builder) Build() *ProcessInfo {
+	m0 := &ProcessInfo{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Pid = b.Pid
+	x.xxx_hidden_Hostname = b.Hostname
+	x.xxx_hidden_Runtime = b.Runtime
+	x.xxx_hidden_Os = b.Os
+	x.xxx_hidden_Arch = b.Arch
+	x.xxx_hidden_Version = b.Version
+	return m0
+}
+
+// File descriptor information for raw logs
+type FileDescriptorInfo struct {
+	state                 protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Fd         int32                  `protobuf:"varint,1,opt,name=fd"`
+	xxx_hidden_Name       string                 `protobuf:"bytes,2,opt,name=name"`
+	xxx_hidden_IsStdout   bool                   `protobuf:"varint,3,opt,name=is_stdout,json=isStdout"`
+	xxx_hidden_IsStderr   bool                   `protobuf:"varint,4,opt,name=is_stderr,json=isStderr"`
+	xxx_hidden_StreamType string                 `protobuf:"bytes,5,opt,name=stream_type,json=streamType"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *FileDescriptorInfo) Reset() {
+	*x = FileDescriptorInfo{}
+	mi := &file_devlog_v1_devlog_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FileDescriptorInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FileDescriptorInfo) ProtoMessage() {}
+
+func (x *FileDescriptorInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_devlog_v1_devlog_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *FileDescriptorInfo) GetFd() int32 {
+	if x != nil {
+		return x.xxx_hidden_Fd
+	}
+	return 0
+}
+
+func (x *FileDescriptorInfo) GetName() string {
+	if x != nil {
+		return x.xxx_hidden_Name
+	}
+	return ""
+}
+
+func (x *FileDescriptorInfo) GetIsStdout() bool {
+	if x != nil {
+		return x.xxx_hidden_IsStdout
+	}
+	return false
+}
+
+func (x *FileDescriptorInfo) GetIsStderr() bool {
+	if x != nil {
+		return x.xxx_hidden_IsStderr
+	}
+	return false
+}
+
+func (x *FileDescriptorInfo) GetStreamType() string {
+	if x != nil {
+		return x.xxx_hidden_StreamType
+	}
+	return ""
+}
+
+func (x *FileDescriptorInfo) SetFd(v int32) {
+	x.xxx_hidden_Fd = v
+}
+
+func (x *FileDescriptorInfo) SetName(v string) {
+	x.xxx_hidden_Name = v
+}
+
+func (x *FileDescriptorInfo) SetIsStdout(v bool) {
+	x.xxx_hidden_IsStdout = v
+}
+
+func (x *FileDescriptorInfo) SetIsStderr(v bool) {
+	x.xxx_hidden_IsStderr = v
+}
+
+func (x *FileDescriptorInfo) SetStreamType(v string) {
+	x.xxx_hidden_StreamType = v
+}
+
+type FileDescriptorInfo_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	Fd         int32
+	Name       string
+	IsStdout   bool
+	IsStderr   bool
+	StreamType string
+}
+
+func (b0 FileDescriptorInfo_builder) Build() *FileDescriptorInfo {
+	m0 := &FileDescriptorInfo{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Fd = b.Fd
+	x.xxx_hidden_Name = b.Name
+	x.xxx_hidden_IsStdout = b.IsStdout
+	x.xxx_hidden_IsStderr = b.IsStderr
+	x.xxx_hidden_StreamType = b.StreamType
+	return m0
+}
+
+// Attribute value supporting multiple types (OTEL-compatible)
+type AttributeValue struct {
+	state            protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Value isAttributeValue_Value `protobuf_oneof:"value"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *AttributeValue) Reset() {
+	*x = AttributeValue{}
+	mi := &file_devlog_v1_devlog_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AttributeValue) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AttributeValue) ProtoMessage() {}
+
+func (x *AttributeValue) ProtoReflect() protoreflect.Message {
+	mi := &file_devlog_v1_devlog_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *AttributeValue) GetStringValue() string {
+	if x != nil {
+		if x, ok := x.xxx_hidden_Value.(*attributeValue_StringValue); ok {
+			return x.StringValue
+		}
+	}
+	return ""
+}
+
+func (x *AttributeValue) GetIntValue() int64 {
+	if x != nil {
+		if x, ok := x.xxx_hidden_Value.(*attributeValue_IntValue); ok {
+			return x.IntValue
+		}
+	}
+	return 0
+}
+
+func (x *AttributeValue) GetDoubleValue() float64 {
+	if x != nil {
+		if x, ok := x.xxx_hidden_Value.(*attributeValue_DoubleValue); ok {
+			return x.DoubleValue
+		}
+	}
+	return 0
+}
+
+func (x *AttributeValue) GetBoolValue() bool {
+	if x != nil {
+		if x, ok := x.xxx_hidden_Value.(*attributeValue_BoolValue); ok {
+			return x.BoolValue
+		}
+	}
+	return false
+}
+
+func (x *AttributeValue) GetBytesValue() []byte {
+	if x != nil {
+		if x, ok := x.xxx_hidden_Value.(*attributeValue_BytesValue); ok {
+			return x.BytesValue
+		}
+	}
+	return nil
+}
+
+func (x *AttributeValue) GetArrayValue() *AttributeArray {
+	if x != nil {
+		if x, ok := x.xxx_hidden_Value.(*attributeValue_ArrayValue); ok {
+			return x.ArrayValue
+		}
+	}
+	return nil
+}
+
+func (x *AttributeValue) GetMapValue() *AttributeMap {
+	if x != nil {
+		if x, ok := x.xxx_hidden_Value.(*attributeValue_MapValue); ok {
+			return x.MapValue
+		}
+	}
+	return nil
+}
+
+func (x *AttributeValue) SetStringValue(v string) {
+	x.xxx_hidden_Value = &attributeValue_StringValue{v}
+}
+
+func (x *AttributeValue) SetIntValue(v int64) {
+	x.xxx_hidden_Value = &attributeValue_IntValue{v}
+}
+
+func (x *AttributeValue) SetDoubleValue(v float64) {
+	x.xxx_hidden_Value = &attributeValue_DoubleValue{v}
+}
+
+func (x *AttributeValue) SetBoolValue(v bool) {
+	x.xxx_hidden_Value = &attributeValue_BoolValue{v}
+}
+
+func (x *AttributeValue) SetBytesValue(v []byte) {
+	if v == nil {
+		v = []byte{}
+	}
+	x.xxx_hidden_Value = &attributeValue_BytesValue{v}
+}
+
+func (x *AttributeValue) SetArrayValue(v *AttributeArray) {
+	if v == nil {
+		x.xxx_hidden_Value = nil
+		return
+	}
+	x.xxx_hidden_Value = &attributeValue_ArrayValue{v}
+}
+
+func (x *AttributeValue) SetMapValue(v *AttributeMap) {
+	if v == nil {
+		x.xxx_hidden_Value = nil
+		return
+	}
+	x.xxx_hidden_Value = &attributeValue_MapValue{v}
+}
+
+func (x *AttributeValue) HasValue() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_Value != nil
+}
+
+func (x *AttributeValue) HasStringValue() bool {
+	if x == nil {
+		return false
+	}
+	_, ok := x.xxx_hidden_Value.(*attributeValue_StringValue)
+	return ok
+}
+
+func (x *AttributeValue) HasIntValue() bool {
+	if x == nil {
+		return false
+	}
+	_, ok := x.xxx_hidden_Value.(*attributeValue_IntValue)
+	return ok
+}
+
+func (x *AttributeValue) HasDoubleValue() bool {
+	if x == nil {
+		return false
+	}
+	_, ok := x.xxx_hidden_Value.(*attributeValue_DoubleValue)
+	return ok
+}
+
+func (x *AttributeValue) HasBoolValue() bool {
+	if x == nil {
+		return false
+	}
+	_, ok := x.xxx_hidden_Value.(*attributeValue_BoolValue)
+	return ok
+}
+
+func (x *AttributeValue) HasBytesValue() bool {
+	if x == nil {
+		return false
+	}
+	_, ok := x.xxx_hidden_Value.(*attributeValue_BytesValue)
+	return ok
+}
+
+func (x *AttributeValue) HasArrayValue() bool {
+	if x == nil {
+		return false
+	}
+	_, ok := x.xxx_hidden_Value.(*attributeValue_ArrayValue)
+	return ok
+}
+
+func (x *AttributeValue) HasMapValue() bool {
+	if x == nil {
+		return false
+	}
+	_, ok := x.xxx_hidden_Value.(*attributeValue_MapValue)
+	return ok
+}
+
+func (x *AttributeValue) ClearValue() {
+	x.xxx_hidden_Value = nil
+}
+
+func (x *AttributeValue) ClearStringValue() {
+	if _, ok := x.xxx_hidden_Value.(*attributeValue_StringValue); ok {
+		x.xxx_hidden_Value = nil
+	}
+}
+
+func (x *AttributeValue) ClearIntValue() {
+	if _, ok := x.xxx_hidden_Value.(*attributeValue_IntValue); ok {
+		x.xxx_hidden_Value = nil
+	}
+}
+
+func (x *AttributeValue) ClearDoubleValue() {
+	if _, ok := x.xxx_hidden_Value.(*attributeValue_DoubleValue); ok {
+		x.xxx_hidden_Value = nil
+	}
+}
+
+func (x *AttributeValue) ClearBoolValue() {
+	if _, ok := x.xxx_hidden_Value.(*attributeValue_BoolValue); ok {
+		x.xxx_hidden_Value = nil
+	}
+}
+
+func (x *AttributeValue) ClearBytesValue() {
+	if _, ok := x.xxx_hidden_Value.(*attributeValue_BytesValue); ok {
+		x.xxx_hidden_Value = nil
+	}
+}
+
+func (x *AttributeValue) ClearArrayValue() {
+	if _, ok := x.xxx_hidden_Value.(*attributeValue_ArrayValue); ok {
+		x.xxx_hidden_Value = nil
+	}
+}
+
+func (x *AttributeValue) ClearMapValue() {
+	if _, ok := x.xxx_hidden_Value.(*attributeValue_MapValue); ok {
+		x.xxx_hidden_Value = nil
+	}
+}
+
+const AttributeValue_Value_not_set_case case_AttributeValue_Value = 0
+const AttributeValue_StringValue_case case_AttributeValue_Value = 1
+const AttributeValue_IntValue_case case_AttributeValue_Value = 2
+const AttributeValue_DoubleValue_case case_AttributeValue_Value = 3
+const AttributeValue_BoolValue_case case_AttributeValue_Value = 4
+const AttributeValue_BytesValue_case case_AttributeValue_Value = 5
+const AttributeValue_ArrayValue_case case_AttributeValue_Value = 6
+const AttributeValue_MapValue_case case_AttributeValue_Value = 7
+
+func (x *AttributeValue) WhichValue() case_AttributeValue_Value {
+	if x == nil {
+		return AttributeValue_Value_not_set_case
+	}
+	switch x.xxx_hidden_Value.(type) {
+	case *attributeValue_StringValue:
+		return AttributeValue_StringValue_case
+	case *attributeValue_IntValue:
+		return AttributeValue_IntValue_case
+	case *attributeValue_DoubleValue:
+		return AttributeValue_DoubleValue_case
+	case *attributeValue_BoolValue:
+		return AttributeValue_BoolValue_case
+	case *attributeValue_BytesValue:
+		return AttributeValue_BytesValue_case
+	case *attributeValue_ArrayValue:
+		return AttributeValue_ArrayValue_case
+	case *attributeValue_MapValue:
+		return AttributeValue_MapValue_case
+	default:
+		return AttributeValue_Value_not_set_case
+	}
+}
+
+type AttributeValue_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	// Fields of oneof xxx_hidden_Value:
+	StringValue *string
+	IntValue    *int64
+	DoubleValue *float64
+	BoolValue   *bool
+	BytesValue  []byte
+	ArrayValue  *AttributeArray
+	MapValue    *AttributeMap
+	// -- end of xxx_hidden_Value
+}
+
+func (b0 AttributeValue_builder) Build() *AttributeValue {
+	m0 := &AttributeValue{}
+	b, x := &b0, m0
+	_, _ = b, x
+	if b.StringValue != nil {
+		x.xxx_hidden_Value = &attributeValue_StringValue{*b.StringValue}
+	}
+	if b.IntValue != nil {
+		x.xxx_hidden_Value = &attributeValue_IntValue{*b.IntValue}
+	}
+	if b.DoubleValue != nil {
+		x.xxx_hidden_Value = &attributeValue_DoubleValue{*b.DoubleValue}
+	}
+	if b.BoolValue != nil {
+		x.xxx_hidden_Value = &attributeValue_BoolValue{*b.BoolValue}
+	}
+	if b.BytesValue != nil {
+		x.xxx_hidden_Value = &attributeValue_BytesValue{b.BytesValue}
+	}
+	if b.ArrayValue != nil {
+		x.xxx_hidden_Value = &attributeValue_ArrayValue{b.ArrayValue}
+	}
+	if b.MapValue != nil {
+		x.xxx_hidden_Value = &attributeValue_MapValue{b.MapValue}
+	}
+	return m0
+}
+
+type case_AttributeValue_Value protoreflect.FieldNumber
+
+func (x case_AttributeValue_Value) String() string {
+	md := file_devlog_v1_devlog_proto_msgTypes[3].Descriptor()
+	if x == 0 {
+		return "not set"
+	}
+	return protoimpl.X.MessageFieldStringOf(md, protoreflect.FieldNumber(x))
+}
+
+type isAttributeValue_Value interface {
+	isAttributeValue_Value()
+}
+
+type attributeValue_StringValue struct {
+	StringValue string `protobuf:"bytes,1,opt,name=string_value,json=stringValue,oneof"`
+}
+
+type attributeValue_IntValue struct {
+	IntValue int64 `protobuf:"varint,2,opt,name=int_value,json=intValue,oneof"`
+}
+
+type attributeValue_DoubleValue struct {
+	DoubleValue float64 `protobuf:"fixed64,3,opt,name=double_value,json=doubleValue,oneof"`
+}
+
+type attributeValue_BoolValue struct {
+	BoolValue bool `protobuf:"varint,4,opt,name=bool_value,json=boolValue,oneof"`
+}
+
+type attributeValue_BytesValue struct {
+	BytesValue []byte `protobuf:"bytes,5,opt,name=bytes_value,json=bytesValue,oneof"`
+}
+
+type attributeValue_ArrayValue struct {
+	ArrayValue *AttributeArray `protobuf:"bytes,6,opt,name=array_value,json=arrayValue,oneof"`
+}
+
+type attributeValue_MapValue struct {
+	MapValue *AttributeMap `protobuf:"bytes,7,opt,name=map_value,json=mapValue,oneof"`
+}
+
+func (*attributeValue_StringValue) isAttributeValue_Value() {}
+
+func (*attributeValue_IntValue) isAttributeValue_Value() {}
+
+func (*attributeValue_DoubleValue) isAttributeValue_Value() {}
+
+func (*attributeValue_BoolValue) isAttributeValue_Value() {}
+
+func (*attributeValue_BytesValue) isAttributeValue_Value() {}
+
+func (*attributeValue_ArrayValue) isAttributeValue_Value() {}
+
+func (*attributeValue_MapValue) isAttributeValue_Value() {}
+
+type AttributeArray struct {
+	state             protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Values *[]*AttributeValue     `protobuf:"bytes,1,rep,name=values"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *AttributeArray) Reset() {
+	*x = AttributeArray{}
+	mi := &file_devlog_v1_devlog_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AttributeArray) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AttributeArray) ProtoMessage() {}
+
+func (x *AttributeArray) ProtoReflect() protoreflect.Message {
+	mi := &file_devlog_v1_devlog_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *AttributeArray) GetValues() []*AttributeValue {
+	if x != nil {
+		if x.xxx_hidden_Values != nil {
+			return *x.xxx_hidden_Values
+		}
+	}
+	return nil
+}
+
+func (x *AttributeArray) SetValues(v []*AttributeValue) {
+	x.xxx_hidden_Values = &v
+}
+
+type AttributeArray_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	Values []*AttributeValue
+}
+
+func (b0 AttributeArray_builder) Build() *AttributeArray {
+	m0 := &AttributeArray{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Values = &b.Values
+	return m0
+}
+
+type AttributeMap struct {
+	state             protoimpl.MessageState     `protogen:"opaque.v1"`
+	xxx_hidden_Values map[string]*AttributeValue `protobuf:"bytes,1,rep,name=values" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *AttributeMap) Reset() {
+	*x = AttributeMap{}
+	mi := &file_devlog_v1_devlog_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AttributeMap) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AttributeMap) ProtoMessage() {}
+
+func (x *AttributeMap) ProtoReflect() protoreflect.Message {
+	mi := &file_devlog_v1_devlog_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *AttributeMap) GetValues() map[string]*AttributeValue {
+	if x != nil {
+		return x.xxx_hidden_Values
+	}
+	return nil
+}
+
+func (x *AttributeMap) SetValues(v map[string]*AttributeValue) {
+	x.xxx_hidden_Values = v
+}
+
+type AttributeMap_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	Values map[string]*AttributeValue
+}
+
+func (b0 AttributeMap_builder) Build() *AttributeMap {
+	m0 := &AttributeMap{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Values = b.Values
+	return m0
+}
+
+// Key-value attribute with grouping support
+type Attribute struct {
+	state            protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Key   string                 `protobuf:"bytes,1,opt,name=key"`
+	xxx_hidden_Value *AttributeValue        `protobuf:"bytes,2,opt,name=value"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *Attribute) Reset() {
+	*x = Attribute{}
+	mi := &file_devlog_v1_devlog_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Attribute) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Attribute) ProtoMessage() {}
+
+func (x *Attribute) ProtoReflect() protoreflect.Message {
+	mi := &file_devlog_v1_devlog_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *Attribute) GetKey() string {
+	if x != nil {
+		return x.xxx_hidden_Key
+	}
+	return ""
+}
+
+func (x *Attribute) GetValue() *AttributeValue {
+	if x != nil {
+		return x.xxx_hidden_Value
+	}
+	return nil
+}
+
+func (x *Attribute) SetKey(v string) {
+	x.xxx_hidden_Key = v
+}
+
+func (x *Attribute) SetValue(v *AttributeValue) {
+	x.xxx_hidden_Value = v
+}
+
+func (x *Attribute) HasValue() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_Value != nil
+}
+
+func (x *Attribute) ClearValue() {
+	x.xxx_hidden_Value = nil
+}
+
+type Attribute_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	Key   string
+	Value *AttributeValue
+}
+
+func (b0 Attribute_builder) Build() *Attribute {
+	m0 := &Attribute{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Key = b.Key
+	x.xxx_hidden_Value = b.Value
+	return m0
+}
+
+// Error information with stack trace
+type ErrorInfo struct {
+	state                 protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Message    string                 `protobuf:"bytes,1,opt,name=message"`
+	xxx_hidden_Type       string                 `protobuf:"bytes,2,opt,name=type"`
+	xxx_hidden_StackTrace string                 `protobuf:"bytes,3,opt,name=stack_trace,json=stackTrace"`
+	xxx_hidden_Frames     *[]*SourceInfo         `protobuf:"bytes,4,rep,name=frames"`
+	xxx_hidden_Cause      *ErrorInfo             `protobuf:"bytes,5,opt,name=cause"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *ErrorInfo) Reset() {
+	*x = ErrorInfo{}
+	mi := &file_devlog_v1_devlog_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ErrorInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ErrorInfo) ProtoMessage() {}
+
+func (x *ErrorInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_devlog_v1_devlog_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *ErrorInfo) GetMessage() string {
+	if x != nil {
+		return x.xxx_hidden_Message
+	}
+	return ""
+}
+
+func (x *ErrorInfo) GetType() string {
+	if x != nil {
+		return x.xxx_hidden_Type
+	}
+	return ""
+}
+
+func (x *ErrorInfo) GetStackTrace() string {
+	if x != nil {
+		return x.xxx_hidden_StackTrace
+	}
+	return ""
+}
+
+func (x *ErrorInfo) GetFrames() []*SourceInfo {
+	if x != nil {
+		if x.xxx_hidden_Frames != nil {
+			return *x.xxx_hidden_Frames
+		}
+	}
+	return nil
+}
+
+func (x *ErrorInfo) GetCause() *ErrorInfo {
+	if x != nil {
+		return x.xxx_hidden_Cause
+	}
+	return nil
+}
+
+func (x *ErrorInfo) SetMessage(v string) {
+	x.xxx_hidden_Message = v
+}
+
+func (x *ErrorInfo) SetType(v string) {
+	x.xxx_hidden_Type = v
+}
+
+func (x *ErrorInfo) SetStackTrace(v string) {
+	x.xxx_hidden_StackTrace = v
+}
+
+func (x *ErrorInfo) SetFrames(v []*SourceInfo) {
+	x.xxx_hidden_Frames = &v
+}
+
+func (x *ErrorInfo) SetCause(v *ErrorInfo) {
+	x.xxx_hidden_Cause = v
+}
+
+func (x *ErrorInfo) HasCause() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_Cause != nil
+}
+
+func (x *ErrorInfo) ClearCause() {
+	x.xxx_hidden_Cause = nil
+}
+
+type ErrorInfo_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	Message    string
+	Type       string
+	StackTrace string
+	Frames     []*SourceInfo
+	Cause      *ErrorInfo
+}
+
+func (b0 ErrorInfo_builder) Build() *ErrorInfo {
+	m0 := &ErrorInfo{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Message = b.Message
+	x.xxx_hidden_Type = b.Type
+	x.xxx_hidden_StackTrace = b.StackTrace
+	x.xxx_hidden_Frames = &b.Frames
+	x.xxx_hidden_Cause = b.Cause
+	return m0
+}
+
+// Structured log entry
 type StructuredLog struct {
-	state         protoimpl.MessageState `protogen:"opaque.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Timestamp  *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=timestamp"`
+	xxx_hidden_Level      LogLevel               `protobuf:"varint,2,opt,name=level,enum=runm.devlog.v1.LogLevel"`
+	xxx_hidden_Message    string                 `protobuf:"bytes,3,opt,name=message"`
+	xxx_hidden_LoggerName string                 `protobuf:"bytes,4,opt,name=logger_name,json=loggerName"`
+	xxx_hidden_Source     *SourceInfo            `protobuf:"bytes,5,opt,name=source"`
+	xxx_hidden_Process    *ProcessInfo           `protobuf:"bytes,6,opt,name=process"`
+	xxx_hidden_Attributes *[]*Attribute          `protobuf:"bytes,7,rep,name=attributes"`
+	xxx_hidden_Error      *ErrorInfo             `protobuf:"bytes,8,opt,name=error"`
+	xxx_hidden_TraceId    string                 `protobuf:"bytes,9,opt,name=trace_id,json=traceId"`
+	xxx_hidden_SpanId     string                 `protobuf:"bytes,10,opt,name=span_id,json=spanId"`
+	xxx_hidden_Labels     map[string]string      `protobuf:"bytes,11,rep,name=labels" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *StructuredLog) Reset() {
 	*x = StructuredLog{}
-	mi := &file_devlog_v1_devlog_proto_msgTypes[0]
+	mi := &file_devlog_v1_devlog_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +1183,7 @@ func (x *StructuredLog) String() string {
 func (*StructuredLog) ProtoMessage() {}
 
 func (x *StructuredLog) ProtoReflect() protoreflect.Message {
-	mi := &file_devlog_v1_devlog_proto_msgTypes[0]
+	mi := &file_devlog_v1_devlog_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -54,27 +1194,224 @@ func (x *StructuredLog) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
+func (x *StructuredLog) GetTimestamp() *timestamppb.Timestamp {
+	if x != nil {
+		return x.xxx_hidden_Timestamp
+	}
+	return nil
+}
+
+func (x *StructuredLog) GetLevel() LogLevel {
+	if x != nil {
+		return x.xxx_hidden_Level
+	}
+	return LogLevel_LOG_LEVEL_UNSPECIFIED
+}
+
+func (x *StructuredLog) GetMessage() string {
+	if x != nil {
+		return x.xxx_hidden_Message
+	}
+	return ""
+}
+
+func (x *StructuredLog) GetLoggerName() string {
+	if x != nil {
+		return x.xxx_hidden_LoggerName
+	}
+	return ""
+}
+
+func (x *StructuredLog) GetSource() *SourceInfo {
+	if x != nil {
+		return x.xxx_hidden_Source
+	}
+	return nil
+}
+
+func (x *StructuredLog) GetProcess() *ProcessInfo {
+	if x != nil {
+		return x.xxx_hidden_Process
+	}
+	return nil
+}
+
+func (x *StructuredLog) GetAttributes() []*Attribute {
+	if x != nil {
+		if x.xxx_hidden_Attributes != nil {
+			return *x.xxx_hidden_Attributes
+		}
+	}
+	return nil
+}
+
+func (x *StructuredLog) GetError() *ErrorInfo {
+	if x != nil {
+		return x.xxx_hidden_Error
+	}
+	return nil
+}
+
+func (x *StructuredLog) GetTraceId() string {
+	if x != nil {
+		return x.xxx_hidden_TraceId
+	}
+	return ""
+}
+
+func (x *StructuredLog) GetSpanId() string {
+	if x != nil {
+		return x.xxx_hidden_SpanId
+	}
+	return ""
+}
+
+func (x *StructuredLog) GetLabels() map[string]string {
+	if x != nil {
+		return x.xxx_hidden_Labels
+	}
+	return nil
+}
+
+func (x *StructuredLog) SetTimestamp(v *timestamppb.Timestamp) {
+	x.xxx_hidden_Timestamp = v
+}
+
+func (x *StructuredLog) SetLevel(v LogLevel) {
+	x.xxx_hidden_Level = v
+}
+
+func (x *StructuredLog) SetMessage(v string) {
+	x.xxx_hidden_Message = v
+}
+
+func (x *StructuredLog) SetLoggerName(v string) {
+	x.xxx_hidden_LoggerName = v
+}
+
+func (x *StructuredLog) SetSource(v *SourceInfo) {
+	x.xxx_hidden_Source = v
+}
+
+func (x *StructuredLog) SetProcess(v *ProcessInfo) {
+	x.xxx_hidden_Process = v
+}
+
+func (x *StructuredLog) SetAttributes(v []*Attribute) {
+	x.xxx_hidden_Attributes = &v
+}
+
+func (x *StructuredLog) SetError(v *ErrorInfo) {
+	x.xxx_hidden_Error = v
+}
+
+func (x *StructuredLog) SetTraceId(v string) {
+	x.xxx_hidden_TraceId = v
+}
+
+func (x *StructuredLog) SetSpanId(v string) {
+	x.xxx_hidden_SpanId = v
+}
+
+func (x *StructuredLog) SetLabels(v map[string]string) {
+	x.xxx_hidden_Labels = v
+}
+
+func (x *StructuredLog) HasTimestamp() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_Timestamp != nil
+}
+
+func (x *StructuredLog) HasSource() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_Source != nil
+}
+
+func (x *StructuredLog) HasProcess() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_Process != nil
+}
+
+func (x *StructuredLog) HasError() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_Error != nil
+}
+
+func (x *StructuredLog) ClearTimestamp() {
+	x.xxx_hidden_Timestamp = nil
+}
+
+func (x *StructuredLog) ClearSource() {
+	x.xxx_hidden_Source = nil
+}
+
+func (x *StructuredLog) ClearProcess() {
+	x.xxx_hidden_Process = nil
+}
+
+func (x *StructuredLog) ClearError() {
+	x.xxx_hidden_Error = nil
+}
+
 type StructuredLog_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
+	Timestamp  *timestamppb.Timestamp
+	Level      LogLevel
+	Message    string
+	LoggerName string
+	Source     *SourceInfo
+	Process    *ProcessInfo
+	Attributes []*Attribute
+	Error      *ErrorInfo
+	TraceId    string
+	SpanId     string
+	Labels     map[string]string
 }
 
 func (b0 StructuredLog_builder) Build() *StructuredLog {
 	m0 := &StructuredLog{}
 	b, x := &b0, m0
 	_, _ = b, x
+	x.xxx_hidden_Timestamp = b.Timestamp
+	x.xxx_hidden_Level = b.Level
+	x.xxx_hidden_Message = b.Message
+	x.xxx_hidden_LoggerName = b.LoggerName
+	x.xxx_hidden_Source = b.Source
+	x.xxx_hidden_Process = b.Process
+	x.xxx_hidden_Attributes = &b.Attributes
+	x.xxx_hidden_Error = b.Error
+	x.xxx_hidden_TraceId = b.TraceId
+	x.xxx_hidden_SpanId = b.SpanId
+	x.xxx_hidden_Labels = b.Labels
 	return m0
 }
 
+// Raw log entry (stdout/stderr capture)
 type RawLog struct {
-	state         protoimpl.MessageState `protogen:"opaque.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Timestamp  *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=timestamp"`
+	xxx_hidden_Data       []byte                 `protobuf:"bytes,2,opt,name=data"`
+	xxx_hidden_Process    *ProcessInfo           `protobuf:"bytes,3,opt,name=process"`
+	xxx_hidden_FdInfo     *FileDescriptorInfo    `protobuf:"bytes,4,opt,name=fd_info,json=fdInfo"`
+	xxx_hidden_LoggerName string                 `protobuf:"bytes,5,opt,name=logger_name,json=loggerName"`
+	xxx_hidden_Labels     map[string]string      `protobuf:"bytes,6,rep,name=labels" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	xxx_hidden_TraceId    string                 `protobuf:"bytes,7,opt,name=trace_id,json=traceId"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *RawLog) Reset() {
 	*x = RawLog{}
-	mi := &file_devlog_v1_devlog_proto_msgTypes[1]
+	mi := &file_devlog_v1_devlog_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -86,7 +1423,7 @@ func (x *RawLog) String() string {
 func (*RawLog) ProtoMessage() {}
 
 func (x *RawLog) ProtoReflect() protoreflect.Message {
-	mi := &file_devlog_v1_devlog_proto_msgTypes[1]
+	mi := &file_devlog_v1_devlog_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -97,15 +1434,142 @@ func (x *RawLog) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
+func (x *RawLog) GetTimestamp() *timestamppb.Timestamp {
+	if x != nil {
+		return x.xxx_hidden_Timestamp
+	}
+	return nil
+}
+
+func (x *RawLog) GetData() []byte {
+	if x != nil {
+		return x.xxx_hidden_Data
+	}
+	return nil
+}
+
+func (x *RawLog) GetProcess() *ProcessInfo {
+	if x != nil {
+		return x.xxx_hidden_Process
+	}
+	return nil
+}
+
+func (x *RawLog) GetFdInfo() *FileDescriptorInfo {
+	if x != nil {
+		return x.xxx_hidden_FdInfo
+	}
+	return nil
+}
+
+func (x *RawLog) GetLoggerName() string {
+	if x != nil {
+		return x.xxx_hidden_LoggerName
+	}
+	return ""
+}
+
+func (x *RawLog) GetLabels() map[string]string {
+	if x != nil {
+		return x.xxx_hidden_Labels
+	}
+	return nil
+}
+
+func (x *RawLog) GetTraceId() string {
+	if x != nil {
+		return x.xxx_hidden_TraceId
+	}
+	return ""
+}
+
+func (x *RawLog) SetTimestamp(v *timestamppb.Timestamp) {
+	x.xxx_hidden_Timestamp = v
+}
+
+func (x *RawLog) SetData(v []byte) {
+	if v == nil {
+		v = []byte{}
+	}
+	x.xxx_hidden_Data = v
+}
+
+func (x *RawLog) SetProcess(v *ProcessInfo) {
+	x.xxx_hidden_Process = v
+}
+
+func (x *RawLog) SetFdInfo(v *FileDescriptorInfo) {
+	x.xxx_hidden_FdInfo = v
+}
+
+func (x *RawLog) SetLoggerName(v string) {
+	x.xxx_hidden_LoggerName = v
+}
+
+func (x *RawLog) SetLabels(v map[string]string) {
+	x.xxx_hidden_Labels = v
+}
+
+func (x *RawLog) SetTraceId(v string) {
+	x.xxx_hidden_TraceId = v
+}
+
+func (x *RawLog) HasTimestamp() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_Timestamp != nil
+}
+
+func (x *RawLog) HasProcess() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_Process != nil
+}
+
+func (x *RawLog) HasFdInfo() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_FdInfo != nil
+}
+
+func (x *RawLog) ClearTimestamp() {
+	x.xxx_hidden_Timestamp = nil
+}
+
+func (x *RawLog) ClearProcess() {
+	x.xxx_hidden_Process = nil
+}
+
+func (x *RawLog) ClearFdInfo() {
+	x.xxx_hidden_FdInfo = nil
+}
+
 type RawLog_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
+	Timestamp  *timestamppb.Timestamp
+	Data       []byte
+	Process    *ProcessInfo
+	FdInfo     *FileDescriptorInfo
+	LoggerName string
+	Labels     map[string]string
+	TraceId    string
 }
 
 func (b0 RawLog_builder) Build() *RawLog {
 	m0 := &RawLog{}
 	b, x := &b0, m0
 	_, _ = b, x
+	x.xxx_hidden_Timestamp = b.Timestamp
+	x.xxx_hidden_Data = b.Data
+	x.xxx_hidden_Process = b.Process
+	x.xxx_hidden_FdInfo = b.FdInfo
+	x.xxx_hidden_LoggerName = b.LoggerName
+	x.xxx_hidden_Labels = b.Labels
+	x.xxx_hidden_TraceId = b.TraceId
 	return m0
 }
 
@@ -118,7 +1582,7 @@ type LogRequest struct {
 
 func (x *LogRequest) Reset() {
 	*x = LogRequest{}
-	mi := &file_devlog_v1_devlog_proto_msgTypes[2]
+	mi := &file_devlog_v1_devlog_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -130,7 +1594,7 @@ func (x *LogRequest) String() string {
 func (*LogRequest) ProtoMessage() {}
 
 func (x *LogRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_devlog_v1_devlog_proto_msgTypes[2]
+	mi := &file_devlog_v1_devlog_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -257,7 +1721,7 @@ func (b0 LogRequest_builder) Build() *LogRequest {
 type case_LogRequest_Log protoreflect.FieldNumber
 
 func (x case_LogRequest_Log) String() string {
-	md := file_devlog_v1_devlog_proto_msgTypes[2].Descriptor()
+	md := file_devlog_v1_devlog_proto_msgTypes[10].Descriptor()
 	if x == 0 {
 		return "not set"
 	}
@@ -281,14 +1745,16 @@ func (*logRequest_Structured) isLogRequest_Log() {}
 func (*logRequest_Raw) isLogRequest_Log() {}
 
 type LogResponse struct {
-	state         protoimpl.MessageState `protogen:"opaque.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Success bool                   `protobuf:"varint,1,opt,name=success"`
+	xxx_hidden_Error   string                 `protobuf:"bytes,2,opt,name=error"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *LogResponse) Reset() {
 	*x = LogResponse{}
-	mi := &file_devlog_v1_devlog_proto_msgTypes[3]
+	mi := &file_devlog_v1_devlog_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -300,7 +1766,7 @@ func (x *LogResponse) String() string {
 func (*LogResponse) ProtoMessage() {}
 
 func (x *LogResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_devlog_v1_devlog_proto_msgTypes[3]
+	mi := &file_devlog_v1_devlog_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -311,15 +1777,41 @@ func (x *LogResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
+func (x *LogResponse) GetSuccess() bool {
+	if x != nil {
+		return x.xxx_hidden_Success
+	}
+	return false
+}
+
+func (x *LogResponse) GetError() string {
+	if x != nil {
+		return x.xxx_hidden_Error
+	}
+	return ""
+}
+
+func (x *LogResponse) SetSuccess(v bool) {
+	x.xxx_hidden_Success = v
+}
+
+func (x *LogResponse) SetError(v string) {
+	x.xxx_hidden_Error = v
+}
+
 type LogResponse_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
+	Success bool
+	Error   string
 }
 
 func (b0 LogResponse_builder) Build() *LogResponse {
 	m0 := &LogResponse{}
 	b, x := &b0, m0
 	_, _ = b, x
+	x.xxx_hidden_Success = b.Success
+	x.xxx_hidden_Error = b.Error
 	return m0
 }
 
@@ -327,38 +1819,163 @@ var File_devlog_v1_devlog_proto protoreflect.FileDescriptor
 
 const file_devlog_v1_devlog_proto_rawDesc = "" +
 	"\n" +
-	"\x16devlog/v1/devlog.proto\x12\x0erunm.devlog.v1\x1a!google/protobuf/go_features.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x0f\n" +
-	"\rStructuredLog\"\b\n" +
-	"\x06RawLog\"\x80\x01\n" +
+	"\x16devlog/v1/devlog.proto\x12\x0erunm.devlog.v1\x1a!google/protobuf/go_features.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\"\xdc\x01\n" +
+	"\n" +
+	"SourceInfo\x12\x1b\n" +
+	"\tfile_path\x18\x01 \x01(\tR\bfilePath\x12\x1f\n" +
+	"\vline_number\x18\x02 \x01(\x05R\n" +
+	"lineNumber\x12#\n" +
+	"\rfunction_name\x18\x03 \x01(\tR\ffunctionName\x12!\n" +
+	"\fpackage_name\x18\x04 \x01(\tR\vpackageName\x12\x1f\n" +
+	"\vmodule_name\x18\x05 \x01(\tR\n" +
+	"moduleName\x12'\n" +
+	"\x0fprogram_counter\x18\x06 \x01(\x04R\x0eprogramCounter\"\x93\x01\n" +
+	"\vProcessInfo\x12\x10\n" +
+	"\x03pid\x18\x01 \x01(\x05R\x03pid\x12\x1a\n" +
+	"\bhostname\x18\x02 \x01(\tR\bhostname\x12\x18\n" +
+	"\aruntime\x18\x03 \x01(\tR\aruntime\x12\x0e\n" +
+	"\x02os\x18\x04 \x01(\tR\x02os\x12\x12\n" +
+	"\x04arch\x18\x05 \x01(\tR\x04arch\x12\x18\n" +
+	"\aversion\x18\x06 \x01(\tR\aversion\"\x93\x01\n" +
+	"\x12FileDescriptorInfo\x12\x0e\n" +
+	"\x02fd\x18\x01 \x01(\x05R\x02fd\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1b\n" +
+	"\tis_stdout\x18\x03 \x01(\bR\bisStdout\x12\x1b\n" +
+	"\tis_stderr\x18\x04 \x01(\bR\bisStderr\x12\x1f\n" +
+	"\vstream_type\x18\x05 \x01(\tR\n" +
+	"streamType\"\xc6\x02\n" +
+	"\x0eAttributeValue\x12#\n" +
+	"\fstring_value\x18\x01 \x01(\tH\x00R\vstringValue\x12\x1d\n" +
+	"\tint_value\x18\x02 \x01(\x03H\x00R\bintValue\x12#\n" +
+	"\fdouble_value\x18\x03 \x01(\x01H\x00R\vdoubleValue\x12\x1f\n" +
+	"\n" +
+	"bool_value\x18\x04 \x01(\bH\x00R\tboolValue\x12!\n" +
+	"\vbytes_value\x18\x05 \x01(\fH\x00R\n" +
+	"bytesValue\x12A\n" +
+	"\varray_value\x18\x06 \x01(\v2\x1e.runm.devlog.v1.AttributeArrayH\x00R\n" +
+	"arrayValue\x12;\n" +
+	"\tmap_value\x18\a \x01(\v2\x1c.runm.devlog.v1.AttributeMapH\x00R\bmapValueB\a\n" +
+	"\x05value\"H\n" +
+	"\x0eAttributeArray\x126\n" +
+	"\x06values\x18\x01 \x03(\v2\x1e.runm.devlog.v1.AttributeValueR\x06values\"\xab\x01\n" +
+	"\fAttributeMap\x12@\n" +
+	"\x06values\x18\x01 \x03(\v2(.runm.devlog.v1.AttributeMap.ValuesEntryR\x06values\x1aY\n" +
+	"\vValuesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x124\n" +
+	"\x05value\x18\x02 \x01(\v2\x1e.runm.devlog.v1.AttributeValueR\x05value:\x028\x01\"S\n" +
+	"\tAttribute\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x124\n" +
+	"\x05value\x18\x02 \x01(\v2\x1e.runm.devlog.v1.AttributeValueR\x05value\"\xbf\x01\n" +
+	"\tErrorInfo\x12\x18\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\x12\x12\n" +
+	"\x04type\x18\x02 \x01(\tR\x04type\x12\x1f\n" +
+	"\vstack_trace\x18\x03 \x01(\tR\n" +
+	"stackTrace\x122\n" +
+	"\x06frames\x18\x04 \x03(\v2\x1a.runm.devlog.v1.SourceInfoR\x06frames\x12/\n" +
+	"\x05cause\x18\x05 \x01(\v2\x19.runm.devlog.v1.ErrorInfoR\x05cause\"\xbd\x04\n" +
+	"\rStructuredLog\x128\n" +
+	"\ttimestamp\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12.\n" +
+	"\x05level\x18\x02 \x01(\x0e2\x18.runm.devlog.v1.LogLevelR\x05level\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\x12\x1f\n" +
+	"\vlogger_name\x18\x04 \x01(\tR\n" +
+	"loggerName\x122\n" +
+	"\x06source\x18\x05 \x01(\v2\x1a.runm.devlog.v1.SourceInfoR\x06source\x125\n" +
+	"\aprocess\x18\x06 \x01(\v2\x1b.runm.devlog.v1.ProcessInfoR\aprocess\x129\n" +
+	"\n" +
+	"attributes\x18\a \x03(\v2\x19.runm.devlog.v1.AttributeR\n" +
+	"attributes\x12/\n" +
+	"\x05error\x18\b \x01(\v2\x19.runm.devlog.v1.ErrorInfoR\x05error\x12\x19\n" +
+	"\btrace_id\x18\t \x01(\tR\atraceId\x12\x17\n" +
+	"\aspan_id\x18\n" +
+	" \x01(\tR\x06spanId\x12A\n" +
+	"\x06labels\x18\v \x03(\v2).runm.devlog.v1.StructuredLog.LabelsEntryR\x06labels\x1a9\n" +
+	"\vLabelsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xfd\x02\n" +
+	"\x06RawLog\x128\n" +
+	"\ttimestamp\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12\x12\n" +
+	"\x04data\x18\x02 \x01(\fR\x04data\x125\n" +
+	"\aprocess\x18\x03 \x01(\v2\x1b.runm.devlog.v1.ProcessInfoR\aprocess\x12;\n" +
+	"\afd_info\x18\x04 \x01(\v2\".runm.devlog.v1.FileDescriptorInfoR\x06fdInfo\x12\x1f\n" +
+	"\vlogger_name\x18\x05 \x01(\tR\n" +
+	"loggerName\x12:\n" +
+	"\x06labels\x18\x06 \x03(\v2\".runm.devlog.v1.RawLog.LabelsEntryR\x06labels\x12\x19\n" +
+	"\btrace_id\x18\a \x01(\tR\atraceId\x1a9\n" +
+	"\vLabelsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x80\x01\n" +
 	"\n" +
 	"LogRequest\x12?\n" +
 	"\n" +
 	"structured\x18\x01 \x01(\v2\x1d.runm.devlog.v1.StructuredLogH\x00R\n" +
 	"structured\x12*\n" +
 	"\x03raw\x18\x02 \x01(\v2\x16.runm.devlog.v1.RawLogH\x00R\x03rawB\x05\n" +
-	"\x03log\"\r\n" +
-	"\vLogResponse2S\n" +
+	"\x03log\"=\n" +
+	"\vLogResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error*\xa1\x01\n" +
+	"\bLogLevel\x12\x19\n" +
+	"\x15LOG_LEVEL_UNSPECIFIED\x10\x00\x12\x13\n" +
+	"\x0fLOG_LEVEL_TRACE\x10\x01\x12\x13\n" +
+	"\x0fLOG_LEVEL_DEBUG\x10\x02\x12\x12\n" +
+	"\x0eLOG_LEVEL_INFO\x10\x03\x12\x12\n" +
+	"\x0eLOG_LEVEL_WARN\x10\x04\x12\x13\n" +
+	"\x0fLOG_LEVEL_ERROR\x10\x05\x12\x13\n" +
+	"\x0fLOG_LEVEL_FATAL\x10\x062S\n" +
 	"\rDevlogService\x12B\n" +
 	"\x03Log\x12\x1a.runm.devlog.v1.LogRequest\x1a\x1b.runm.devlog.v1.LogResponse(\x010\x01B\xb6\x01\n" +
 	"\x12com.runm.devlog.v1B\vDevlogProtoP\x01Z/github.com/walteh/runm/proto/devlog/v1;devlogv1\xa2\x02\x03RDX\xaa\x02\x0eRunm.Devlog.V1\xca\x02\x0eRunm\\Devlog\\V1\xe2\x02\x1aRunm\\Devlog\\V1\\GPBMetadata\xea\x02\x10Runm::Devlog::V1\x92\x03\a\xd2>\x02\x10\x03\b\x02b\beditionsp\xe8\a"
 
-var file_devlog_v1_devlog_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_devlog_v1_devlog_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_devlog_v1_devlog_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_devlog_v1_devlog_proto_goTypes = []any{
-	(*StructuredLog)(nil), // 0: runm.devlog.v1.StructuredLog
-	(*RawLog)(nil),        // 1: runm.devlog.v1.RawLog
-	(*LogRequest)(nil),    // 2: runm.devlog.v1.LogRequest
-	(*LogResponse)(nil),   // 3: runm.devlog.v1.LogResponse
+	(LogLevel)(0),                 // 0: runm.devlog.v1.LogLevel
+	(*SourceInfo)(nil),            // 1: runm.devlog.v1.SourceInfo
+	(*ProcessInfo)(nil),           // 2: runm.devlog.v1.ProcessInfo
+	(*FileDescriptorInfo)(nil),    // 3: runm.devlog.v1.FileDescriptorInfo
+	(*AttributeValue)(nil),        // 4: runm.devlog.v1.AttributeValue
+	(*AttributeArray)(nil),        // 5: runm.devlog.v1.AttributeArray
+	(*AttributeMap)(nil),          // 6: runm.devlog.v1.AttributeMap
+	(*Attribute)(nil),             // 7: runm.devlog.v1.Attribute
+	(*ErrorInfo)(nil),             // 8: runm.devlog.v1.ErrorInfo
+	(*StructuredLog)(nil),         // 9: runm.devlog.v1.StructuredLog
+	(*RawLog)(nil),                // 10: runm.devlog.v1.RawLog
+	(*LogRequest)(nil),            // 11: runm.devlog.v1.LogRequest
+	(*LogResponse)(nil),           // 12: runm.devlog.v1.LogResponse
+	nil,                           // 13: runm.devlog.v1.AttributeMap.ValuesEntry
+	nil,                           // 14: runm.devlog.v1.StructuredLog.LabelsEntry
+	nil,                           // 15: runm.devlog.v1.RawLog.LabelsEntry
+	(*timestamppb.Timestamp)(nil), // 16: google.protobuf.Timestamp
 }
 var file_devlog_v1_devlog_proto_depIdxs = []int32{
-	0, // 0: runm.devlog.v1.LogRequest.structured:type_name -> runm.devlog.v1.StructuredLog
-	1, // 1: runm.devlog.v1.LogRequest.raw:type_name -> runm.devlog.v1.RawLog
-	2, // 2: runm.devlog.v1.DevlogService.Log:input_type -> runm.devlog.v1.LogRequest
-	3, // 3: runm.devlog.v1.DevlogService.Log:output_type -> runm.devlog.v1.LogResponse
-	3, // [3:4] is the sub-list for method output_type
-	2, // [2:3] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	5,  // 0: runm.devlog.v1.AttributeValue.array_value:type_name -> runm.devlog.v1.AttributeArray
+	6,  // 1: runm.devlog.v1.AttributeValue.map_value:type_name -> runm.devlog.v1.AttributeMap
+	4,  // 2: runm.devlog.v1.AttributeArray.values:type_name -> runm.devlog.v1.AttributeValue
+	13, // 3: runm.devlog.v1.AttributeMap.values:type_name -> runm.devlog.v1.AttributeMap.ValuesEntry
+	4,  // 4: runm.devlog.v1.Attribute.value:type_name -> runm.devlog.v1.AttributeValue
+	1,  // 5: runm.devlog.v1.ErrorInfo.frames:type_name -> runm.devlog.v1.SourceInfo
+	8,  // 6: runm.devlog.v1.ErrorInfo.cause:type_name -> runm.devlog.v1.ErrorInfo
+	16, // 7: runm.devlog.v1.StructuredLog.timestamp:type_name -> google.protobuf.Timestamp
+	0,  // 8: runm.devlog.v1.StructuredLog.level:type_name -> runm.devlog.v1.LogLevel
+	1,  // 9: runm.devlog.v1.StructuredLog.source:type_name -> runm.devlog.v1.SourceInfo
+	2,  // 10: runm.devlog.v1.StructuredLog.process:type_name -> runm.devlog.v1.ProcessInfo
+	7,  // 11: runm.devlog.v1.StructuredLog.attributes:type_name -> runm.devlog.v1.Attribute
+	8,  // 12: runm.devlog.v1.StructuredLog.error:type_name -> runm.devlog.v1.ErrorInfo
+	14, // 13: runm.devlog.v1.StructuredLog.labels:type_name -> runm.devlog.v1.StructuredLog.LabelsEntry
+	16, // 14: runm.devlog.v1.RawLog.timestamp:type_name -> google.protobuf.Timestamp
+	2,  // 15: runm.devlog.v1.RawLog.process:type_name -> runm.devlog.v1.ProcessInfo
+	3,  // 16: runm.devlog.v1.RawLog.fd_info:type_name -> runm.devlog.v1.FileDescriptorInfo
+	15, // 17: runm.devlog.v1.RawLog.labels:type_name -> runm.devlog.v1.RawLog.LabelsEntry
+	9,  // 18: runm.devlog.v1.LogRequest.structured:type_name -> runm.devlog.v1.StructuredLog
+	10, // 19: runm.devlog.v1.LogRequest.raw:type_name -> runm.devlog.v1.RawLog
+	4,  // 20: runm.devlog.v1.AttributeMap.ValuesEntry.value:type_name -> runm.devlog.v1.AttributeValue
+	11, // 21: runm.devlog.v1.DevlogService.Log:input_type -> runm.devlog.v1.LogRequest
+	12, // 22: runm.devlog.v1.DevlogService.Log:output_type -> runm.devlog.v1.LogResponse
+	22, // [22:23] is the sub-list for method output_type
+	21, // [21:22] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_devlog_v1_devlog_proto_init() }
@@ -366,7 +1983,16 @@ func file_devlog_v1_devlog_proto_init() {
 	if File_devlog_v1_devlog_proto != nil {
 		return
 	}
-	file_devlog_v1_devlog_proto_msgTypes[2].OneofWrappers = []any{
+	file_devlog_v1_devlog_proto_msgTypes[3].OneofWrappers = []any{
+		(*attributeValue_StringValue)(nil),
+		(*attributeValue_IntValue)(nil),
+		(*attributeValue_DoubleValue)(nil),
+		(*attributeValue_BoolValue)(nil),
+		(*attributeValue_BytesValue)(nil),
+		(*attributeValue_ArrayValue)(nil),
+		(*attributeValue_MapValue)(nil),
+	}
+	file_devlog_v1_devlog_proto_msgTypes[10].OneofWrappers = []any{
 		(*logRequest_Structured)(nil),
 		(*logRequest_Raw)(nil),
 	}
@@ -375,13 +2001,14 @@ func file_devlog_v1_devlog_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_devlog_v1_devlog_proto_rawDesc), len(file_devlog_v1_devlog_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   4,
+			NumEnums:      1,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_devlog_v1_devlog_proto_goTypes,
 		DependencyIndexes: file_devlog_v1_devlog_proto_depIdxs,
+		EnumInfos:         file_devlog_v1_devlog_proto_enumTypes,
 		MessageInfos:      file_devlog_v1_devlog_proto_msgTypes,
 	}.Build()
 	File_devlog_v1_devlog_proto = out.File

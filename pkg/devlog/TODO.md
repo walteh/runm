@@ -45,6 +45,11 @@ enhanced package structure:
 
 NOTE: an additional ffield i wiould like to add to all logs is the 'language' or 'runtime' field to signify the language of the log. since other languages could ahve their own devlog implemenations.
 
+OTHER NOTES: 1. it can do both! 2. 100ms is a good start (you can set up options via the option gen stuff, see how ./pkg/taskgroup does it, go generate . can also be used to regenerate opts) 3. yeah anything that we can easily grab from the system and helpful other things like │
+│ timestamp, special info about the writer (like if it is an os.File, what was the fd or name, is it == to the sderr/stdout file pointer?) 4. yes keep slogdevterm AND stackerr untouched for now - we will add new log creator funcs in ./pkg/logging as needed for the new │
+│ system. 5. i was thingking otlp/otel, but tbh that mgiht be overkil - this thing is not for otel export or anything, its straight up to make logging for devs locally easier it. you know what lets instead of foxising on otel support of own internal log transer type, lets │
+│ make sure to just be built from the ground up to enable seamless support with otel - so like including as many log types as we can nativly. then, if we ever want to export to otel, we can have someting similar to the ./console package that will hande that
+
 ## STEP 2: INTEGRATE WITH pkg/logging
 
 -   currently the whole app relies on a complex mess of 'delimited' and 'raw' loggers, we need to move the project over to use devlog instead. almost all the work is needed in the ./pkg/logging package.

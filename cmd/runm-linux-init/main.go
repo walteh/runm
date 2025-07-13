@@ -3,6 +3,8 @@
 package main
 
 import (
+	_ "net/http/pprof"
+
 	"bytes"
 	"context"
 	"encoding/json"
@@ -12,16 +14,16 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	goruntime "runtime"
 	"runtime/debug"
 	"strconv"
 	"strings"
 	"syscall"
+
+	goruntime "runtime"
 
 	"golang.org/x/sys/unix"
 

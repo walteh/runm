@@ -7,11 +7,13 @@ import (
 	"os"
 	"reflect"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/containerd/console"
 	"github.com/rs/xid"
-	"github.com/walteh/runm/core/runc/runtime"
 	"gitlab.com/tozd/go/errors"
-	"golang.org/x/sys/unix"
+
+	"github.com/walteh/runm/core/runc/runtime"
 )
 
 var _ runtime.ConsoleSocket = &guestPathProviderConsoleSocket{}

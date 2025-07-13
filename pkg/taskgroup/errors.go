@@ -20,7 +20,7 @@ func (tge *TaskGroupError) Error() string {
 	}
 
 	var parts []string
-	
+
 	// Count different types of failures
 	failedCount := 0
 	panickedCount := 0
@@ -35,12 +35,12 @@ func (tge *TaskGroupError) Error() string {
 	// Create summary
 	summary := fmt.Sprintf("taskgroup failed with %d error(s)", len(tge.TaskErrors))
 	if failedCount > 0 && panickedCount > 0 {
-		summary = fmt.Sprintf("taskgroup failed with %d error(s) (%d failed, %d panicked)", 
+		summary = fmt.Sprintf("taskgroup failed with %d error(s) (%d failed, %d panicked)",
 			len(tge.TaskErrors), failedCount, panickedCount)
 	} else if panickedCount > 0 {
 		summary = fmt.Sprintf("taskgroup failed with %d panic(s)", panickedCount)
 	}
-	
+
 	parts = append(parts, summary)
 
 	// Sort task names for consistent output

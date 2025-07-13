@@ -14,10 +14,11 @@ import (
 	"time"
 
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/walteh/runm/pkg/ticker"
 	"gitlab.com/tozd/go/errors"
 
 	gorunc "github.com/containerd/go-runc"
+
+	"github.com/walteh/runm/pkg/ticker"
 )
 
 func tryReadPidFile(ctx context.Context, pidfile string) (int, error) {

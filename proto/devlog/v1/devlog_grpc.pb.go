@@ -28,7 +28,7 @@ const (
 //
 // Devlog service for managing debug targets
 type DevlogServiceClient interface {
-	// Register a new debug target
+	// Stream logs (bidirectional for both batch and real-time)
 	Log(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[LogRequest, LogResponse], error)
 }
 
@@ -59,7 +59,7 @@ type DevlogService_LogClient = grpc.BidiStreamingClient[LogRequest, LogResponse]
 //
 // Devlog service for managing debug targets
 type DevlogServiceServer interface {
-	// Register a new debug target
+	// Stream logs (bidirectional for both batch and real-time)
 	Log(grpc.BidiStreamingServer[LogRequest, LogResponse]) error
 }
 

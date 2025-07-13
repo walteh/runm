@@ -19,9 +19,8 @@
 package runm
 
 import (
-	"fmt"
-
 	"github.com/containerd/containerd/v2/pkg/stdio"
+	"gitlab.com/tozd/go/errors"
 
 	"github.com/walteh/runm/pkg/kqueue"
 )
@@ -30,7 +29,7 @@ import (
 func NewPlatform() (stdio.Platform, error) {
 	kqueuer, err := kqueue.NewKqueuer()
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize kqueuer: %w", err)
+		return nil, errors.Errorf("initializing kqueuer: %w", err)
 	}
 	go kqueuer.Wait()
 	return newPlatform(kqueuer)

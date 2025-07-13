@@ -12,42 +12,50 @@ import (
 	"gitlab.com/tozd/go/errors"
 
 	"github.com/walteh/runm/core/runc/runtime"
+
+	runmv1 "github.com/walteh/runm/proto/v1"
 )
 
 var _ runtime.CgroupAdapter = (*CgroupV2Adapter)(nil)
 
 type CgroupV2Adapter struct {
 	cgroup *cgroup2.Manager
+	path   string
 }
 
 func NewCgroupV2Adapter(ctx context.Context, containerId string) (*CgroupV2Adapter, error) {
 
+	path := "/" + containerId
+
 	// get the cgroup manager
-	cg, err := cgroup2.Load("/" + containerId)
+	cg, err := cgroup2.Load(path)
 	if err != nil {
 		return nil, errors.Errorf("failed to load cgroup2 for root: %w", err)
 	}
 
-	return &CgroupV2Adapter{cgroup: cg}, nil
+	return &CgroupV2Adapter{cgroup: cg, path: path}, nil
 }
 
 // OpenEventChan implements runtime.CgroupAdapter.
-func (me *CgroupV2Adapter) OpenEventChan(ctx context.Context) (<-chan runtime.CgroupEvent, <-chan error, error) {
+func (me *CgroupV2Adapter) OpenEventChan(ctx context.Context) (<-chan *runmv1.CgroupEvent, <-chan error, error) {
 
 	evch, errch := me.cgroup.EventChan()
 
-	evch2 := make(chan runtime.CgroupEvent)
+	evch2 := make(chan *runmv1.CgroupEvent)
 
 	go func() {
 		for ev := range evch {
 			go func() {
-				evch2 <- runtime.CgroupEvent{
-					Low:     ev.Low,
-					High:    ev.High,
-					Max:     ev.Max,
-					OOM:     ev.OOM,
-					OOMKill: ev.OOMKill,
+				req := &runmv1.CgroupEvent_builder{
+					Low:        ev.Low,
+					High:       ev.High,
+					Max:        ev.Max,
+					Oom:        ev.OOM,
+					OomKill:    ev.OOMKill,
+					CgroupPath: me.path,
 				}
+
+				evch2 <- req.Build()
 			}()
 		}
 	}()

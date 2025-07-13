@@ -14,10 +14,11 @@ import (
 
 	"github.com/walteh/runm/core/runc/oom"
 	"github.com/walteh/runm/core/runc/runtime"
-	grpcruntime "github.com/walteh/runm/core/runc/runtime/grpc"
 	"github.com/walteh/runm/core/virt/vmm"
 	"github.com/walteh/runm/pkg/logging"
 	"github.com/walteh/runm/pkg/units"
+
+	grpcruntime "github.com/walteh/runm/core/runc/runtime/grpc"
 )
 
 var (

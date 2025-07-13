@@ -20,13 +20,12 @@ package process
 
 import (
 	"context"
-	"errors"
-	"fmt"
 
 	"github.com/containerd/console"
 	"github.com/containerd/errdefs"
 
 	google_protobuf "github.com/containerd/containerd/v2/pkg/protobuf/types"
+	"gitlab.com/tozd/go/errors"
 
 	"github.com/walteh/runm/core/runc/process"
 )
@@ -59,11 +58,11 @@ func (s *deletedState) Start(ctx context.Context) error {
 }
 
 func (s *deletedState) Delete(ctx context.Context) error {
-	return fmt.Errorf("cannot delete a deleted process: %w", errdefs.ErrNotFound)
+	return errors.Errorf("deleting already deleted process: %w", errdefs.ErrNotFound)
 }
 
 func (s *deletedState) Kill(ctx context.Context, sig uint32, all bool) error {
-	return fmt.Errorf("cannot kill a deleted process: %w", errdefs.ErrNotFound)
+	return errors.Errorf("killing deleted process: %w", errdefs.ErrNotFound)
 }
 
 func (s *deletedState) SetExited(status int) {

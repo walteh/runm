@@ -20,11 +20,10 @@ package process
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"log/slog"
 
 	"github.com/containerd/console"
+	"gitlab.com/tozd/go/errors"
 )
 
 type execState interface {
@@ -49,7 +48,7 @@ func (s *execCreatedState) transition(name string) error {
 	case "deleted":
 		s.p.execState = &deletedState{}
 	default:
-		return fmt.Errorf("invalid state transition %q to %q", stateName(s), name)
+		return errors.Errorf("transitioning state from %q to %q", stateName(s), name)
 	}
 	return nil
 }
@@ -107,7 +106,7 @@ func (s *execRunningState) transition(name string) error {
 	case "stopped":
 		s.p.execState = &execStoppedState{p: s.p}
 	default:
-		return fmt.Errorf("invalid state transition %q to %q", stateName(s), name)
+		return errors.Errorf("transitioning state from %q to %q", stateName(s), name)
 	}
 	return nil
 }
@@ -149,7 +148,7 @@ func (s *execStoppedState) transition(name string) error {
 	case "deleted":
 		s.p.execState = &deletedState{}
 	default:
-		return fmt.Errorf("invalid state transition %q to %q", stateName(s), name)
+		return errors.Errorf("transitioning state from %q to %q", stateName(s), name)
 	}
 	return nil
 }

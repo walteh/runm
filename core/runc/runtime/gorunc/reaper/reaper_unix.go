@@ -30,10 +30,12 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/sys/unix"
+
 	runc "github.com/containerd/go-runc"
+
 	"github.com/walteh/runm/core/runc/runtime/gorunc/piddebug"
 	"github.com/walteh/runm/pkg/ticker"
-	"golang.org/x/sys/unix"
 )
 
 // ErrNoSuchProcess is returned when the process no longer exists

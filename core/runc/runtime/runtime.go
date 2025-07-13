@@ -21,6 +21,8 @@ import (
 	gorunc "github.com/containerd/go-runc"
 
 	"github.com/walteh/runm/core/runc/process"
+
+	runmv1 "github.com/walteh/runm/proto/v1"
 )
 
 const (
@@ -50,17 +52,18 @@ type SocketAllocator interface {
 }
 
 type CgroupEvent struct {
-	Low     uint64
-	High    uint64
-	Max     uint64
-	OOM     uint64
-	OOMKill uint64
+	Low         uint64
+	High        uint64
+	Max         uint64
+	OOM         uint64
+	OOMKill     uint64
+	ContainerID string
 }
 
 type CgroupAdapter interface {
 	Stat(ctx context.Context) (*stats.Metrics, error)
 	ToggleControllers(ctx context.Context) error
-	OpenEventChan(ctx context.Context) (<-chan CgroupEvent, <-chan error, error)
+	OpenEventChan(ctx context.Context) (<-chan *runmv1.CgroupEvent, <-chan error, error)
 }
 
 type GuestManagement interface {

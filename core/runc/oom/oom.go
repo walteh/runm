@@ -3,6 +3,7 @@ package oom
 import (
 	"context"
 	"log/slog"
+	"strings"
 
 	"github.com/containerd/containerd/v2/core/events"
 	"gitlab.com/tozd/go/errors"
@@ -21,70 +22,56 @@ type Watcher struct {
 	cgroupAdapter runtime.CgroupAdapter
 }
 
-type item struct {
-	id  string
-	ev  runtime.CgroupEvent
-	err error
-}
-
 func RunOOMWatcher(ctx context.Context, publisher events.Publisher, cgroupAdapter runtime.CgroupAdapter) error {
-
 	eventCh, errCh, err := cgroupAdapter.OpenEventChan(ctx)
 	if err != nil {
 		return errors.Errorf("failed to open event channel: %w", err)
 	}
 
-	lastOOMMap := make(map[string]uint64) // key: id, value: ev.OOM
-	itemCh := make(chan item)
-
-	defer func() {
-
-		close(itemCh)
-	}()
-
-	go func() {
-		for {
-			i := item{id: "root"}
-			select {
-			case ev := <-eventCh:
-				slog.Debug("OOM[EVENT]", "id", i.id, "ev", ev)
-				i.ev = ev
-				itemCh <- i
-			case err := <-errCh:
-				// channel is closed when cgroup gets deleted or connection closes
-				if err != nil && status.Code(err) != codes.Canceled {
-					i.err = err
-					itemCh <- i
-					// we no longer get any event/err when we got an err
-					slog.Error("error from *cgroupsv2.Manager.EventChan", "error", err)
-				}
-				return
-			}
-		}
-	}()
+	var lastOOMCount uint64
 
 	for {
 		select {
 		case <-ctx.Done():
-			close(itemCh)
 			return ctx.Err()
-		case i := <-itemCh:
-			if i.err != nil {
-				delete(lastOOMMap, i.id)
-				continue
+
+		case ev := <-eventCh:
+			slog.Debug("OOM-WATCHER[EVENT]", "event", ev)
+
+			var containerID string
+			if ev.GetCgroupPath() == "/" {
+				containerID = "root"
+			} else {
+				containerID = strings.TrimPrefix(ev.GetCgroupPath(), "/")
 			}
-			lastOOM := lastOOMMap[i.id]
-			if i.ev.OOMKill > lastOOM {
+
+			if ev.GetOomKill() > lastOOMCount {
 				if err := publisher.Publish(ctx, coreruntime.TaskOOMEventTopic, &eventstypes.TaskOOM{
-					ContainerID: i.id,
+					ContainerID: containerID,
 				}); err != nil {
 					return errors.Errorf("failed to publish OOM event: %w", err)
 				}
+				lastOOMCount = ev.GetOomKill()
 			}
-			if i.ev.OOMKill > 0 {
-				lastOOMMap[i.id] = i.ev.OOMKill
+
+		case err := <-errCh:
+			if err == nil {
+				slog.Debug("OOM-WATCHER[DONE] no error")
+				return nil
 			}
+
+			// Check for cancellation in nested errors (e.g., "Unavailable desc = ... Canceled")
+			errStr := err.Error()
+			if status.Code(err) == codes.Canceled ||
+				status.Code(err) == codes.Unavailable ||
+				strings.Contains(errStr, "Canceled") ||
+				strings.Contains(errStr, "client connection is closing") {
+				slog.Debug("OOM-WATCHER[DONE] ignoring error", "error", err)
+				return nil
+			}
+
+			slog.Error("OOM-WATCHER[ERROR] error from cgroup event channel", "error", err)
+			return errors.Errorf("error in cgroup event channel: %w", err)
 		}
 	}
-
 }

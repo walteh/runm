@@ -31,11 +31,12 @@ message GetCgroupStatsResponse {
 message StreamCgroupEventsRequest {}
 
 message CgroupEvent {
-	uint64 low      = 1;
-	uint64 high     = 2;
-	uint64 max      = 3;
-	uint64 oom      = 4;
-	uint64 oom_kill = 5;
+	uint64 low         = 1;
+	uint64 high        = 2;
+	uint64 max         = 3;
+	uint64 oom         = 4;
+	uint64 oom_kill    = 5;
+	string cgroup_path = 6;
 }
 
 message StreamCgroupEventsResponse {

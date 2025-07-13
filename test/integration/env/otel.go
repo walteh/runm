@@ -8,10 +8,11 @@ import (
 	"net"
 	"os"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/containerd/log"
 	"github.com/sirupsen/logrus"
 	"gitlab.com/tozd/go/errors"
-	"golang.org/x/sys/unix"
 
 	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/logging"

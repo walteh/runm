@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	slogctx "github.com/veqryn/slog-context"
+
 	"github.com/walteh/runm/pkg/stackerr"
 	"github.com/walteh/runm/pkg/ticker"
 )

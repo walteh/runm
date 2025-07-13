@@ -5,14 +5,223 @@
 package devlogv1
 
 import (
+	fmt "fmt"
 	slog "log/slog"
 )
+
+func (x *SourceInfo) LogValue() slog.Value {
+	if x == nil {
+		return slog.AnyValue(nil)
+	}
+	attrs := make([]slog.Attr, 0, 6)
+	attrs = append(attrs, slog.String("file_path", x.GetFilePath()))
+	attrs = append(attrs, slog.Int64("line_number", int64(x.GetLineNumber())))
+	attrs = append(attrs, slog.String("function_name", x.GetFunctionName()))
+	attrs = append(attrs, slog.String("package_name", x.GetPackageName()))
+	attrs = append(attrs, slog.String("module_name", x.GetModuleName()))
+	attrs = append(attrs, slog.Uint64("program_counter", x.GetProgramCounter()))
+	return slog.GroupValue(attrs...)
+}
+
+func (x *ProcessInfo) LogValue() slog.Value {
+	if x == nil {
+		return slog.AnyValue(nil)
+	}
+	attrs := make([]slog.Attr, 0, 6)
+	attrs = append(attrs, slog.Int64("pid", int64(x.GetPid())))
+	attrs = append(attrs, slog.String("hostname", x.GetHostname()))
+	attrs = append(attrs, slog.String("runtime", x.GetRuntime()))
+	attrs = append(attrs, slog.String("os", x.GetOs()))
+	attrs = append(attrs, slog.String("arch", x.GetArch()))
+	attrs = append(attrs, slog.String("version", x.GetVersion()))
+	return slog.GroupValue(attrs...)
+}
+
+func (x *FileDescriptorInfo) LogValue() slog.Value {
+	if x == nil {
+		return slog.AnyValue(nil)
+	}
+	attrs := make([]slog.Attr, 0, 5)
+	attrs = append(attrs, slog.Int64("fd", int64(x.GetFd())))
+	attrs = append(attrs, slog.String("name", x.GetName()))
+	attrs = append(attrs, slog.Bool("is_stdout", x.GetIsStdout()))
+	attrs = append(attrs, slog.Bool("is_stderr", x.GetIsStderr()))
+	attrs = append(attrs, slog.String("stream_type", x.GetStreamType()))
+	return slog.GroupValue(attrs...)
+}
+
+func (x *AttributeValue) LogValue() slog.Value {
+	if x == nil {
+		return slog.AnyValue(nil)
+	}
+	attrs := make([]slog.Attr, 0, 7)
+	// Handle oneof field: Value
+	switch x.WhichValue() {
+	case AttributeValue_StringValue_case:
+		attrs = append(attrs, slog.String("string_value", x.GetStringValue()))
+	case AttributeValue_IntValue_case:
+		attrs = append(attrs, slog.Int64("int_value", x.GetIntValue()))
+	case AttributeValue_DoubleValue_case:
+		attrs = append(attrs, slog.Float64("double_value", x.GetDoubleValue()))
+	case AttributeValue_BoolValue_case:
+		attrs = append(attrs, slog.Bool("bool_value", x.GetBoolValue()))
+	case AttributeValue_BytesValue_case:
+		attrs = append(attrs, slog.Any("bytes_value", x.GetBytesValue()))
+	case AttributeValue_ArrayValue_case:
+		if msgValue, ok := interface{}(x.GetArrayValue()).(slog.LogValuer); ok {
+			attrs = append(attrs, slog.Attr{Key: "array_value", Value: msgValue.LogValue()})
+		} else {
+			attrs = append(attrs, slog.Any("array_value", x.GetArrayValue()))
+		}
+	case AttributeValue_MapValue_case:
+		if msgValue, ok := interface{}(x.GetMapValue()).(slog.LogValuer); ok {
+			attrs = append(attrs, slog.Attr{Key: "map_value", Value: msgValue.LogValue()})
+		} else {
+			attrs = append(attrs, slog.Any("map_value", x.GetMapValue()))
+		}
+	}
+	return slog.GroupValue(attrs...)
+}
+
+func (x *AttributeArray) LogValue() slog.Value {
+	if x == nil {
+		return slog.AnyValue(nil)
+	}
+	attrs := make([]slog.Attr, 0, 1)
+	if len(x.GetValues()) != 0 {
+		attrs0 := make([]slog.Attr, 0, len(x.GetValues()))
+		for i, v := range x.GetValues() {
+			if v, ok := interface{}(v).(slog.LogValuer); ok {
+				attrs0 = append(attrs0, slog.Attr{Key: fmt.Sprintf("%d", i), Value: v.LogValue()})
+			} else {
+				attrs0 = append(attrs0, slog.Any(fmt.Sprintf("%d", i), v))
+			}
+		}
+		attrs = append(attrs, slog.Any("values", attrs0))
+	}
+	return slog.GroupValue(attrs...)
+}
+
+func (x *AttributeMap) LogValue() slog.Value {
+	if x == nil {
+		return slog.AnyValue(nil)
+	}
+	attrs := make([]slog.Attr, 0, 1)
+	if len(x.GetValues()) != 0 {
+		attrs0 := make([]slog.Attr, 0, len(x.GetValues()))
+		for k, v := range x.GetValues() {
+			if vv, ok := interface{}(v).(slog.LogValuer); ok {
+				attrs0 = append(attrs0, slog.Attr{Key: fmt.Sprintf("%v", k), Value: vv.LogValue()})
+			} else {
+				attrs0 = append(attrs0, slog.Any(fmt.Sprintf("%v", k), v))
+			}
+		}
+		attrs = append(attrs, slog.Any("values", attrs0))
+	}
+	return slog.GroupValue(attrs...)
+}
+
+func (x *Attribute) LogValue() slog.Value {
+	if x == nil {
+		return slog.AnyValue(nil)
+	}
+	attrs := make([]slog.Attr, 0, 2)
+	attrs = append(attrs, slog.String("key", x.GetKey()))
+	if x.GetValue() != nil {
+		if v, ok := interface{}(x.GetValue()).(slog.LogValuer); ok {
+			attrs = append(attrs, slog.Attr{Key: "value", Value: v.LogValue()})
+		} else {
+			attrs = append(attrs, slog.Any("value", x.GetValue()))
+		}
+	}
+	return slog.GroupValue(attrs...)
+}
+
+func (x *ErrorInfo) LogValue() slog.Value {
+	if x == nil {
+		return slog.AnyValue(nil)
+	}
+	attrs := make([]slog.Attr, 0, 5)
+	attrs = append(attrs, slog.String("message", x.GetMessage()))
+	attrs = append(attrs, slog.String("type", x.GetType()))
+	attrs = append(attrs, slog.String("stack_trace", x.GetStackTrace()))
+	if len(x.GetFrames()) != 0 {
+		attrs3 := make([]slog.Attr, 0, len(x.GetFrames()))
+		for i, v := range x.GetFrames() {
+			if v, ok := interface{}(v).(slog.LogValuer); ok {
+				attrs3 = append(attrs3, slog.Attr{Key: fmt.Sprintf("%d", i), Value: v.LogValue()})
+			} else {
+				attrs3 = append(attrs3, slog.Any(fmt.Sprintf("%d", i), v))
+			}
+		}
+		attrs = append(attrs, slog.Any("frames", attrs3))
+	}
+	if x.GetCause() != nil {
+		if v, ok := interface{}(x.GetCause()).(slog.LogValuer); ok {
+			attrs = append(attrs, slog.Attr{Key: "cause", Value: v.LogValue()})
+		} else {
+			attrs = append(attrs, slog.Any("cause", x.GetCause()))
+		}
+	}
+	return slog.GroupValue(attrs...)
+}
 
 func (x *StructuredLog) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
 	}
-	attrs := make([]slog.Attr, 0, 0)
+	attrs := make([]slog.Attr, 0, 11)
+	if x.GetTimestamp() != nil {
+		if v, ok := interface{}(x.GetTimestamp()).(slog.LogValuer); ok {
+			attrs = append(attrs, slog.Attr{Key: "timestamp", Value: v.LogValue()})
+		} else {
+			attrs = append(attrs, slog.Any("timestamp", x.GetTimestamp()))
+		}
+	}
+	attrs = append(attrs, slog.String("level", x.GetLevel().String()))
+	attrs = append(attrs, slog.String("message", x.GetMessage()))
+	attrs = append(attrs, slog.String("logger_name", x.GetLoggerName()))
+	if x.GetSource() != nil {
+		if v, ok := interface{}(x.GetSource()).(slog.LogValuer); ok {
+			attrs = append(attrs, slog.Attr{Key: "source", Value: v.LogValue()})
+		} else {
+			attrs = append(attrs, slog.Any("source", x.GetSource()))
+		}
+	}
+	if x.GetProcess() != nil {
+		if v, ok := interface{}(x.GetProcess()).(slog.LogValuer); ok {
+			attrs = append(attrs, slog.Attr{Key: "process", Value: v.LogValue()})
+		} else {
+			attrs = append(attrs, slog.Any("process", x.GetProcess()))
+		}
+	}
+	if len(x.GetAttributes()) != 0 {
+		attrs6 := make([]slog.Attr, 0, len(x.GetAttributes()))
+		for i, v := range x.GetAttributes() {
+			if v, ok := interface{}(v).(slog.LogValuer); ok {
+				attrs6 = append(attrs6, slog.Attr{Key: fmt.Sprintf("%d", i), Value: v.LogValue()})
+			} else {
+				attrs6 = append(attrs6, slog.Any(fmt.Sprintf("%d", i), v))
+			}
+		}
+		attrs = append(attrs, slog.Any("attributes", attrs6))
+	}
+	if x.GetError() != nil {
+		if v, ok := interface{}(x.GetError()).(slog.LogValuer); ok {
+			attrs = append(attrs, slog.Attr{Key: "error", Value: v.LogValue()})
+		} else {
+			attrs = append(attrs, slog.Any("error", x.GetError()))
+		}
+	}
+	attrs = append(attrs, slog.String("trace_id", x.GetTraceId()))
+	attrs = append(attrs, slog.String("span_id", x.GetSpanId()))
+	if len(x.GetLabels()) != 0 {
+		attrs10 := make([]slog.Attr, 0, len(x.GetLabels()))
+		for k, v := range x.GetLabels() {
+			attrs10 = append(attrs10, slog.String(fmt.Sprintf("%v", k), v))
+		}
+		attrs = append(attrs, slog.Any("labels", attrs10))
+	}
 	return slog.GroupValue(attrs...)
 }
 
@@ -20,7 +229,38 @@ func (x *RawLog) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
 	}
-	attrs := make([]slog.Attr, 0, 0)
+	attrs := make([]slog.Attr, 0, 7)
+	if x.GetTimestamp() != nil {
+		if v, ok := interface{}(x.GetTimestamp()).(slog.LogValuer); ok {
+			attrs = append(attrs, slog.Attr{Key: "timestamp", Value: v.LogValue()})
+		} else {
+			attrs = append(attrs, slog.Any("timestamp", x.GetTimestamp()))
+		}
+	}
+	attrs = append(attrs, slog.Any("data", x.GetData()))
+	if x.GetProcess() != nil {
+		if v, ok := interface{}(x.GetProcess()).(slog.LogValuer); ok {
+			attrs = append(attrs, slog.Attr{Key: "process", Value: v.LogValue()})
+		} else {
+			attrs = append(attrs, slog.Any("process", x.GetProcess()))
+		}
+	}
+	if x.GetFdInfo() != nil {
+		if v, ok := interface{}(x.GetFdInfo()).(slog.LogValuer); ok {
+			attrs = append(attrs, slog.Attr{Key: "fd_info", Value: v.LogValue()})
+		} else {
+			attrs = append(attrs, slog.Any("fd_info", x.GetFdInfo()))
+		}
+	}
+	attrs = append(attrs, slog.String("logger_name", x.GetLoggerName()))
+	if len(x.GetLabels()) != 0 {
+		attrs5 := make([]slog.Attr, 0, len(x.GetLabels()))
+		for k, v := range x.GetLabels() {
+			attrs5 = append(attrs5, slog.String(fmt.Sprintf("%v", k), v))
+		}
+		attrs = append(attrs, slog.Any("labels", attrs5))
+	}
+	attrs = append(attrs, slog.String("trace_id", x.GetTraceId()))
 	return slog.GroupValue(attrs...)
 }
 
@@ -51,6 +291,8 @@ func (x *LogResponse) LogValue() slog.Value {
 	if x == nil {
 		return slog.AnyValue(nil)
 	}
-	attrs := make([]slog.Attr, 0, 0)
+	attrs := make([]slog.Attr, 0, 2)
+	attrs = append(attrs, slog.Bool("success", x.GetSuccess()))
+	attrs = append(attrs, slog.String("error", x.GetError()))
 	return slog.GroupValue(attrs...)
 }

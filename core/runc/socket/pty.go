@@ -9,8 +9,9 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/creack/pty"
-	"github.com/walteh/runm/pkg/conn"
 	"gitlab.com/tozd/go/errors"
+
+	"github.com/walteh/runm/pkg/conn"
 )
 
 // var _ runtime.RuntimeConsole = &PTYConsoleAdapter{}

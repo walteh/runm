@@ -31,6 +31,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/errdefs"
+	"gitlab.com/tozd/go/errors"
 )
 
 const (
@@ -124,11 +125,11 @@ func checkKillError(err error) error {
 		strings.Contains(err.Error(), "container not running") ||
 		strings.Contains(strings.ToLower(err.Error()), "no such process") ||
 		err == unix.ESRCH {
-		return fmt.Errorf("process already finished: %w", errdefs.ErrNotFound)
+		return errors.Errorf("killing already finished process: %w", errdefs.ErrNotFound)
 	} else if strings.Contains(err.Error(), "does not exist") {
-		return fmt.Errorf("no such container: %w", errdefs.ErrNotFound)
+		return errors.Errorf("killing process in non-existent container: %w", errdefs.ErrNotFound)
 	}
-	return fmt.Errorf("unknown error after kill: %w", err)
+	return errors.Errorf("killing process: %w", err)
 }
 
 func newPidFile(bundle string) *pidFile {
@@ -190,5 +191,5 @@ func stateName(v interface{}) string {
 	case *stoppedState:
 		return "stopped"
 	}
-	panic(fmt.Errorf("invalid state %v", v))
+	panic(errors.Errorf("determining state name for invalid state %v", v))
 }

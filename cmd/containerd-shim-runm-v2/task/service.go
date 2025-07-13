@@ -20,7 +20,6 @@ package task
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 	"path"
@@ -39,6 +38,7 @@ import (
 	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
+	"gitlab.com/tozd/go/errors"
 
 	eventstypes "github.com/containerd/containerd/api/events"
 	taskv3 "github.com/containerd/containerd/api/runtime/task/v3"
@@ -85,7 +85,7 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 	go s.processExits()
 	// gorunc.Monitor = reaper.Default // todo: we need to proxy the reaper events from the vm to the host
 	if err := s.initPlatform(); err != nil {
-		return nil, fmt.Errorf("failed to initialized platform behavior: %w", err)
+		return nil, errors.Errorf("initializing platform behavior: %w", err)
 	}
 	go s.forward(ctx, publisher)
 	sd.RegisterCallback(func(context.Context) error {
@@ -609,7 +609,7 @@ func (s *service) Pids(ctx context.Context, r *taskv3.PidsRequest) (*taskv3.Pids
 				}
 				a, err := typeurl.MarshalAnyToProto(d)
 				if err != nil {
-					return nil, fmt.Errorf("failed to marshal process %d info: %w", pid, err)
+					return nil, errors.Errorf("marshaling process %d info: %w", pid, err)
 				}
 				pInfo.Info = a
 				break

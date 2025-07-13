@@ -21,8 +21,6 @@ package manager
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -45,6 +43,7 @@ import (
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"github.com/containerd/typeurl/v2"
+	"gitlab.com/tozd/go/errors"
 
 	"github.com/walteh/runm/cmd/containerd-shim-runm-v2/runm"
 	"github.com/walteh/runm/core/runc/runtime"
@@ -180,16 +179,16 @@ func newShimSocket(ctx context.Context, path, id string, debug bool) (*shimSocke
 		// grouping functionality where the new process should be run with the same
 		// shim as an existing container
 		if !shim.SocketEaddrinuse(err) {
-			return nil, fmt.Errorf("create new shim socket: %w", err)
+			return nil, errors.Errorf("creating new shim socket: %w", err)
 		}
 		if !debug && shim.CanConnect(address) {
 			return &shimSocket{addr: address}, errdefs.ErrAlreadyExists
 		}
 		if err := shim.RemoveSocket(address); err != nil {
-			return nil, fmt.Errorf("remove pre-existing socket: %w", err)
+			return nil, errors.Errorf("removing pre-existing socket: %w", err)
 		}
 		if socket, err = shim.NewSocket(address); err != nil {
-			return nil, fmt.Errorf("try create new shim socket 2x: %w", err)
+			return nil, errors.Errorf("creating new shim socket on retry: %w", err)
 		}
 	}
 	s := &shimSocket{
@@ -300,7 +299,7 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ shi
 	// }
 
 	if err := shim.AdjustOOMScore(cmd.Process.Pid); err != nil {
-		return params, fmt.Errorf("failed to adjust OOM score for shim: %w", err)
+		return params, errors.Errorf("adjusting OOM score for shim: %w", err)
 	}
 
 	params.Address = sockets[0].addr
@@ -361,13 +360,13 @@ func (m manager) Info(ctx context.Context, optionsR io.Reader) (*types.RuntimeIn
 	opts, err := shim.ReadRuntimeOptions[*options.Options](optionsR)
 	if err != nil {
 		if !errors.Is(err, errdefs.ErrNotFound) {
-			return nil, fmt.Errorf("failed to read runtime options (*options.Options): %w", err)
+			return nil, errors.Errorf("reading runtime options: %w", err)
 		}
 	}
 	if opts != nil {
 		info.Options, err = typeurl.MarshalAnyToProto(opts)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal %T: %w", opts, err)
+			return nil, errors.Errorf("marshaling runtime options: %w", err)
 		}
 	}
 	// if opts.BinaryName != "" {
@@ -411,11 +410,11 @@ func (m manager) Info(ctx context.Context, optionsR io.Reader) (*types.RuntimeIn
 
 	features, err := m.creator.Features(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get runtime features: %w", err)
+		return nil, errors.Errorf("getting runtime features: %w", err)
 	}
 	info.Features, err = typeurl.MarshalAnyToProto(features)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal %T: %w", features, err)
+		return nil, errors.Errorf("marshaling runtime features: %w", err)
 	}
 	// }
 	return info, nil

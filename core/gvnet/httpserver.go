@@ -27,7 +27,6 @@ func NewHTTPServer(name string, mux http.Handler, ln net.Listener) *httpServer {
 	}
 }
 
-
 func (me *httpServer) Run(ctx context.Context) error {
 	s := &http.Server{
 		Handler:      me.mux,
@@ -72,7 +71,6 @@ func NewCmuxServer(name string, mux cmux.CMux) *cmuxServer {
 		name: name,
 	}
 }
-
 
 func (me *cmuxServer) Run(ctx context.Context) error {
 	me.running = true

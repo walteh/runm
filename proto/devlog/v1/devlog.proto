@@ -4,20 +4,118 @@ package runm.devlog.v1;
 
 import "google/protobuf/go_features.proto";
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
 
 option features.(pb.go).api_level = API_OPAQUE;
-option features.field_presence = IMPLICIT;  // makes everything by default required, for optional set to EXPLICIT
+option features.field_presence = IMPLICIT;
 
 // Devlog service for managing debug targets
 service DevlogService {
-	// Register a new debug target
+	// Stream logs (bidirectional for both batch and real-time)
 	rpc Log(stream LogRequest) returns (stream LogResponse);
 }
 
-// Target registration request
-message StructuredLog {}
+// Log severity levels (aligned with slog and OTEL)
+enum LogLevel {
+	LOG_LEVEL_UNSPECIFIED = 0;
+	LOG_LEVEL_TRACE       = 1;   // Maps to slog.LevelDebug - 4 (-8)
+	LOG_LEVEL_DEBUG       = 2;   // Maps to slog.LevelDebug (-4)
+	LOG_LEVEL_INFO        = 3;   // Maps to slog.LevelInfo (0)
+	LOG_LEVEL_WARN        = 4;   // Maps to slog.LevelWarn (4)
+	LOG_LEVEL_ERROR       = 5;   // Maps to slog.LevelError (8)
+	LOG_LEVEL_FATAL       = 6;   // Maps to custom level (12)
+}
 
-message RawLog {}
+// Source information for debugging
+message SourceInfo {
+	string file_path     = 1;  // Full file path
+	int32  line_number   = 2;  // Line number
+	string function_name = 3;  // Function name
+	string package_name  = 4;  // Go package name
+	string module_name   = 5;  // Go module name
+	uint64 program_counter = 6; // PC for stack trace
+}
+
+// Process and runtime metadata
+message ProcessInfo {
+	int32  pid           = 1;  // Process ID
+	string hostname      = 2;  // System hostname
+	string runtime       = 3;  // Runtime (go, nodejs, python, etc.)
+	string os            = 4;  // Operating system
+	string arch          = 5;  // Architecture
+	string version       = 6;  // Runtime version
+}
+
+// File descriptor information for raw logs
+message FileDescriptorInfo {
+	int32  fd            = 1;  // File descriptor number
+	string name          = 2;  // File name or path
+	bool   is_stdout     = 3;  // True if this is stdout
+	bool   is_stderr     = 4;  // True if this is stderr
+	string stream_type   = 5;  // "stdout", "stderr", "file", "pipe", etc.
+}
+
+// Attribute value supporting multiple types (OTEL-compatible)
+message AttributeValue {
+	oneof value {
+		string   string_value = 1;
+		int64    int_value    = 2;
+		double   double_value = 3;
+		bool     bool_value   = 4;
+		bytes    bytes_value  = 5;
+		AttributeArray array_value = 6;
+		AttributeMap   map_value   = 7;
+	}
+}
+
+message AttributeArray {
+	repeated AttributeValue values = 1;
+}
+
+message AttributeMap {
+	map<string, AttributeValue> values = 1;
+}
+
+// Key-value attribute with grouping support
+message Attribute {
+	string         key   = 1;  // Attribute key (can be dotted for groups)
+	AttributeValue value = 2;  // Attribute value
+}
+
+// Error information with stack trace
+message ErrorInfo {
+	string   message     = 1;  // Error message
+	string   type        = 2;  // Error type/class
+	string   stack_trace = 3;  // Full stack trace
+	repeated SourceInfo frames = 4; // Parsed stack frames
+	ErrorInfo cause      = 5;  // Wrapped/caused-by error
+}
+
+// Structured log entry
+message StructuredLog {
+	google.protobuf.Timestamp timestamp    = 1;  // Log timestamp
+	LogLevel                  level        = 2;  // Log level
+	string                    message      = 3;  // Log message
+	string                    logger_name  = 4;  // Logger name/identifier
+	SourceInfo                source       = 5;  // Source code location
+	ProcessInfo               process      = 6;  // Process metadata
+	repeated Attribute        attributes   = 7;  // Key-value attributes
+	ErrorInfo                 error        = 8;  // Error information (if applicable)
+	string                    trace_id     = 9;  // Trace ID for correlation
+	string                    span_id      = 10; // Span ID for correlation
+	map<string, string>       labels       = 11; // Additional labels/tags
+}
+
+// Raw log entry (stdout/stderr capture)
+message RawLog {
+	google.protobuf.Timestamp timestamp    = 1;  // Log timestamp
+	bytes                     data         = 2;  // Raw log data
+	ProcessInfo               process      = 3;  // Process metadata
+	FileDescriptorInfo        fd_info      = 4;  // File descriptor info
+	string                    logger_name  = 5;  // Logger name/identifier
+	map<string, string>       labels       = 6;  // Additional labels/tags
+	string                    trace_id     = 7;  // Trace ID for correlation
+}
 
 message LogRequest {
 	oneof log {
@@ -26,4 +124,7 @@ message LogRequest {
 	}
 }
 
-message LogResponse {}
+message LogResponse {
+	bool   success = 1;  // Whether the log was processed successfully
+	string error   = 2;  // Error message if processing failed
+}

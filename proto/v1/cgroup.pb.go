@@ -181,14 +181,15 @@ func (b0 StreamCgroupEventsRequest_builder) Build() *StreamCgroupEventsRequest {
 }
 
 type CgroupEvent struct {
-	state              protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_Low     uint64                 `protobuf:"varint,1,opt,name=low"`
-	xxx_hidden_High    uint64                 `protobuf:"varint,2,opt,name=high"`
-	xxx_hidden_Max     uint64                 `protobuf:"varint,3,opt,name=max"`
-	xxx_hidden_Oom     uint64                 `protobuf:"varint,4,opt,name=oom"`
-	xxx_hidden_OomKill uint64                 `protobuf:"varint,5,opt,name=oom_kill,json=oomKill"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Low        uint64                 `protobuf:"varint,1,opt,name=low"`
+	xxx_hidden_High       uint64                 `protobuf:"varint,2,opt,name=high"`
+	xxx_hidden_Max        uint64                 `protobuf:"varint,3,opt,name=max"`
+	xxx_hidden_Oom        uint64                 `protobuf:"varint,4,opt,name=oom"`
+	xxx_hidden_OomKill    uint64                 `protobuf:"varint,5,opt,name=oom_kill,json=oomKill"`
+	xxx_hidden_CgroupPath string                 `protobuf:"bytes,6,opt,name=cgroup_path,json=cgroupPath"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *CgroupEvent) Reset() {
@@ -251,6 +252,13 @@ func (x *CgroupEvent) GetOomKill() uint64 {
 	return 0
 }
 
+func (x *CgroupEvent) GetCgroupPath() string {
+	if x != nil {
+		return x.xxx_hidden_CgroupPath
+	}
+	return ""
+}
+
 func (x *CgroupEvent) SetLow(v uint64) {
 	x.xxx_hidden_Low = v
 }
@@ -271,14 +279,19 @@ func (x *CgroupEvent) SetOomKill(v uint64) {
 	x.xxx_hidden_OomKill = v
 }
 
+func (x *CgroupEvent) SetCgroupPath(v string) {
+	x.xxx_hidden_CgroupPath = v
+}
+
 type CgroupEvent_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
-	Low     uint64
-	High    uint64
-	Max     uint64
-	Oom     uint64
-	OomKill uint64
+	Low        uint64
+	High       uint64
+	Max        uint64
+	Oom        uint64
+	OomKill    uint64
+	CgroupPath string
 }
 
 func (b0 CgroupEvent_builder) Build() *CgroupEvent {
@@ -290,6 +303,7 @@ func (b0 CgroupEvent_builder) Build() *CgroupEvent {
 	x.xxx_hidden_Max = b.Max
 	x.xxx_hidden_Oom = b.Oom
 	x.xxx_hidden_OomKill = b.OomKill
+	x.xxx_hidden_CgroupPath = b.CgroupPath
 	return m0
 }
 
@@ -455,13 +469,15 @@ const file_v1_cgroup_proto_rawDesc = "" +
 	"\x15GetCgroupStatsRequest\"D\n" +
 	"\x16GetCgroupStatsResponse\x12*\n" +
 	"\x05stats\x18\x01 \x01(\v2\x14.google.protobuf.AnyR\x05stats\"\x1b\n" +
-	"\x19StreamCgroupEventsRequest\"r\n" +
+	"\x19StreamCgroupEventsRequest\"\x93\x01\n" +
 	"\vCgroupEvent\x12\x10\n" +
 	"\x03low\x18\x01 \x01(\x04R\x03low\x12\x12\n" +
 	"\x04high\x18\x02 \x01(\x04R\x04high\x12\x10\n" +
 	"\x03max\x18\x03 \x01(\x04R\x03max\x12\x10\n" +
 	"\x03oom\x18\x04 \x01(\x04R\x03oom\x12\x19\n" +
-	"\boom_kill\x18\x05 \x01(\x04R\aoomKill\"H\n" +
+	"\boom_kill\x18\x05 \x01(\x04R\aoomKill\x12\x1f\n" +
+	"\vcgroup_path\x18\x06 \x01(\tR\n" +
+	"cgroupPath\"H\n" +
 	"\x1aStreamCgroupEventsResponse\x12*\n" +
 	"\x05event\x18\x01 \x01(\v2\x14.runm.v1.CgroupEventR\x05event\"\x1d\n" +
 	"\x1bToggleAllControllersRequest\"\x1e\n" +

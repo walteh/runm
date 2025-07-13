@@ -8,7 +8,6 @@ import (
 	"github.com/containerd/cgroups/v3/cgroup2/stats"
 	"gitlab.com/tozd/go/errors"
 
-	"github.com/walteh/runm/core/runc/conversion"
 	"github.com/walteh/runm/core/runc/runtime"
 
 	runmv1 "github.com/walteh/runm/proto/v1"
@@ -17,7 +16,7 @@ import (
 var _ runtime.CgroupAdapter = (*GRPCClientRuntime)(nil)
 
 // EventChan implements runtime.CgroupAdapter.
-func (me *GRPCClientRuntime) OpenEventChan(ctx context.Context) (<-chan runtime.CgroupEvent, <-chan error, error) {
+func (me *GRPCClientRuntime) OpenEventChan(ctx context.Context) (<-chan *runmv1.CgroupEvent, <-chan error, error) {
 
 	stream, err := me.guestCgroupAdapterService.StreamCgroupEvents(ctx, &runmv1.StreamCgroupEventsRequest{})
 	if err != nil {
@@ -25,7 +24,7 @@ func (me *GRPCClientRuntime) OpenEventChan(ctx context.Context) (<-chan runtime.
 	}
 
 	errch := make(chan error)
-	rch := make(chan runtime.CgroupEvent)
+	rch := make(chan *runmv1.CgroupEvent)
 
 	go func() {
 		for {
@@ -33,7 +32,7 @@ func (me *GRPCClientRuntime) OpenEventChan(ctx context.Context) (<-chan runtime.
 			if err != nil {
 				errch <- err
 			} else {
-				rch <- conversion.ConvertCgroupEventFromProto(refId.GetEvent())
+				rch <- refId.GetEvent()
 			}
 		}
 	}()

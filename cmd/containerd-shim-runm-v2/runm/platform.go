@@ -31,8 +31,9 @@ import (
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/stdio"
 	"github.com/containerd/fifo"
-	"github.com/walteh/runm/cmd/containerd-shim-runm-v2/process"
 	"gitlab.com/tozd/go/errors"
+
+	"github.com/walteh/runm/cmd/containerd-shim-runm-v2/process"
 )
 
 var bufPool = sync.Pool{

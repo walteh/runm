@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"github.com/walteh/runm/pkg/taskgroup"
 )
 
@@ -936,33 +937,33 @@ func TestTaskGroup_ComprehensiveErrorCollection(t *testing.T) {
 	// Check that we got a TaskGroupError
 	tgErr, ok := err.(*taskgroup.TaskGroupError)
 	require.True(t, ok, "Expected TaskGroupError but got %T", err)
-	
+
 	// Check that all three errors are captured
 	assert.Equal(t, 3, len(tgErr.TaskErrors))
-	
+
 	// Check specific task errors
 	task1Err, exists := tgErr.GetTaskError("task1")
 	assert.True(t, exists)
 	assert.Equal(t, err1, task1Err)
-	
+
 	task2Err, exists := tgErr.GetTaskError("task2")
 	assert.True(t, exists)
 	assert.Equal(t, err2, task2Err)
-	
+
 	_, exists = tgErr.GetTaskError("task3")
 	assert.False(t, exists) // task3 succeeded
-	
+
 	task4Err, exists := tgErr.GetTaskError("task4")
 	assert.True(t, exists)
 	assert.Equal(t, err3, task4Err)
-	
+
 	// Check failed task names
 	failedNames := tgErr.GetFailedTaskNames()
 	assert.Len(t, failedNames, 3)
 	assert.Contains(t, failedNames, "task1")
 	assert.Contains(t, failedNames, "task2")
 	assert.Contains(t, failedNames, "task4")
-	
+
 	// Check error message format
 	errMsg := tgErr.Error()
 	assert.Contains(t, errMsg, "taskgroup failed with 3 error(s)")
@@ -991,10 +992,10 @@ func TestTaskGroup_MixedErrorsAndPanics(t *testing.T) {
 	// Check that we got a TaskGroupError
 	tgErr, ok := err.(*taskgroup.TaskGroupError)
 	require.True(t, ok)
-	
+
 	// Check that both errors are captured
 	assert.Equal(t, 2, len(tgErr.TaskErrors))
-	
+
 	// Check error message mentions both failed and panicked
 	errMsg := tgErr.Error()
 	assert.Contains(t, errMsg, "taskgroup failed with 2 error(s) (1 failed, 1 panicked)")

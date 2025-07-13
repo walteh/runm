@@ -164,7 +164,7 @@ func (l *debugReader) Read(p []byte) (int, error) {
 			failedReadData = ""
 			successfulReadData = escapeString(p)
 		}
-		slog.ErrorContext(l.ctx, fmt.Sprintf("%s[READ-ERROR]", l.name), "error", err, "stats", l, "current_read_data", successfulReadData, "failed_read_data", failedReadData)
+		slog.DebugContext(l.ctx, fmt.Sprintf("%s[READ-ERROR]", l.name), "error", err, "stats", l, "current_read_data", successfulReadData, "failed_read_data", failedReadData)
 	} else {
 		slog.DebugContext(l.ctx, fmt.Sprintf("%s[READ]", l.name), "data", escapeString(p[:n]), "stats", l)
 	}

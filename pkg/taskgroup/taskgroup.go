@@ -12,6 +12,7 @@ import (
 	"time"
 
 	slogctx "github.com/veqryn/slog-context"
+
 	"github.com/walteh/runm/pkg/syncmap"
 	"github.com/walteh/runm/pkg/ticker"
 )
@@ -367,7 +368,7 @@ func (tg *TaskGroup) Wait() error {
 	case <-tg.ctx.Done():
 		// Context was cancelled (timeout or manual cancellation)
 		tg.setFundamentalError(tg.ctx.Err())
-		
+
 		// Log cancellation information
 		reason, caller, when, _ := tg.GetCancellationInfo()
 		if reason != "" {
@@ -674,11 +675,11 @@ func (tg *TaskGroup) RegisterCleanup(cleanup CleanupFunc) {
 func (tg *TaskGroup) RegisterCleanupWithName(name string, cleanup CleanupFunc) {
 	tg.mu.Lock()
 	defer tg.mu.Unlock()
-	
+
 	if name == "" {
 		name = fmt.Sprintf("cleanup-%d", len(tg.cleanupFuncs)+1)
 	}
-	
+
 	tg.cleanupFuncs = append(tg.cleanupFuncs, CleanupEntry{
 		Name: name,
 		Func: cleanup,
@@ -695,7 +696,7 @@ func (tg *TaskGroup) RegisterCloserWithName(name string, closer interface{ Close
 	if name == "" {
 		name = fmt.Sprintf("closer-%d", len(tg.cleanupFuncs)+1)
 	}
-	
+
 	tg.RegisterCleanupWithName(name, func(ctx context.Context) error {
 		return closer.Close()
 	})
@@ -749,7 +750,7 @@ func (tg *TaskGroup) executeCleanup(ctx context.Context) {
 func (tg *TaskGroup) GetCleanupNames() []string {
 	tg.mu.RLock()
 	defer tg.mu.RUnlock()
-	
+
 	names := make([]string, len(tg.cleanupFuncs))
 	for i, entry := range tg.cleanupFuncs {
 		names[i] = entry.Name
@@ -768,7 +769,7 @@ func (tg *TaskGroup) GetCleanupCount() int {
 func (tg *TaskGroup) CancelWithReason(reason string) {
 	tg.manualCancelOnce.Do(func() {
 		caller, _, _, _ := runtime.Caller(1)
-		
+
 		tg.mu.Lock()
 		tg.cancelReason = reason
 		tg.cancelCaller = caller

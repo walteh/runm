@@ -5,8 +5,9 @@ import (
 	"syscall"
 	"time"
 
-	gorunc "github.com/containerd/go-runc"
 	"golang.org/x/sys/unix"
+
+	gorunc "github.com/containerd/go-runc"
 )
 
 // ProcessWatcher defines the interface for a process event watcher

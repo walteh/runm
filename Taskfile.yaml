@@ -22,6 +22,7 @@ vars:
     TEST_BIN_DIR: ./gen/build/test-bin
     LINUX_RUNTIME_DIR: ./gen/build/linux-runtime
     CLAUDE_FLOW_PROJECT_DIR: .claude/claude-flow
+    NERDCTL_CMD: 'sudo -A -E {{.TEST_BIN_DIR}}/nerdctl-test'
 
 env:
     COMPOSE_BAKE: true
@@ -41,58 +42,6 @@ tasks:
         cmds:
           - cmd: bun install -g @anthropic-ai/claude-code
           - cmd: bun --bun run claude --ide {{.CLI_ARGS}}
-    # ---------------------------------------------------------------------------
-    # Initialise a new Claude-Flow project in ~/.cache/claude-flow/<project>
-    # Usage: task claude:flow:init:devlog         # basic
-    #        task claude:flow:init:devlog -- --sparc --neural-enhanced
-    claude:flow:init:*:
-        label: 'claude:flow:init:{{.CLAUDE_FLOW_PROJECT}}'
-        desc: initialises a Claude-Flow hive project outside the repo
-        vars:
-            CLAUDE_FLOW_PROJECT: '{{index .MATCH 0}}'
-
-        cmds:
-          - cmd: |
-                set -e
-                PROJECT_DIR="{{.CLAUDE_FLOW_PROJECT_DIR}}/{{.CLAUDE_FLOW_PROJECT}}"
-                mkdir -p "$PROJECT_DIR"
-                cd "$PROJECT_DIR"
-                # Create or refresh the hive scaffold
-                npx --yes claude-flow@alpha init --force \
-                    --project-name "{{.CLAUDE_FLOW_PROJECT}}" \
-                    {{.CLI_ARGS}}
-
-    # ---------------------------------------------------------------------------
-    # Start (or resume) a hive-mind session for an existing project
-    # Usage: task claude:flow:start:devlog -- "Devlog abstraction — phase 1" --claude
-    #        task claude:flow:start:devlog -- --resume
-    claude:flow:start:*:
-        label: 'claude:flow:start:{{.CLAUDE_FLOW_PROJECT}}'
-        desc: spawns or resumes a Claude-Flow hive for the project
-        vars:
-            CLAUDE_FLOW_PROJECT: '{{index .MATCH 0}}'
-
-        cmds:
-          - cmd: |
-                set -e
-                PROJECT_DIR="{{.CLAUDE_FLOW_PROJECT_DIR}}/{{.CLAUDE_FLOW_PROJECT}}"
-                if [ ! -d "$PROJECT_DIR" ]; then
-                    echo "🔥 Project not initialised: $PROJECT_DIR" >&2
-                    echo "Run: task claude:flow:init:{{.CLAUDE_FLOW_PROJECT}}" >&2
-                    exit 1
-                fi
-                cd "$PROJECT_DIR"
-                # If user passed --resume we just resume, otherwise default to spawn
-                if echo "{{.CLI_ARGS}}" | grep -q -- '--resume'; then
-                    npx claude-flow@alpha hive-mind resume {{.CLI_ARGS}}
-                else
-                    # First arg after -- is taken as the objective, or fallback text
-                    OBJECTIVE="${1:-\"{{.CLAUDE_FLOW_PROJECT}} work\"}"
-                    shift || true
-                    npx claude-flow@alpha hive-mind spawn "$OBJECTIVE" \
-                    --namespace "{{.CLAUDE_FLOW_PROJECT}}" \
-                    --claude "$@"
-                fi
 
     go:tidy:
         run: once
@@ -295,9 +244,12 @@ tasks:
         cmds:
           - cmd: go build {{.BUILD_FLAGS}} {{.CMD_DIR}}/{{.NAME}}
           - cmd: if [ "{{.DEBUG}}" != "1" ]; then strip {{.OUT_DIR}}/{{.NAME}}; fi
+            silent: true
           - cmd: |-
                 if [ "{{.CODESIGN}}" = "1" ]; then go tool codesign -target {{.OUT_DIR}}/{{.NAME}} -mode=sign --force --entitlement=com.apple.security.virtualization; fi
+            silent: true
           - cmd: if [ "{{.SYMLINK}}" != "" ]; then ln -laf {{.OUT_DIR}}/{{.NAME}} {{.OUT_DIR}}/{{.SYMLINK}}; fi
+            silent: true
 
     test:binary:nerdctl-test:
         desc: builds the nerdctl test
@@ -562,10 +514,19 @@ tasks:
     dev:nerdctl-test:kill-all-running-containers:
         desc: kills all running containers
         run: once
-        vars:
-            BIN: "{{.TEST_BIN_DIR}}/nerdctl-test"
         cmds:
-          - cmd: sudo -A -E {{.BIN}} ps -q | xargs -I {} sudo -A -E {{.BIN}} kill {}
+          - cmd: |-
+                {{.NERDCTL_CMD}} ps -q | xargs -I {} {{.NERDCTL_CMD}} kill {}
+
+    dev:nerdctl-test:kill:
+        desc: kills a running container
+        deps: ['test:binary:nerdctl-test', 'test:binary:containerd-shim-runm-v2-test']
+        requires: {vars: [CONTAINER_ID]}
+        vars:
+            CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
+        cmds:
+          - cmd: |-
+                {{.NERDCTL_CMD}} kill {{.CONTAINER_ID}}
 
     dev:nerdctl-test:run:
         desc: runs the nerdctl test
@@ -578,7 +539,7 @@ tasks:
             STDOUT_FILE_PIPE: '{{.STDOUT_FILE | empty | ternary "" ">"}}'
         cmds:
           - cmd: |-
-                {{.TIMEOUT}} sudo -A -E {{.TEST_BIN_DIR}}/nerdctl-test run \
+                {{.TIMEOUT}} {{.NERDCTL_CMD}} run \
                     --platform=linux/arm64 \
                     --network=host \
                     --runtime=containerd.shim.runc.v2 \
@@ -599,7 +560,7 @@ tasks:
         # interactive: true
         cmds:
           - cmd: |-
-                {{.TIMEOUT_CMD}} {{.TIMEOUT}} sudo -A -E {{.TEST_BIN_DIR}}/nerdctl-test exec \
+                {{.TIMEOUT_CMD}} {{.TIMEOUT}} {{.NERDCTL_CMD}} exec \
                     {{.FLAGS}} {{.CONTAINER_ID}} {{.COMMAND}}
 
     dev:nerdctl-test:stop:
@@ -611,7 +572,7 @@ tasks:
             CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
         cmds:
           - cmd: |-
-                {{.TIMEOUT}} sudo -A -E {{.TEST_BIN_DIR}}/nerdctl-test stop \
+                {{.TIMEOUT}} {{.NERDCTL_CMD}} stop \
                     {{.FLAGS}} {{.CONTAINER_ID}}
 
     dev:nerdctl-test:rm:
@@ -622,7 +583,7 @@ tasks:
             CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
         cmds:
           - cmd: |-
-                sudo -A -E {{.TEST_BIN_DIR}}/nerdctl-test rm \
+                {{.NERDCTL_CMD}} rm \
                     {{.FLAGS}} {{.CONTAINER_ID}}
 
     dev:nerdctl-test:ps:
@@ -634,7 +595,7 @@ tasks:
             STDOUT_FILE_PIPE: '{{.STDOUT_FILE | empty | ternary "" ">"}}'
         cmds:
           - cmd: |-
-                sudo -A -E {{.TEST_BIN_DIR}}/nerdctl-test ps {{.FLAGS}} {{.STDOUT_FILE_PIPE}} {{.STDOUT_FILE}}
+                {{.NERDCTL_CMD}} ps {{.FLAGS}} {{.STDOUT_FILE_PIPE}} {{.STDOUT_FILE}}
 
     dev:2025-06-18:01:
         desc: runs the shim for 2025-06-18 - bun version from entrypoint
@@ -683,10 +644,11 @@ tasks:
           - task: dev:nerdctl-test:run
             vars:
                 FLAGS: '-d'
-                IMAGE: 'docker.io/oven/bun:alpine'
+                IMAGE: 'docker.io/library/alpine:latest'
                 STDOUT_FILE: '{{.TMP_DIR}}/stdout.txt'
+
                 ARGS: |-
-                    sh -c 'sleep 30 && echo "done sleeping"'
+                    sh -c 'echo "Container PID 1: $$"; ps aux; sleep 30'
           - cmd: cat {{.TMP_DIR}}/stdout.txt
           - task: dev:nerdctl-test:ps
             vars:
@@ -702,7 +664,7 @@ tasks:
                     sh: cat {{.TMP_DIR}}/stdout.txt
                 FLAGS: '--tty'
                 # TIMEOUT: '10s'
-          - task: dev:nerdctl-test:stop
+          - task: dev:nerdctl-test:kill
             vars:
                 CONTAINER_ID:
                     sh: cat {{.TMP_DIR}}/stdout.txt

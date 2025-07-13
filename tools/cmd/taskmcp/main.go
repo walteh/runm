@@ -18,9 +18,10 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/rs/zerolog"
+	"gopkg.in/yaml.v3"
+
 	zlog "github.com/rs/zerolog/log"
 	errors "gitlab.com/tozd/go/errors"
-	"gopkg.in/yaml.v3"
 )
 
 type TaskRegistry struct {
