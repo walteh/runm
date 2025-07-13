@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/soheilhy/cmux"
-	"github.com/superblocksteam/run"
 	"gitlab.com/tozd/go/errors"
 )
 
@@ -28,7 +27,6 @@ func NewHTTPServer(name string, mux http.Handler, ln net.Listener) *httpServer {
 	}
 }
 
-var _ run.Runnable = (*httpServer)(nil)
 
 func (me *httpServer) Run(ctx context.Context) error {
 	s := &http.Server{
@@ -75,7 +73,6 @@ func NewCmuxServer(name string, mux cmux.CMux) *cmuxServer {
 	}
 }
 
-var _ run.Runnable = (*cmuxServer)(nil)
 
 func (me *cmuxServer) Run(ctx context.Context) error {
 	me.running = true

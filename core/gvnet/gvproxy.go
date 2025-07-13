@@ -6,12 +6,9 @@ import (
 	"net"
 	"path/filepath"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/containers/gvisor-tap-vsock/pkg/types"
 	"github.com/containers/gvisor-tap-vsock/pkg/virtualnetwork"
 	"github.com/soheilhy/cmux"
-	"github.com/walteh/run"
 	"gitlab.com/tozd/go/errors"
 	"gvisor.dev/gvisor/pkg/tcpip/stack"
 
@@ -19,6 +16,7 @@ import (
 
 	"github.com/walteh/runm/core/gvnet/tapsock"
 	"github.com/walteh/runm/core/virt/virtio"
+	"github.com/walteh/runm/pkg/taskgroup"
 )
 
 type GvproxyConfig struct {
@@ -39,8 +37,8 @@ func GvproxyVersion() string {
 }
 
 type gvproxy struct {
-	netdev *virtio.VirtioNet
-	waiter func(ctx context.Context) error
+	netdev    *virtio.VirtioNet
+	taskGroup *taskgroup.TaskGroup
 }
 
 func (p *gvproxy) VirtioNetDevice() *virtio.VirtioNet {
@@ -48,7 +46,7 @@ func (p *gvproxy) VirtioNetDevice() *virtio.VirtioNet {
 }
 
 func (p *gvproxy) Wait(ctx context.Context) error {
-	return p.waiter(ctx)
+	return p.taskGroup.Wait()
 }
 
 type Proxy interface {
@@ -68,14 +66,15 @@ func NewProxy(ctx context.Context, cfg *GvproxyConfig) (Proxy, error) {
 
 	ctx = slogctx.WithGroup(ctx, "gvnet")
 
-	groupErrs, ctx := errgroup.WithContext(ctx)
-
-	group := run.New(run.WithLogger(slog.Default()))
-
-	go func() {
-		<-ctx.Done()
-		slog.InfoContext(ctx, "DONE, cleaning up gvproxy")
-	}()
+	// Create taskgroup for managing all gvproxy tasks
+	tg := taskgroup.NewTaskGroup(ctx,
+		taskgroup.WithName("gvproxy"),
+		taskgroup.WithLogStart(true),
+		taskgroup.WithLogEnd(true),
+		taskgroup.WithLogTaskStart(true),
+		taskgroup.WithLogTaskEnd(true),
+		taskgroup.WithSlogBaseContext(ctx),
+	)
 
 	// start the vmFileSocket
 	device, runner, err := tapsock.NewDgramVirtioNet(ctx, VIRTUAL_GUEST_MAC)
@@ -102,17 +101,8 @@ func NewProxy(ctx context.Context, cfg *GvproxyConfig) (Proxy, error) {
 		return nil, errors.Errorf("isolating network stack: %w", err)
 	}
 
-	if cfg.MagicHostPort == "" {
-		slog.InfoContext(ctx, "setting up magic forwarding", "magicHostPort", cfg.MagicHostPort)
-		m, err := cfg.setupMagicForwarding(ctx, stack)
-		if err != nil {
-			return nil, errors.Errorf("setting up magic forwarding: %w", err)
-		}
-		group.Always(m)
-
-	}
-
-	groupErrs.Go(func() error {
+	// Start tasks using taskgroup
+	tg.GoWithName("tapsock-runner", func(ctx context.Context) error {
 		if ctx.Err() != nil {
 			slog.InfoContext(ctx, "context cancelled, not running runner")
 			return nil
@@ -120,34 +110,42 @@ func NewProxy(ctx context.Context, cfg *GvproxyConfig) (Proxy, error) {
 
 		if err := runner.Run(ctx); err != nil {
 			slog.ErrorContext(ctx, "running runner", "error", err)
+			return errors.Errorf("running runner: %w", err)
 		}
 		return nil
 	})
 
-	groupErrs.Go(func() error {
-		if ctx.Err() != nil {
-			slog.InfoContext(ctx, "context cancelled, not running group")
-			return nil
-		}
+	if cfg.MagicHostPort != "" {
+		tg.GoWithName("magic-forwarding", func(ctx context.Context) error {
+			if ctx.Err() != nil {
+				slog.InfoContext(ctx, "context cancelled, not running magic forwarding")
+				return nil
+			}
 
-		slog.InfoContext(ctx, "listening on gvproxy network")
-		if err := group.RunContext(ctx); err != nil {
-			return errors.Errorf("listening on gvproxy network: %w", err)
-		}
+			slog.InfoContext(ctx, "setting up magic forwarding", "magicHostPort", cfg.MagicHostPort)
+			m, err := cfg.setupMagicForwarding(tg, ctx, stack)
+			if err != nil {
+				return errors.Errorf("setting up magic forwarding: %w", err)
+			}
+
+			slog.InfoContext(ctx, "running magic forwarding")
+			if err := m.Run(ctx); err != nil {
+				return errors.Errorf("running magic forwarding: %w", err)
+			}
+			return nil
+		})
+	}
+
+	// Add cleanup task that monitors context cancellation
+	tg.GoWithName("cleanup-monitor", func(ctx context.Context) error {
+		<-ctx.Done()
+		slog.InfoContext(ctx, "DONE, cleaning up gvproxy")
 		return nil
 	})
 
 	return &gvproxy{
-		netdev: device,
-		waiter: func(ctx context.Context) error {
-			if err := groupErrs.Wait(); err != nil {
-				if err == context.Canceled {
-					return nil
-				}
-				return errors.Errorf("gvnet exiting: %v", err)
-			}
-			return nil
-		},
+		netdev:    device,
+		taskGroup: tg,
 	}, nil
 }
 
@@ -224,8 +222,8 @@ func (cfg *GvproxyConfig) buildConfiguration(ctx context.Context) (*types.Config
 	return &config, nil
 }
 
-func (cfg *GvproxyConfig) setupMagicForwarding(ctx context.Context, stack *stack.Stack) (*MagicHostPort, error) {
-	m, err := NewMagicHostPortStream(ctx, cfg.MagicHostPort)
+func (cfg *GvproxyConfig) setupMagicForwarding(tg *taskgroup.TaskGroup, ctx context.Context, stack *stack.Stack) (*MagicHostPort, error) {
+	m, err := NewMagicHostPortStream(ctx, cfg.MagicHostPort, tg)
 	if err != nil {
 		return nil, errors.Errorf("creating global host port: %w", err)
 	}

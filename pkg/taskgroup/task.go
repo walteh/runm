@@ -9,6 +9,15 @@ import (
 
 type TaskFunc func(ctx context.Context) error
 
+// CleanupFunc represents a cleanup function that can be registered with a TaskGroup
+type CleanupFunc func(ctx context.Context) error
+
+// CleanupEntry represents a named cleanup function
+type CleanupEntry struct {
+	Name string
+	Func CleanupFunc
+}
+
 type TaskStatus int
 
 const (

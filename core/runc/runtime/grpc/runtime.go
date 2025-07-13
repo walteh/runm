@@ -4,11 +4,9 @@ package grpcruntime
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log/slog"
 	"net"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -308,13 +306,13 @@ func (c *GRPCClientRuntime) Create(ctx context.Context, id, bundle string, optio
 	req.SetOptions(conv)
 
 	// cat the contents of the pid file
-	pid, err := os.ReadDir(filepath.Dir(conv.GetPidFile()))
-	if err != nil {
-		return errors.Errorf("reading pid file: %w", err)
-	}
-	for _, p := range pid {
-		fmt.Printf("pid file contents %s\n", p.Name())
-	}
+	// pid, err := os.ReadDir(filepath.Dir(conv.GetPidFile()))
+	// if err != nil {
+	// 	return errors.Errorf("reading pid file: %w", err)
+	// }
+	// for _, p := range pid {
+	// 	fmt.Printf("pid file contents %s\n", p.Name())
+	// }
 
 	slog.InfoContext(ctx, "creating container", "id", id, "bundle", bundle)
 

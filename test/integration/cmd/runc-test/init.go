@@ -28,9 +28,9 @@ func init() {
 		defer closer()
 
 		defer ticker.NewTicker(
-			ticker.WithInterval(1*time.Millisecond),
-			ticker.WithStartBurst(50),
-			ticker.WithFrequency(15000),
+			ticker.WithInterval(1*time.Second),
+			ticker.WithStartBurst(5),
+			ticker.WithFrequency(15),
 			ticker.WithMessage("RUNC:INIT[RUNNING]"),
 			ticker.WithDoneMessage("RUNC:INIT[DONE]"),
 			ticker.WithLogLevel(slog.LevelDebug),

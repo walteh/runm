@@ -59,7 +59,8 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 	ctx context.Context,
 	hpv Hypervisor[VM],
 	ctrconfig OCIVMConfig,
-	devices ...virtio.VirtioDevice) (*RunningVM[VM], error) {
+	devices ...virtio.VirtioDevice,
+) (*RunningVM[VM], error) {
 
 	id := "vm-oci-" + ctrconfig.ID[:8]
 	creationErrGroup, ctx := errgroup.WithContext(ctx)

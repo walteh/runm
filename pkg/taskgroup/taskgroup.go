@@ -70,6 +70,10 @@ type TaskGroup struct {
 
 	// Ticker for periodic status logging
 	statusTicker *ticker.Ticker
+
+	// Cleanup functions
+	cleanupFuncs []CleanupEntry
+	cleanupOnce  sync.Once
 }
 
 func NewTaskGroup(ctx context.Context, opts ...TaskGroupOpt) *TaskGroup {
@@ -373,6 +377,9 @@ func (tg *TaskGroup) Wait() error {
 		tg.statusTicker.Stop()
 	}
 
+	// Execute cleanup functions
+	tg.executeCleanup(tg.ctx)
+
 	if tg.opts.logEnd {
 		runningTasks := tg.GetRunningTasks()
 		completedTasks := tg.GetTasksByStatus(TaskStatusCompleted)
@@ -634,4 +641,121 @@ func (tg *TaskGroup) executeTaskWithRecovery(ctx context.Context, taskState *Tas
 // GetPprofHelper returns a helper for pprof operations
 func (tg *TaskGroup) GetPprofHelper() *PprofHelper {
 	return &PprofHelper{tg: tg}
+}
+
+// RegisterCleanup registers a cleanup function to be called when the TaskGroup shuts down
+func (tg *TaskGroup) RegisterCleanup(cleanup CleanupFunc) {
+	tg.RegisterCleanupWithName("", cleanup)
+}
+
+// RegisterCleanupWithName registers a named cleanup function to be called when the TaskGroup shuts down
+func (tg *TaskGroup) RegisterCleanupWithName(name string, cleanup CleanupFunc) {
+	tg.mu.Lock()
+	defer tg.mu.Unlock()
+	
+	if name == "" {
+		name = fmt.Sprintf("cleanup-%d", len(tg.cleanupFuncs)+1)
+	}
+	
+	tg.cleanupFuncs = append(tg.cleanupFuncs, CleanupEntry{
+		Name: name,
+		Func: cleanup,
+	})
+}
+
+// RegisterCloser registers an io.Closer to be closed when the TaskGroup shuts down
+func (tg *TaskGroup) RegisterCloser(closer interface{ Close() error }) {
+	tg.RegisterCloserWithName("", closer)
+}
+
+// RegisterCloserWithName registers a named io.Closer to be closed when the TaskGroup shuts down
+func (tg *TaskGroup) RegisterCloserWithName(name string, closer interface{ Close() error }) {
+	if name == "" {
+		name = fmt.Sprintf("closer-%d", len(tg.cleanupFuncs)+1)
+	}
+	
+	tg.RegisterCleanupWithName(name, func(ctx context.Context) error {
+		return closer.Close()
+	})
+}
+
+// executeCleanup runs all registered cleanup functions
+func (tg *TaskGroup) executeCleanup(ctx context.Context) {
+	tg.cleanupOnce.Do(func() {
+		tg.mu.RLock()
+		cleanupEntries := make([]CleanupEntry, len(tg.cleanupFuncs))
+		copy(cleanupEntries, tg.cleanupFuncs)
+		tg.mu.RUnlock()
+
+		if len(cleanupEntries) == 0 {
+			return
+		}
+
+		tg.log(slog.LevelDebug, "executing cleanup functions", slog.Int("count", len(cleanupEntries)))
+
+		// Execute cleanup functions in reverse order (LIFO)
+		for i := len(cleanupEntries) - 1; i >= 0; i-- {
+			entry := cleanupEntries[i]
+			func(cleanupEntry CleanupEntry) {
+				defer func() {
+					if r := recover(); r != nil {
+						tg.log(slog.LevelError, "cleanup function panicked",
+							slog.String("cleanup_name", cleanupEntry.Name),
+							slog.Any("panic_value", r),
+						)
+					}
+				}()
+
+				tg.log(slog.LevelDebug, "executing cleanup function", slog.String("name", cleanupEntry.Name))
+
+				if err := cleanupEntry.Func(ctx); err != nil {
+					tg.log(slog.LevelWarn, "cleanup function failed",
+						slog.String("cleanup_name", cleanupEntry.Name),
+						slog.String("error", err.Error()),
+					)
+				} else {
+					tg.log(slog.LevelDebug, "cleanup function completed", slog.String("name", cleanupEntry.Name))
+				}
+			}(entry)
+		}
+
+		tg.log(slog.LevelDebug, "all cleanup functions completed")
+	})
+}
+
+// GetCleanupNames returns the names of all registered cleanup functions
+func (tg *TaskGroup) GetCleanupNames() []string {
+	tg.mu.RLock()
+	defer tg.mu.RUnlock()
+	
+	names := make([]string, len(tg.cleanupFuncs))
+	for i, entry := range tg.cleanupFuncs {
+		names[i] = entry.Name
+	}
+	return names
+}
+
+// GetCleanupCount returns the number of registered cleanup functions
+func (tg *TaskGroup) GetCleanupCount() int {
+	tg.mu.RLock()
+	defer tg.mu.RUnlock()
+	return len(tg.cleanupFuncs)
+}
+
+// Close manually triggers cleanup and cancels the TaskGroup context
+func (tg *TaskGroup) Close() error {
+	tg.mu.Lock()
+	if tg.finished {
+		tg.mu.Unlock()
+		return nil
+	}
+	tg.mu.Unlock()
+
+	// Cancel context to signal shutdown
+	tg.cancel()
+
+	// Execute cleanup functions
+	tg.executeCleanup(context.Background())
+
+	return nil
 }

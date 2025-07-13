@@ -9,14 +9,12 @@ import (
 	"github.com/containers/gvisor-tap-vsock/pkg/tap"
 	"github.com/containers/gvisor-tap-vsock/pkg/types"
 	"github.com/containers/gvisor-tap-vsock/pkg/virtualnetwork"
-	"github.com/walteh/run"
 	"gitlab.com/tozd/go/errors"
 	"gvisor.dev/gvisor/pkg/tcpip/stack"
 
 	"github.com/walteh/runm/pkg/hack"
 )
 
-var _ run.Runnable = (*VirtualNetworkRunner)(nil)
 
 type VirtualNetworkRunner struct {
 	name    string

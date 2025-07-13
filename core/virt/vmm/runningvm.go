@@ -70,62 +70,62 @@ func (r *RunningVM[VM]) GuestVsockConn(ctx context.Context) (*grpc.ClientConn, e
 	return r.buildGuestGrpcConn(ctx)
 }
 
-func (r *RunningVM[VM]) GuestVsockConnOLD(ctx context.Context) (*grpc.ClientConn, error) {
+// func (r *RunningVM[VM]) GuestVsockConnOLD(ctx context.Context) (*grpc.ClientConn, error) {
 
-	ticker := time.NewTicker(100 * time.Millisecond)
-	timeout := time.NewTimer(3 * time.Second)
-	defer ticker.Stop()
-	defer timeout.Stop()
+// 	ticker := time.NewTicker(100 * time.Millisecond)
+// 	timeout := time.NewTimer(3 * time.Second)
+// 	defer ticker.Stop()
+// 	defer timeout.Stop()
 
-	lastError := error(errors.Errorf("initial error"))
+// 	lastError := error(errors.Errorf("initial error"))
 
-	for {
-		select {
-		case <-ticker.C:
-			slog.InfoContext(ctx, "connecting to vsock", "port", constants.RunmGuestServerVsockPort)
+// 	for {
+// 		select {
+// 		case <-ticker.C:
+// 			slog.InfoContext(ctx, "connecting to vsock", "port", constants.RunmGuestServerVsockPort)
 
-			opts := []grpc.DialOption{
-				grpc.WithTransportCredentials(insecure.NewCredentials()),
-				grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
-					slog.InfoContext(ctx, "dialing vsock", "port", constants.RunmGuestServerVsockPort, "ignored_addr", addr)
-					conn, err := r.vm.VSockConnect(ctx, uint32(constants.RunmGuestServerVsockPort))
-					if err != nil {
-						return nil, err
-					}
-					return conn, nil
-				}),
-				grpc.WithUnaryInterceptor(grpcerr.NewUnaryClientInterceptor(ctx)),
-				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*10), grpc.WaitForReady(true)),
-			}
-			if logging.GetGlobalOtelInstances() != nil {
-				opts = append(opts, logging.GetGlobalOtelInstances().GetGrpcClientOpts())
-			}
-			grpcConn, err := grpc.NewClient("passthrough:target", opts...)
-			if err != nil {
-				lastError = err
-				continue
-			}
+// 			opts := []grpc.DialOption{
+// 				grpc.WithTransportCredentials(insecure.NewCredentials()),
+// 				grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+// 					slog.InfoContext(ctx, "dialing vsock", "port", constants.RunmGuestServerVsockPort, "ignored_addr", addr)
+// 					conn, err := r.vm.VSockConnect(ctx, uint32(constants.RunmGuestServerVsockPort))
+// 					if err != nil {
+// 						return nil, err
+// 					}
+// 					return conn, nil
+// 				}),
+// 				grpc.WithUnaryInterceptor(grpcerr.NewUnaryClientInterceptor(ctx)),
+// 				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*10), grpc.WaitForReady(true)),
+// 			}
+// 			if logging.GetGlobalOtelInstances() != nil {
+// 				opts = append(opts, logging.GetGlobalOtelInstances().GetGrpcClientOpts())
+// 			}
+// 			grpcConn, err := grpc.NewClient("passthrough:target", opts...)
+// 			if err != nil {
+// 				lastError = err
+// 				continue
+// 			}
 
-			// test the connection
-			grpcConn.Connect()
+// 			// test the connection
+// 			grpcConn.Connect()
 
-			// r.runtime, err = grpcruntime.NewGRPCClientRuntimeFromConn(grpcConn)
-			// if err != nil {
-			// 	lastError = err
-			// 	continue
-			// }
-			// r.runtime.SetVsockProxier(r)
-			// return r.runtime, nil
-			return grpcConn, nil
-		case <-timeout.C:
-			slog.ErrorContext(ctx, "timeout waiting for guest service connection", "error", lastError)
-			return nil, errors.Errorf("timeout waiting for guest service connection: %w", lastError)
-		case <-ctx.Done():
-			slog.ErrorContext(ctx, "context done waiting for guest service connection", "error", lastError)
-			return nil, ctx.Err()
-		}
-	}
-}
+// 			// r.runtime, err = grpcruntime.NewGRPCClientRuntimeFromConn(grpcConn)
+// 			// if err != nil {
+// 			// 	lastError = err
+// 			// 	continue
+// 			// }
+// 			// r.runtime.SetVsockProxier(r)
+// 			// return r.runtime, nil
+// 			return grpcConn, nil
+// 		case <-timeout.C:
+// 			slog.ErrorContext(ctx, "timeout waiting for guest service connection", "error", lastError)
+// 			return nil, errors.Errorf("timeout waiting for guest service connection: %w", lastError)
+// 		case <-ctx.Done():
+// 			slog.ErrorContext(ctx, "context done waiting for guest service connection", "error", lastError)
+// 			return nil, ctx.Err()
+// 		}
+// 	}
+// }
 
 func (r *RunningVM[VM]) ListenAndAcceptSingleVsockConnection(ctx context.Context, port uint32, dialCallback func(ctx context.Context) error) (net.Conn, error) {
 
@@ -292,6 +292,15 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 	ctx, closeCancel := context.WithCancel(ctx)
 	rvm.closeCancel = closeCancel
 
+	if rvm.rawWriter == nil {
+		slog.WarnContext(ctx, "raw writer is nil, using default raw writer")
+		rvm.rawWriter = logging.GetDefaultRawWriter()
+	}
+
+	if rvm.delimWriter == nil {
+		slog.WarnContext(ctx, "delim writer is nil, using default delim writer")
+		rvm.delimWriter = logging.GetDefaultDelimWriter()
+	}
 	// Initialize taskgroup
 	rvm.taskGroup = taskgroup.NewTaskGroup(ctx,
 		taskgroup.WithName("runningvm"),
@@ -318,126 +327,6 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 		return nil
 	})
 
-	err := bootVM(ctx, rvm.VM())
-	if err != nil {
-		if err := TryAppendingConsoleLog(ctx, rvm.workingDir); err != nil {
-			slog.ErrorContext(ctx, "error appending console log", "error", err)
-		}
-		return errors.Errorf("booting virtual machine: %w", err)
-	}
-
-	go func() {
-		rvm.cachedGuestGrpcConn.Connect()
-
-	}()
-
-	rvm.taskGroup.GoWithName("vsock-raw-writer-proxy", func(ctx context.Context) error {
-		var writer io.Writer
-		if rvm.rawWriter == nil {
-			slog.WarnContext(ctx, "raw writer is nil, using default raw writer")
-			writer = logging.GetDefaultRawWriter()
-		} else {
-			writer = rvm.rawWriter
-		}
-		slog.InfoContext(ctx, "running vsock raw writer proxy server", "port", constants.VsockRawWriterProxyPort)
-		err = rvm.RunVsockProxyServer(ctx, uint32(constants.VsockRawWriterProxyPort), writer)
-		if err != nil {
-			slog.ErrorContext(ctx, "error running vsock raw writer proxy server", "error", err)
-			return errors.Errorf("running vsock raw writer proxy server: %w", err)
-		}
-		return nil
-	})
-
-	rvm.taskGroup.GoWithName("vsock-delimited-writer-proxy", func(ctx context.Context) error {
-		var writer io.Writer
-		if rvm.delimWriter == nil {
-			slog.WarnContext(ctx, "delim writer is nil, using default delim writer")
-			writer = logging.GetDefaultDelimWriter()
-		} else {
-			writer = rvm.delimWriter
-		}
-		slog.InfoContext(ctx, "running vsock delimited writer proxy server", "port", constants.VsockDelimitedWriterProxyPort)
-		err = rvm.RunVsockProxyServer(ctx, uint32(constants.VsockDelimitedWriterProxyPort), writer)
-		if err != nil {
-			slog.ErrorContext(ctx, "error running vsock delimited writer proxy server", "error", err)
-			return errors.Errorf("running vsock delimited writer proxy server: %w", err)
-		}
-		return nil
-	})
-
-	rvm.taskGroup.GoWithName("vsock-debug-proxy", func(ctx context.Context) error {
-		// open up a tcp port (lets just do 2017)
-		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", 2017))
-		if err != nil {
-			slog.ErrorContext(ctx, "error listening on tcp port", "err", err)
-			return errors.Errorf("listening on tcp port: %w", err)
-		}
-		defer listener.Close()
-		slog.InfoContext(ctx, "running vsock delimited writer proxy server", "port", 2017)
-		err = rvm.RunVsockProxyClient(ctx, uint32(constants.VsockDebugPort), listener)
-		if err != nil {
-			slog.ErrorContext(ctx, "error running vsock delimited writer proxy server", "error", err)
-			return errors.Errorf("running vsock delimited writer proxy server: %w", err)
-		}
-		return nil
-	})
-
-	rvm.taskGroup.GoWithName("vsock-pprof-proxy", func(ctx context.Context) error {
-		// open up a tcp port for pprof (port 6060)
-		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", 6060))
-		if err != nil {
-			slog.ErrorContext(ctx, "error listening on tcp port for pprof", "err", err)
-			return errors.Errorf("listening on tcp port for pprof: %w", err)
-		}
-		defer listener.Close()
-		slog.InfoContext(ctx, "running vsock pprof proxy server", "port", 6060)
-		err = rvm.RunVsockProxyClient(ctx, uint32(constants.VsockPprofPort), listener)
-		if err != nil {
-			slog.ErrorContext(ctx, "error running vsock pprof proxy server", "error", err)
-			return errors.Errorf("running vsock pprof proxy server: %w", err)
-		}
-		return nil
-	})
-
-	if rvm.hostOtlpPort != 0 {
-		rvm.taskGroup.GoWithName("otel-forwarder", func(ctx context.Context) error {
-			err = rvm.SetupOtelForwarder(ctx)
-			if err != nil {
-				slog.ErrorContext(ctx, "error setting up otel forwarder", "error", err)
-				return errors.Errorf("setting up otel forwarder: %w", err)
-			}
-			return nil
-		})
-	}
-
-	rvm.taskGroup.GoWithName("vm-background-tasks", func(ctx context.Context) error {
-		err = rvm.VM().ServeBackgroundTasks(ctx)
-		if err != nil {
-			slog.ErrorContext(ctx, "error serving background tasks", "error", err)
-			return errors.Errorf("serving background tasks: %w", err)
-		}
-		return nil
-	})
-
-	rvm.taskGroup.GoWithName("host-service", func(ctx context.Context) error {
-		err = rvm.SetupHostService(ctx)
-		if err != nil {
-			slog.ErrorContext(ctx, "error setting up host service", "error", err)
-			return errors.Errorf("setting up host service: %w", err)
-		}
-		return nil
-	})
-
-	err = TailConsoleLog(ctx, rvm.workingDir)
-	if err != nil {
-		slog.ErrorContext(ctx, "error tailing console log", "error", err)
-	}
-
-	// For container runtimes, we want the VM to stay running, not wait for it to stop
-	slog.InfoContext(ctx, "VM is ready for container execution")
-
-	// Create an error channel that will receive VM state changes
-
 	rvm.taskGroup.GoWithName("vm-state-monitor", func(ctx context.Context) error {
 		// Only send error if VM actually encounters an error state
 		stateNotify := rvm.VM().StateChangeNotify(ctx)
@@ -460,13 +349,118 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 		}
 	})
 
+	err := bootVM(ctx, rvm.VM(), rvm.taskGroup)
+	if err != nil {
+		if err := TryAppendingConsoleLog(ctx, rvm.workingDir); err != nil {
+			slog.ErrorContext(ctx, "error appending console log", "error", err)
+		}
+		return errors.Errorf("booting virtual machine: %w", err)
+	}
+
+	go func() {
+		rvm.cachedGuestGrpcConn.Connect()
+	}()
+
+	rvm.taskGroup.GoWithName("vsock-raw-writer-proxy", func(ctx context.Context) error {
+
+		err = rvm.RunVsockProxyServer(ctx, uint32(constants.VsockRawWriterProxyPort), rvm.rawWriter)
+		if err != nil {
+			slog.ErrorContext(ctx, "error running vsock raw writer proxy server", "error", err)
+			return errors.Errorf("running vsock raw writer proxy server: %w", err)
+		}
+		return nil
+	})
+
+	rvm.taskGroup.GoWithName("vsock-delimited-writer-proxy", func(ctx context.Context) error {
+		err = rvm.RunVsockProxyServer(ctx, uint32(constants.VsockDelimitedWriterProxyPort), rvm.delimWriter)
+		if err != nil {
+			return errors.Errorf("running vsock delimited writer proxy server: %w", err)
+		}
+		return nil
+	})
+
+	rvm.taskGroup.GoWithName("vsock-debug-proxy", func(ctx context.Context) error {
+		// open up a tcp port (lets just do 2017)
+		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", 2017))
+		if err != nil {
+			return errors.Errorf("listening on tcp port: %w", err)
+		}
+		defer listener.Close()
+		err = rvm.RunVsockProxyClient(ctx, uint32(constants.VsockDebugPort), listener)
+		if err != nil {
+			return errors.Errorf("running vsock delimited writer proxy server: %w", err)
+		}
+		return nil
+	})
+
+	rvm.taskGroup.GoWithName("vsock-pprof-proxy", func(ctx context.Context) error {
+		// open up a tcp port for pprof (port 6060)
+		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", 6060))
+		if err != nil {
+			return errors.Errorf("listening on tcp port for pprof: %w", err)
+		}
+		defer listener.Close()
+		err = rvm.RunVsockProxyClient(ctx, uint32(constants.VsockPprofPort), listener)
+		if err != nil {
+			return errors.Errorf("running vsock pprof proxy server: %w", err)
+		}
+		return nil
+	})
+
+	if rvm.hostOtlpPort != 0 {
+		rvm.taskGroup.GoWithName("otel-forwarder", func(ctx context.Context) error {
+			err = rvm.SetupOtelForwarder(ctx)
+			if err != nil {
+				return errors.Errorf("setting up otel forwarder: %w", err)
+			}
+			return nil
+		})
+	}
+
+	rvm.taskGroup.GoWithName("vm-background-tasks", func(ctx context.Context) error {
+		err = rvm.VM().ServeBackgroundTasks(ctx)
+		if err != nil {
+			return errors.Errorf("serving background tasks: %w", err)
+		}
+		return nil
+	})
+
+	rvm.taskGroup.GoWithName("host-service", func(ctx context.Context) error {
+		err = rvm.SetupHostService(ctx)
+		if err != nil {
+			return errors.Errorf("setting up host service: %w", err)
+		}
+		return nil
+	})
+
+	rvm.taskGroup.GoWithName("tail-console-log", func(ctx context.Context) error {
+		err = TailConsoleLog(ctx, rvm.workingDir, rvm.rawWriter)
+		if err != nil {
+			return errors.Errorf("tailing console log: %w", err)
+		}
+		return nil
+	})
+
+	// For container runtimes, we want the VM to stay running, not wait for it to stop
+	slog.InfoContext(ctx, "VM is ready for container execution")
+
+	// Create an error channel that will receive VM state changes
+
 	err = rvm.RunInitalTimesyncRequests(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "error running initial timesync requests", "error", err)
 		return errors.Errorf("running initial timesync requests: %w", err)
 	}
 
+	rvm.taskGroup.RegisterCleanup(func(ctx context.Context) error {
+		return rvm.Close(ctx)
+	})
+
 	return nil
+}
+
+func (rvm *RunningVM[VM]) TaskGroup() *taskgroup.TaskGroup {
+	return rvm.taskGroup
 }
 
 func (rvm *RunningVM[VM]) RunInitalTimesyncRequests(ctx context.Context) error {
@@ -588,7 +582,7 @@ func proxy(ctx context.Context, src net.Conn, dst net.Conn) {
 	}
 }
 
-func bootVM[VM VirtualMachine](ctx context.Context, vm VM) error {
+func bootVM[VM VirtualMachine](ctx context.Context, vm VM, tg *taskgroup.TaskGroup) error {
 	bootCtx, bootCancel := context.WithCancel(ctx)
 	defer func() {
 		if r := recover(); r != nil {
@@ -601,6 +595,7 @@ func bootVM[VM VirtualMachine](ctx context.Context, vm VM) error {
 	}()
 
 	go func() {
+		// this is temporary, don't need to add it to the taskgroup
 		for {
 			select {
 			case <-bootCtx.Done():
@@ -661,34 +656,27 @@ func TryAppendingConsoleLog(ctx context.Context, workingDir string) error {
 	return nil
 }
 
-func TailConsoleLog(ctx context.Context, workingDir string) error {
+func TailConsoleLog(ctx context.Context, workingDir string, writer io.Writer) error {
 	dat, err := os.ReadFile(filepath.Join(workingDir, "console.log"))
 	if err != nil {
-		slog.ErrorContext(ctx, "error reading console log file", "error", err)
 		return errors.Errorf("reading console log file: %w", err)
 	}
 
-	writer := logging.GetDefaultRawWriter()
-
 	if writer == nil {
-		slog.WarnContext(ctx, "default raw writer is not set, skipping tailing console log")
-		return nil
+		return errors.Errorf("writer is nil")
 	}
 
 	for _, line := range strings.Split(string(dat), "\n") {
 		fmt.Fprintf(writer, "%s\n", line)
 	}
 
-	go func() {
-		t, err := tail.TailFile(filepath.Join(workingDir, "console.log"), tail.Config{Follow: true, Location: &tail.SeekInfo{Offset: int64(len(dat)), Whence: io.SeekStart}})
-		if err != nil {
-			slog.ErrorContext(ctx, "error tailing log file", "error", err)
-			return
-		}
-		for line := range t.Lines {
-			fmt.Fprintf(writer, "%s\n", line.Text)
-		}
-	}()
+	t, err := tail.TailFile(filepath.Join(workingDir, "console.log"), tail.Config{Follow: true, Location: &tail.SeekInfo{Offset: int64(len(dat)), Whence: io.SeekStart}})
+	if err != nil {
+		return errors.Errorf("error tailing log file: %w", err)
+	}
+	for line := range t.Lines {
+		fmt.Fprintf(writer, "%s\n", line.Text)
+	}
 
 	return nil
 }

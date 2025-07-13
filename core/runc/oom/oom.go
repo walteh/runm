@@ -5,7 +5,6 @@ import (
 	"log/slog"
 
 	"github.com/containerd/containerd/v2/core/events"
-	"github.com/walteh/run"
 	"gitlab.com/tozd/go/errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -16,45 +15,10 @@ import (
 	"github.com/walteh/runm/core/runc/runtime"
 )
 
-var _ run.Runnable = (*Watcher)(nil)
-
-// isExpectedClosureError checks if the error indicates an expected closure condition
-// func isExpectedClosureError(err error) bool {
-// 	if errors.Is(err, io.EOF) {
-// 		return true
-// 	}
-
-// 	errStatus := status.Code(err)
-// 	if errStatus == codes.Canceled {
-// 		return true
-// 	}
-
-// 	// Check for gRPC connection closing errors
-// 	errStr := err.Error()
-// 	return strings.Contains(errStr, "grpc: the client connection is closing") ||
-// 		strings.Contains(errStr, "transport is closing") ||
-// 		strings.Contains(errStr, "connection is closing")
-// }
-
 type Watcher struct {
 	alive         bool
 	publisher     events.Publisher
 	cgroupAdapter runtime.CgroupAdapter
-}
-
-// Alive implements run.Runnable.
-func (w *Watcher) Alive() bool {
-	return w.alive
-}
-
-// Fields implements run.Runnable.
-func (w *Watcher) Fields() []slog.Attr {
-	return []slog.Attr{}
-}
-
-// Name implements run.Runnable.
-func (w *Watcher) Name() string {
-	return "oom-watcher"
 }
 
 type item struct {
@@ -63,24 +27,9 @@ type item struct {
 	err error
 }
 
-func NewWatcher(publisher events.Publisher, cgroupAdapter runtime.CgroupAdapter) *Watcher {
-	return &Watcher{
-		publisher:     publisher,
-		cgroupAdapter: cgroupAdapter,
-	}
-}
+func RunOOMWatcher(ctx context.Context, publisher events.Publisher, cgroupAdapter runtime.CgroupAdapter) error {
 
-func (w *Watcher) Close(ctx context.Context) error {
-	return nil
-}
-
-func (w *Watcher) Run(ctx context.Context) error {
-	w.alive = true
-	defer func() {
-		w.alive = false
-	}()
-
-	eventCh, errCh, err := w.cgroupAdapter.OpenEventChan(ctx)
+	eventCh, errCh, err := cgroupAdapter.OpenEventChan(ctx)
 	if err != nil {
 		return errors.Errorf("failed to open event channel: %w", err)
 	}
@@ -98,7 +47,7 @@ func (w *Watcher) Run(ctx context.Context) error {
 			i := item{id: "root"}
 			select {
 			case ev := <-eventCh:
-				slog.Debug("EVENT", "id", i.id, "ev", ev)
+				slog.Debug("OOM[EVENT]", "id", i.id, "ev", ev)
 				i.ev = ev
 				itemCh <- i
 			case err := <-errCh:
@@ -126,7 +75,7 @@ func (w *Watcher) Run(ctx context.Context) error {
 			}
 			lastOOM := lastOOMMap[i.id]
 			if i.ev.OOMKill > lastOOM {
-				if err := w.publisher.Publish(ctx, coreruntime.TaskOOMEventTopic, &eventstypes.TaskOOM{
+				if err := publisher.Publish(ctx, coreruntime.TaskOOMEventTopic, &eventstypes.TaskOOM{
 					ContainerID: i.id,
 				}); err != nil {
 					return errors.Errorf("failed to publish OOM event: %w", err)

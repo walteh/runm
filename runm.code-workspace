@@ -68,7 +68,8 @@
 			"microsoft-dciborow.align-bicep",
 			"mortenson.go-template-transpiler-extension",
 			"casualjim.gotemplate",
-			"tooltitudeteam.tooltitude-pb"
+			"tooltitudeteam.tooltitude-pb",
+			"shivamkumar.go-extras"
 		]
 	},
 	"settings": {
@@ -98,7 +99,8 @@
 		"gopls": {
 			"build.expandWorkspaceToModule": true,
 			"build.templateExtensions": ["tmpl"],
-			"verboseOutput": false
+			"verboseOutput": false,
+			"ui.semanticTokens": true
 			// "build.buildFlags": ["-tags=!windows"]
 		},
 		"go.languageServerFlags": ["-mcp-listen=localhost:50051"],

@@ -6,9 +6,9 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containers/common/pkg/strongunits"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/walteh/run"
 	"gitlab.com/tozd/go/errors"
 	"google.golang.org/grpc"
 
@@ -26,7 +26,7 @@ var (
 	_ runtime.CgroupAdapter   = (*RunmVMRuntime[vmm.VirtualMachine])(nil)
 	_ runtime.EventHandler    = (*RunmVMRuntime[vmm.VirtualMachine])(nil)
 	_ runtime.GuestManagement = (*RunmVMRuntime[vmm.VirtualMachine])(nil)
-	_ run.Runnable            = (*RunmVMRuntime[vmm.VirtualMachine])(nil)
+	// _ run.Runnable            = (*RunmVMRuntime[vmm.VirtualMachine])(nil)
 )
 
 type RunmVMRuntime[VM vmm.VirtualMachine] struct {
@@ -36,14 +36,12 @@ type RunmVMRuntime[VM vmm.VirtualMachine] struct {
 	runtime.EventHandler
 	runtime.GuestManagement
 
-	grpcConn   *grpc.ClientConn
-	spec       *specs.Spec
-	vm         *vmm.RunningVM[VM]
-	oomWatcher *oom.Watcher
+	grpcConn       *grpc.ClientConn
+	spec           *specs.Spec
+	vm             *vmm.RunningVM[VM]
+	eventPublisher events.Publisher
 
 	closers []func() error
-
-	runGroup *run.Group
 }
 
 func NewRunmVMRuntime[VM vmm.VirtualMachine](
@@ -54,8 +52,6 @@ func NewRunmVMRuntime[VM vmm.VirtualMachine](
 	vcpus int,
 ) (*RunmVMRuntime[VM], error) {
 
-	runGroup := run.New()
-
 	closers := []func() error{}
 
 	cfg := vmm.OCIVMConfig{
@@ -63,12 +59,13 @@ func NewRunmVMRuntime[VM vmm.VirtualMachine](
 		Spec:           opts.OciSpec,
 		RootfsMounts:   opts.Mounts,
 		StartingMemory: maxMemory.ToBytes(),
-		VCPUs:          2,
-		Platform:       units.PlatformLinuxARM64,
-		Bundle:         opts.Bundle,
-		HostOtlpPort:   opts.HostOtlpPort,
-		RawWriter:      logging.GetDefaultRawWriter(),
-		DelimWriter:    logging.GetDefaultDelimWriter(),
+		// VCPUs:          uint64(opts.OciSpec.Linux.Resources.CPU.Cpus),
+		VCPUs:        uint64(vcpus),
+		Platform:     units.PlatformLinuxARM64,
+		Bundle:       opts.Bundle,
+		HostOtlpPort: opts.HostOtlpPort,
+		RawWriter:    logging.GetDefaultRawWriter(),
+		DelimWriter:  logging.GetDefaultDelimWriter(),
 	}
 
 	vm, err := vmm.NewOCIVirtualMachine(ctx, hpv, cfg)
@@ -94,24 +91,29 @@ func NewRunmVMRuntime[VM vmm.VirtualMachine](
 		return nil, errors.Errorf("getting guest vsock conn: %w", err)
 	}
 
+	vm.TaskGroup().RegisterCleanupWithName("vm-grpc-client-conn-closer", func(ctx context.Context) error {
+		return srv.Close()
+	})
+
 	rsrv, err := grpcruntime.NewGRPCClientRuntimeFromConn(srv)
 	if err != nil {
 		return nil, errors.Errorf("creating grpc client runtime: %w", err)
 	}
 
+	vm.TaskGroup().RegisterCleanupWithName("vm-grpc-client-runtime-closer", func(ctx context.Context) error {
+		return rsrv.Close(ctx)
+	})
+
 	rsrv.SetVsockProxier(vm)
 
 	slog.InfoContext(ctx, "connected to guest service", "id", vm.VM().ID())
 
-	ep := oom.NewWatcher(opts.Publisher, rsrv)
-
-	slog.InfoContext(ctx, "created oom watcher", "id", vm.VM().ID())
-
-	runGroup.Always(ep)
+	vm.TaskGroup().GoWithName("oom-watcher", func(ctx context.Context) error {
+		return oom.RunOOMWatcher(ctx, opts.Publisher, rsrv)
+	})
 
 	return &RunmVMRuntime[VM]{
 		vm:              vm,
-		oomWatcher:      ep,
 		spec:            cfg.Spec,
 		Runtime:         rsrv,
 		RuntimeExtras:   rsrv,
@@ -119,45 +121,45 @@ func NewRunmVMRuntime[VM vmm.VirtualMachine](
 		EventHandler:    rsrv,
 		closers:         closers,
 		GuestManagement: rsrv,
-		runGroup:        runGroup,
+		eventPublisher:  opts.Publisher,
 	}, nil
 }
 
-// Alive implements run.Runnable.
-func (r *RunmVMRuntime[VM]) Alive() bool {
-	return r.vm.VM().CurrentState() == vmm.VirtualMachineStateTypeRunning
-}
+// // Alive implements run.Runnable.
+// func (r *RunmVMRuntime[VM]) Alive() bool {
+// 	return r.vm.VM().CurrentState() == vmm.VirtualMachineStateTypeRunning
+// }
 
-// Close implements run.Runnable.
-func (r *RunmVMRuntime[VM]) Close(ctx context.Context) error {
+// // Close implements run.Runnable.
+// func (r *RunmVMRuntime[VM]) Close(ctx context.Context) error {
 
-	err := r.Runtime.Close(ctx)
-	slog.DebugContext(ctx, "closed runtime", "err", err)
+// 	err := r.Runtime.Close(ctx)
+// 	slog.DebugContext(ctx, "closed runtime", "err", err)
 
-	// err = r.grpcConn.Close()
-	// slog.DebugContext(ctx, "closed grpc conn", "err", err)
+// 	// err = r.grpcConn.Close()
+// 	// slog.DebugContext(ctx, "closed grpc conn", "err", err)
 
-	err = r.vm.Close(ctx)
-	slog.InfoContext(ctx, "closed vm", "err", err)
-	return nil
-}
+// 	err = r.vm.Close(ctx)
+// 	slog.InfoContext(ctx, "closed vm", "err", err)
+// 	return nil
+// }
 
 // Fields implements run.Runnable.
-func (r *RunmVMRuntime[VM]) Fields() []slog.Attr {
-	return []slog.Attr{
-		slog.String("id", r.vm.VM().ID()),
-	}
-}
+// func (r *RunmVMRuntime[VM]) Fields() []slog.Attr {
+// 	return []slog.Attr{
+// 		slog.String("id", r.vm.VM().ID()),
+// 	}
+// }
 
-// Name implements run.Runnable.
-func (r *RunmVMRuntime[VM]) Name() string {
-	return r.vm.VM().ID()
-}
+// // Name implements run.Runnable.
+// func (r *RunmVMRuntime[VM]) Name() string {
+// 	return r.vm.VM().ID()
+// }
 
-// Run implements run.Runnable.
-// Subtle: this method shadows the method (RuntimeExtras).Run of RunmVMRuntime.RuntimeExtras.
-func (r *RunmVMRuntime[VM]) Run(ctx context.Context) error {
-	slog.InfoContext(ctx, "running vm", "id", r.vm.VM().ID())
+// // Run implements run.Runnable.
+// // Subtle: this method shadows the method (RuntimeExtras).Run of RunmVMRuntime.RuntimeExtras.
+// func (r *RunmVMRuntime[VM]) Run(ctx context.Context) error {
+// 	slog.InfoContext(ctx, "running vm", "id", r.vm.VM().ID())
 
-	return r.runGroup.RunContext(ctx)
-}
+// 	return r.runGroup.RunContext(ctx)
+// }

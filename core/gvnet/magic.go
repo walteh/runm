@@ -12,29 +12,28 @@ import (
 	"github.com/containers/gvisor-tap-vsock/pkg/tcpproxy"
 	"github.com/containers/gvisor-tap-vsock/pkg/transport"
 	"github.com/soheilhy/cmux"
-	"github.com/walteh/run"
 	"gitlab.com/tozd/go/errors"
 	"gvisor.dev/gvisor/pkg/tcpip/adapters/gonet"
 	"gvisor.dev/gvisor/pkg/tcpip/network/ipv4"
 	"gvisor.dev/gvisor/pkg/tcpip/stack"
+
+	"github.com/walteh/runm/pkg/taskgroup"
 )
 
 type MagicHostPort struct {
-	mux      cmux.CMux
-	addr     net.Addr
-	grp      *run.Group
-	toClose  []io.Closer
-	alive    bool
-	listener net.Listener
+	mux       cmux.CMux
+	addr      net.Addr
+	toClose   []io.Closer
+	alive     bool
+	listener  net.Listener
+	taskGroup *taskgroup.TaskGroup
 }
 
-func NewMagicHostPortStream(ctx context.Context, magicHostPort string) (*MagicHostPort, error) {
+func NewMagicHostPortStream(ctx context.Context, magicHostPort string, tg *taskgroup.TaskGroup) (*MagicHostPort, error) {
 	l, err := transport.Listen(magicHostPort)
 	if err != nil {
 		return nil, errors.Errorf("listen: %w", err)
 	}
-
-	grp := run.New(run.WithLogger(slog.Default()))
 
 	cmux := cmux.New(l)
 
@@ -43,13 +42,14 @@ func NewMagicHostPortStream(ctx context.Context, magicHostPort string) (*MagicHo
 		return true
 	})
 
-	grp.Always(NewCmuxServer(fmt.Sprintf("globalhostport_cmux(%s)", magicHostPort), cmux))
-
-	return &MagicHostPort{mux: cmux, addr: l.Addr(), grp: grp, toClose: []io.Closer{l}, listener: l}, nil
+	return &MagicHostPort{mux: cmux, addr: l.Addr(), toClose: []io.Closer{l}, listener: l, taskGroup: tg}, nil
 }
 
 func (g *MagicHostPort) ApplyRestMux(name string, mux http.Handler) {
-	g.grp.Always(NewHTTPServer("globalhostport_"+name, mux, g.mux.Match(cmux.Any())))
+	g.taskGroup.GoWithName("globalhostport_"+name, func(ctx context.Context) error {
+		server := NewHTTPServer("globalhostport_"+name, mux, g.mux.Match(cmux.Any()))
+		return server.Run(ctx)
+	})
 }
 
 func (g *MagicHostPort) Run(ctx context.Context) error {
@@ -58,11 +58,15 @@ func (g *MagicHostPort) Run(ctx context.Context) error {
 		g.alive = false
 	}()
 
-	err := g.grp.RunContext(ctx)
-	if err != nil {
-		return errors.Errorf("run: %w", err)
-	}
-	return nil
+	// Start the cmux server task
+	g.taskGroup.GoWithName("cmux-server", func(ctx context.Context) error {
+		server := NewCmuxServer(fmt.Sprintf("globalhostport_cmux(%s)", g.addr.String()), g.mux)
+		return server.Run(ctx)
+	})
+
+	// Block until context is done
+	<-ctx.Done()
+	return ctx.Err()
 }
 
 func (g *MagicHostPort) Alive() bool {
@@ -110,20 +114,12 @@ func (g *MagicHostPort) ForwardCMUXMatchToGuestPort(ctx context.Context, switc *
 
 	var proxy tcpproxy.Proxy
 	proxy.ListenFunc = func(network, laddr string) (net.Listener, error) {
-		// slog.InfoContext(ctx, "listening", slog.Group("ignored",
-		// 	slog.String("network", network),
-		// 	slog.String("address", laddr),
-		// ), "hostAddress", hostAddress)
 		return listener, nil
 	}
 
 	proxy.AddRoute(hostAddress, &tcpproxy.DialProxy{
 		Addr: guestPortTargetStr,
 		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
-			// slog.InfoContext(ctx, "dialing", slog.Group("ignored",
-			// 	slog.String("network", network),
-			// 	slog.String("address", address),
-			// ), "guestAddress", guestAddress.Addr.String(), "hostAddress", hostAddress)
 			return gonet.DialContextTCP(ctx, switc, guestAddress, ipv4.ProtocolNumber)
 		},
 		OnDialError: func(src net.Conn, dstDialErr error) {
@@ -132,12 +128,28 @@ func (g *MagicHostPort) ForwardCMUXMatchToGuestPort(ctx context.Context, switc *
 		},
 	})
 
-	tcpproxyRunner, err := NewTCPProxyRunner(hostAddress, guestPortTargetStr, &proxy)
+	// Start the proxy
+	err = proxy.Start()
 	if err != nil {
-		return errors.Errorf("failed to create tcpproxy runner: %w", err)
+		return errors.Errorf("starting tcpproxy [%s -> %s]: %w", hostAddress, guestPortTargetStr, err)
 	}
 
-	g.grp.Always(tcpproxyRunner)
+	// Register proxy cleanup
+	g.taskGroup.RegisterCloserWithName(fmt.Sprintf("tcpproxy-%d", guestPortTarget), &proxy)
+
+	// Run the proxy in a task
+	g.taskGroup.GoWithName(fmt.Sprintf("tcpproxy-%d", guestPortTarget), func(ctx context.Context) error {
+		slog.InfoContext(ctx, "starting tcpproxy",
+			"source", hostAddress,
+			"target", guestPortTargetStr,
+			"guest_port", guestPortTarget)
+
+		err := proxy.Wait()
+		if err != nil {
+			return errors.Errorf("running tcpproxy [%s -> %s]: %w", hostAddress, guestPortTargetStr, err)
+		}
+		return nil
+	})
 	g.toClose = append(g.toClose, listener)
 
 	return nil
