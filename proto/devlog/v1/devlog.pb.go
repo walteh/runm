@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.6
 // 	protoc        (unknown)
-// source: devlog/v1/dapmux.proto
+// source: devlog/v1/devlog.proto
 
 package devlogv1
 
@@ -31,7 +31,7 @@ type StructuredLog struct {
 
 func (x *StructuredLog) Reset() {
 	*x = StructuredLog{}
-	mi := &file_devlog_v1_dapmux_proto_msgTypes[0]
+	mi := &file_devlog_v1_devlog_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +43,7 @@ func (x *StructuredLog) String() string {
 func (*StructuredLog) ProtoMessage() {}
 
 func (x *StructuredLog) ProtoReflect() protoreflect.Message {
-	mi := &file_devlog_v1_dapmux_proto_msgTypes[0]
+	mi := &file_devlog_v1_devlog_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -74,7 +74,7 @@ type RawLog struct {
 
 func (x *RawLog) Reset() {
 	*x = RawLog{}
-	mi := &file_devlog_v1_dapmux_proto_msgTypes[1]
+	mi := &file_devlog_v1_devlog_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -86,7 +86,7 @@ func (x *RawLog) String() string {
 func (*RawLog) ProtoMessage() {}
 
 func (x *RawLog) ProtoReflect() protoreflect.Message {
-	mi := &file_devlog_v1_dapmux_proto_msgTypes[1]
+	mi := &file_devlog_v1_devlog_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -118,7 +118,7 @@ type LogRequest struct {
 
 func (x *LogRequest) Reset() {
 	*x = LogRequest{}
-	mi := &file_devlog_v1_dapmux_proto_msgTypes[2]
+	mi := &file_devlog_v1_devlog_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -130,7 +130,7 @@ func (x *LogRequest) String() string {
 func (*LogRequest) ProtoMessage() {}
 
 func (x *LogRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_devlog_v1_dapmux_proto_msgTypes[2]
+	mi := &file_devlog_v1_devlog_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -257,7 +257,7 @@ func (b0 LogRequest_builder) Build() *LogRequest {
 type case_LogRequest_Log protoreflect.FieldNumber
 
 func (x case_LogRequest_Log) String() string {
-	md := file_devlog_v1_dapmux_proto_msgTypes[2].Descriptor()
+	md := file_devlog_v1_devlog_proto_msgTypes[2].Descriptor()
 	if x == 0 {
 		return "not set"
 	}
@@ -288,7 +288,7 @@ type LogResponse struct {
 
 func (x *LogResponse) Reset() {
 	*x = LogResponse{}
-	mi := &file_devlog_v1_dapmux_proto_msgTypes[3]
+	mi := &file_devlog_v1_devlog_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -300,7 +300,7 @@ func (x *LogResponse) String() string {
 func (*LogResponse) ProtoMessage() {}
 
 func (x *LogResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_devlog_v1_dapmux_proto_msgTypes[3]
+	mi := &file_devlog_v1_devlog_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -323,11 +323,11 @@ func (b0 LogResponse_builder) Build() *LogResponse {
 	return m0
 }
 
-var File_devlog_v1_dapmux_proto protoreflect.FileDescriptor
+var File_devlog_v1_devlog_proto protoreflect.FileDescriptor
 
-const file_devlog_v1_dapmux_proto_rawDesc = "" +
+const file_devlog_v1_devlog_proto_rawDesc = "" +
 	"\n" +
-	"\x16devlog/v1/dapmux.proto\x12\x0erunm.devlog.v1\x1a!google/protobuf/go_features.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x0f\n" +
+	"\x16devlog/v1/devlog.proto\x12\x0erunm.devlog.v1\x1a!google/protobuf/go_features.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x0f\n" +
 	"\rStructuredLog\"\b\n" +
 	"\x06RawLog\"\x80\x01\n" +
 	"\n" +
@@ -340,16 +340,16 @@ const file_devlog_v1_dapmux_proto_rawDesc = "" +
 	"\vLogResponse2S\n" +
 	"\rDevlogService\x12B\n" +
 	"\x03Log\x12\x1a.runm.devlog.v1.LogRequest\x1a\x1b.runm.devlog.v1.LogResponse(\x010\x01B\xb6\x01\n" +
-	"\x12com.runm.devlog.v1B\vDapmuxProtoP\x01Z/github.com/walteh/runm/proto/devlog/v1;devlogv1\xa2\x02\x03RDX\xaa\x02\x0eRunm.Devlog.V1\xca\x02\x0eRunm\\Devlog\\V1\xe2\x02\x1aRunm\\Devlog\\V1\\GPBMetadata\xea\x02\x10Runm::Devlog::V1\x92\x03\a\xd2>\x02\x10\x03\b\x02b\beditionsp\xe8\a"
+	"\x12com.runm.devlog.v1B\vDevlogProtoP\x01Z/github.com/walteh/runm/proto/devlog/v1;devlogv1\xa2\x02\x03RDX\xaa\x02\x0eRunm.Devlog.V1\xca\x02\x0eRunm\\Devlog\\V1\xe2\x02\x1aRunm\\Devlog\\V1\\GPBMetadata\xea\x02\x10Runm::Devlog::V1\x92\x03\a\xd2>\x02\x10\x03\b\x02b\beditionsp\xe8\a"
 
-var file_devlog_v1_dapmux_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
-var file_devlog_v1_dapmux_proto_goTypes = []any{
+var file_devlog_v1_devlog_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_devlog_v1_devlog_proto_goTypes = []any{
 	(*StructuredLog)(nil), // 0: runm.devlog.v1.StructuredLog
 	(*RawLog)(nil),        // 1: runm.devlog.v1.RawLog
 	(*LogRequest)(nil),    // 2: runm.devlog.v1.LogRequest
 	(*LogResponse)(nil),   // 3: runm.devlog.v1.LogResponse
 }
-var file_devlog_v1_dapmux_proto_depIdxs = []int32{
+var file_devlog_v1_devlog_proto_depIdxs = []int32{
 	0, // 0: runm.devlog.v1.LogRequest.structured:type_name -> runm.devlog.v1.StructuredLog
 	1, // 1: runm.devlog.v1.LogRequest.raw:type_name -> runm.devlog.v1.RawLog
 	2, // 2: runm.devlog.v1.DevlogService.Log:input_type -> runm.devlog.v1.LogRequest
@@ -361,12 +361,12 @@ var file_devlog_v1_dapmux_proto_depIdxs = []int32{
 	0, // [0:2] is the sub-list for field type_name
 }
 
-func init() { file_devlog_v1_dapmux_proto_init() }
-func file_devlog_v1_dapmux_proto_init() {
-	if File_devlog_v1_dapmux_proto != nil {
+func init() { file_devlog_v1_devlog_proto_init() }
+func file_devlog_v1_devlog_proto_init() {
+	if File_devlog_v1_devlog_proto != nil {
 		return
 	}
-	file_devlog_v1_dapmux_proto_msgTypes[2].OneofWrappers = []any{
+	file_devlog_v1_devlog_proto_msgTypes[2].OneofWrappers = []any{
 		(*logRequest_Structured)(nil),
 		(*logRequest_Raw)(nil),
 	}
@@ -374,17 +374,17 @@ func file_devlog_v1_dapmux_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_devlog_v1_dapmux_proto_rawDesc), len(file_devlog_v1_dapmux_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_devlog_v1_devlog_proto_rawDesc), len(file_devlog_v1_devlog_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_devlog_v1_dapmux_proto_goTypes,
-		DependencyIndexes: file_devlog_v1_dapmux_proto_depIdxs,
-		MessageInfos:      file_devlog_v1_dapmux_proto_msgTypes,
+		GoTypes:           file_devlog_v1_devlog_proto_goTypes,
+		DependencyIndexes: file_devlog_v1_devlog_proto_depIdxs,
+		MessageInfos:      file_devlog_v1_devlog_proto_msgTypes,
 	}.Build()
-	File_devlog_v1_dapmux_proto = out.File
-	file_devlog_v1_dapmux_proto_goTypes = nil
-	file_devlog_v1_dapmux_proto_depIdxs = nil
+	File_devlog_v1_devlog_proto = out.File
+	file_devlog_v1_devlog_proto_goTypes = nil
+	file_devlog_v1_devlog_proto_depIdxs = nil
 }

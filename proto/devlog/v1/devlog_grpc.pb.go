@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             (unknown)
-// source: devlog/v1/dapmux.proto
+// source: devlog/v1/devlog.proto
 
 package devlogv1
 
@@ -115,5 +115,5 @@ var DevlogService_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "devlog/v1/dapmux.proto",
+	Metadata: "devlog/v1/devlog.proto",
 }
