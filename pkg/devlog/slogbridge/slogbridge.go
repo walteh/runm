@@ -43,7 +43,7 @@ func (p *SlogProducer) Produce(ctx context.Context, data interface{}) (*devlog.E
 	}
 
 	// Create structured log entry
-	structured := &devlogv1.StructuredLog{
+	structured := &devlogv1.StructuredLog_builder{
 		Timestamp:  timestamppb.New(record.Time),
 		Level:      devlog.SlogLevelToDevlogLevel(record.Level),
 		Message:    record.Message,
@@ -58,14 +58,14 @@ func (p *SlogProducer) Produce(ctx context.Context, data interface{}) (*devlog.E
 	// Add source information if available
 	if record.PC != 0 {
 		source := stackerr.NewEnhancedSource(record.PC)
-		structured.Source = &devlogv1.SourceInfo{
+		structured.Source = (&devlogv1.SourceInfo_builder{
 			FilePath:       source.RawFilePath,
 			LineNumber:     int32(source.RawFileLine),
 			FunctionName:   source.RawFunc,
 			PackageName:    source.EnhancedPkg,
 			ModuleName:     getModuleName(source.RawFilePath),
 			ProgramCounter: uint64(record.PC),
-		}
+		}).Build()
 	}
 
 	// Handle errors specially
@@ -75,7 +75,7 @@ func (p *SlogProducer) Produce(ctx context.Context, data interface{}) (*devlog.E
 
 	entry := &devlog.Entry{
 		Type:       devlog.EntryTypeStructured,
-		Structured: structured,
+		Structured: structured.Build(),
 	}
 
 	return entry, nil
@@ -123,51 +123,28 @@ func (p *SlogProducer) convertAttribute(attr slog.Attr) *devlogv1.Attribute {
 		return nil
 	}
 
-	return &devlogv1.Attribute{
+	return (&devlogv1.Attribute_builder{
 		Key:   key,
 		Value: value,
-	}
+	}).Build()
 }
 
 // convertAttributeValue converts slog.Value to devlog.AttributeValue
 func (p *SlogProducer) convertAttributeValue(value slog.Value) *devlogv1.AttributeValue {
+	attr := &devlogv1.AttributeValue{}
 	switch value.Kind() {
 	case slog.KindString:
-		return &devlogv1.AttributeValue{
-			Value: &devlogv1.AttributeValue_StringValue{
-				StringValue: value.String(),
-			},
-		}
+		attr.SetStringValue(value.String())
 	case slog.KindInt64:
-		return &devlogv1.AttributeValue{
-			Value: &devlogv1.AttributeValue_IntValue{
-				IntValue: value.Int64(),
-			},
-		}
+		attr.SetIntValue(value.Int64())
 	case slog.KindUint64:
-		return &devlogv1.AttributeValue{
-			Value: &devlogv1.AttributeValue_IntValue{
-				IntValue: int64(value.Uint64()),
-			},
-		}
+		attr.SetIntValue(int64(value.Uint64()))
 	case slog.KindFloat64:
-		return &devlogv1.AttributeValue{
-			Value: &devlogv1.AttributeValue_DoubleValue{
-				DoubleValue: value.Float64(),
-			},
-		}
+		attr.SetDoubleValue(value.Float64())
 	case slog.KindBool:
-		return &devlogv1.AttributeValue{
-			Value: &devlogv1.AttributeValue_BoolValue{
-				BoolValue: value.Bool(),
-			},
-		}
+		attr.SetBoolValue(value.Bool())
 	case slog.KindTime:
-		return &devlogv1.AttributeValue{
-			Value: &devlogv1.AttributeValue_StringValue{
-				StringValue: value.Time().Format(time.RFC3339Nano),
-			},
-		}
+		attr.SetStringValue(value.Time().Format(time.RFC3339Nano))
 	case slog.KindGroup:
 		// Handle groups by flattening them
 		groupAttrs := value.Group()
@@ -176,19 +153,12 @@ func (p *SlogProducer) convertAttributeValue(value slog.Value) *devlogv1.Attribu
 		}
 		// For now, convert to a string representation
 		// TODO: Better group handling
-		return &devlogv1.AttributeValue{
-			Value: &devlogv1.AttributeValue_StringValue{
-				StringValue: "[group]",
-			},
-		}
+		attr.SetStringValue("[group]")
 	default:
 		// Fallback to string representation
-		return &devlogv1.AttributeValue{
-			Value: &devlogv1.AttributeValue_StringValue{
-				StringValue: value.String(),
-			},
-		}
+		attr.SetStringValue(value.String())
 	}
+	return attr
 }
 
 // extractErrorInfo extracts error information from the log record
@@ -210,14 +180,13 @@ func (p *SlogProducer) extractErrorInfo(record slog.Record) *devlogv1.ErrorInfo 
 		return nil
 	}
 
-	errorInfo := &devlogv1.ErrorInfo{
-		Message: foundError.Error(),
-		Type:    getErrorType(foundError),
-	}
+	errorInfo := &devlogv1.ErrorInfo{}
+	errorInfo.SetMessage(foundError.Error())
+	errorInfo.SetType(getErrorType(foundError))
 
 	// Add stack trace if available
 	if stackErr, ok := foundError.(interface{ Stack() []byte }); ok {
-		errorInfo.StackTrace = string(stackErr.Stack())
+		errorInfo.SetStackTrace(string(stackErr.Stack()))
 	}
 
 	return errorInfo
@@ -245,14 +214,14 @@ func (p *SlogProducer) buildDottedKey(attrKey string) string {
 
 // Helper functions
 func getProcessInfo() *devlogv1.ProcessInfo {
-	return &devlogv1.ProcessInfo{
+	return (&devlogv1.ProcessInfo_builder{
 		Pid:      int32(os.Getpid()),
 		Hostname: getHostname(),
 		Runtime:  "go",
 		Os:       runtime.GOOS,
 		Arch:     runtime.GOARCH,
 		Version:  runtime.Version(),
-	}
+	}).Build()
 }
 
 func getHostname() string {
@@ -263,7 +232,7 @@ func getHostname() string {
 	return hostname
 }
 
-func getModuleName(filePath string) string {
+func getModuleName(_ string) string {
 	// TODO: Extract module name from file path
 	return "github.com/walteh/runm"
 }
@@ -277,12 +246,12 @@ func isErrorKey(key string) bool {
 	return key == "error" || key == "err" || key == "error.payload"
 }
 
-func extractTraceID(ctx context.Context) string {
+func extractTraceID(_ context.Context) string {
 	// TODO: Extract trace ID from context (OpenTelemetry, etc.)
 	return ""
 }
 
-func extractSpanID(ctx context.Context) string {
+func extractSpanID(_ context.Context) string {
 	// TODO: Extract span ID from context (OpenTelemetry, etc.)
 	return ""
 }

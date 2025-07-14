@@ -45,6 +45,8 @@ tool (
 
 replace github.com/containerd/ttrpc => ../../ttrpc
 
+replace github.com/go-task/task/v3 => ../../task
+
 replace github.com/kazhuravlev/options-gen => github.com/walteh/options-gen v0.0.0-20250713131630-7173908d186c
 
 require (

@@ -72,10 +72,18 @@ func (p *platform[T]) CopyConsole(ctx context.Context, console console.Console, 
 	if p.queue == nil {
 		return nil, errors.New("uninitialized queue")
 	}
+	var kqueueConsole T
+	var err error
+	// if already a kqueueConsole dont recreate it
+	if _, ok := console.(T); ok {
+		kqueueConsole = console.(T)
+		// return console, nil
+	} else {
 
-	kqueueConsole, err := p.queue.Add(console)
-	if err != nil {
-		return nil, errors.Errorf("adding console to queue: %w", err)
+		kqueueConsole, err = p.queue.Add(console)
+		if err != nil {
+			return nil, errors.Errorf("adding console to queue: %w", err)
+		}
 	}
 
 	var cwg sync.WaitGroup

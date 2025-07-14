@@ -159,7 +159,7 @@ func (e *execProcess) Kill(ctx context.Context, sig uint32, _ bool) error {
 	return e.execState.Kill(ctx, sig, false)
 }
 
-func (e *execProcess) kill(ctx context.Context, sig uint32, _ bool) error {
+func (e *execProcess) kill(_ context.Context, sig uint32, _ bool) error {
 	pid := e.pid.getLocked()
 	switch {
 	case pid == 0:

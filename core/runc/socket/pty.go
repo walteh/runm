@@ -49,18 +49,17 @@ func NewRemotePTYConsoleAdapter(ctx context.Context, wrcon io.ReadWriteCloser) (
 		return nil, errors.Errorf("failed to add console to kqueue: %w", err)
 	}
 
+	// WARNING: leaving this here for debugging purposes, but when we enable it we break the
+	// entire forward of the terminal output
 	// if err := consoleInstance.DisableEcho(); err != nil {
 	// 	slog.Error("failed to disable echo", "error", err)
 	// }
 
-	// Clear ONLCR on both master and slave
-	// if err := console.ClearONLCR(ttyFile.Fd()); err != nil {
-	// 	slog.Error("failed to clear ONLCR on slave", "error", err)
+	// WARNING: leaving this here for debugging purposes, but when we enable it we break the
+	// structure of the terminal output
+	// if err := console.ClearONLCR(ptyFile.Fd()); err != nil {
+	// 	slog.Error("failed to clear ONLCR on master", "error", err)
 	// }
-
-	if err := console.ClearONLCR(ptyFile.Fd()); err != nil {
-		slog.Error("failed to clear ONLCR on master", "error", err)
-	}
 
 	adapter := &PTYConsoleAdapter{
 		conn:    wrcon,
