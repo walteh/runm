@@ -31,9 +31,11 @@ import (
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/stdio"
 	"github.com/containerd/fifo"
+	slogctx "github.com/veqryn/slog-context"
 	"gitlab.com/tozd/go/errors"
 
 	"github.com/walteh/runm/cmd/containerd-shim-runm-v2/process"
+	"github.com/walteh/runm/pkg/conn"
 )
 
 var bufPool = sync.Pool{
@@ -87,7 +89,7 @@ func (p *platform[T]) CopyConsole(ctx context.Context, console console.Console, 
 			cwg.Done()
 			bp := bufPool.Get().(*[]byte)
 			defer bufPool.Put(bp)
-			io.CopyBuffer(kqueueConsole, in, *bp)
+			<-conn.DebugCopyWithBuffer(ctx, "stdin(read)->kqueue(write)", kqueueConsole, in, *bp)
 			// we need to shutdown kqueueConsole when pipe broken
 			kqueueConsole.Shutdown(p.queue.CloseConsole)
 			kqueueConsole.Close()
@@ -100,21 +102,23 @@ func (p *platform[T]) CopyConsole(ctx context.Context, console console.Console, 
 		return nil, errors.Errorf("unable to parse stdout uri: %w", err)
 	}
 
+	ctx = slogctx.Append(ctx, "id", id, "stdout", stdout)
+
 	switch uri.Scheme {
 	case "binary":
 
-		slog.DebugContext(ctx, "COPYCONSOLE[A] copying console to binary", "id", id, "stdout", stdout)
+		slog.DebugContext(ctx, "COPYCONSOLE[A] copying console to binary")
 
 		ns, err := namespaces.NamespaceRequired(ctx)
 		if err != nil {
 			return nil, errors.Errorf("getting namespace: %w", err)
 		}
 
-		slog.DebugContext(ctx, "COPYCONSOLE[B] creating binary cmd", "id", id, "stdout", stdout)
+		slog.DebugContext(ctx, "COPYCONSOLE[B] creating binary cmd")
 
 		cmd := process.NewBinaryCmd(uri, id, ns)
 
-		slog.DebugContext(ctx, "COPYCONSOLE[C] created binary cmd", "id", id, "stdout", stdout)
+		slog.DebugContext(ctx, "COPYCONSOLE[C] created binary cmd")
 
 		// In case of unexpected errors during logging binary start, close open pipes
 		var filesToClose []*os.File
@@ -125,7 +129,7 @@ func (p *platform[T]) CopyConsole(ctx context.Context, console console.Console, 
 			}
 		}()
 
-		slog.DebugContext(ctx, "COPYCONSOLE[D] creating pipes", "id", id, "stdout", stdout)
+		slog.DebugContext(ctx, "COPYCONSOLE[D] creating pipes")
 
 		// Create pipe to be used by logging binary for Stdout
 		outR, outW, err := os.Pipe()
@@ -153,25 +157,25 @@ func (p *platform[T]) CopyConsole(ctx context.Context, console console.Console, 
 		cwg.Add(1)
 		go func() {
 			cwg.Done()
-			io.Copy(outW, kqueueConsole)
+			<-conn.DebugCopy(ctx, "binary(read)->fifo(write)", outW, kqueueConsole)
 			outW.Close()
 			wg.Done()
 		}()
 
-		slog.DebugContext(ctx, "COPYCONSOLE[E] starting binary", "id", id, "stdout", stdout)
+		slog.DebugContext(ctx, "COPYCONSOLE[E] starting binary")
 
 		if err := cmd.Start(); err != nil {
 			return nil, errors.Errorf("failed to start logging binary process: %w", err)
 		}
 
-		slog.DebugContext(ctx, "COPYCONSOLE[F] closed write pipe after start", "id", id, "stdout", stdout)
+		slog.DebugContext(ctx, "COPYCONSOLE[F] closed write pipe after start")
 
 		// Close our side of the pipe after start
 		if err := w.Close(); err != nil {
 			return nil, errors.Errorf("failed to close write pipe after start: %w", err)
 		}
 
-		slog.DebugContext(ctx, "COPYCONSOLE[G] read from logging binary", "id", id, "stdout", stdout)
+		slog.DebugContext(ctx, "COPYCONSOLE[G] read from logging binary")
 
 		// Wait for the logging binary to be ready
 		b := make([]byte, 1)
@@ -180,50 +184,51 @@ func (p *platform[T]) CopyConsole(ctx context.Context, console console.Console, 
 		}
 		cwg.Wait()
 
-		slog.DebugContext(ctx, "COPYCONSOLE[H] done", "id", id, "stdout", stdout)
+		slog.DebugContext(ctx, "COPYCONSOLE[H] done")
 
 	default:
-		slog.DebugContext(ctx, "COPYCONSOLE[I] copying console to fifo", "id", id, "stdout", stdout)
+		slog.DebugContext(ctx, "COPYCONSOLE[I] copying console to fifo")
 
 		outw, err := fifo.OpenFifo(ctx, stdout, syscall.O_WRONLY, 0)
 		if err != nil {
 			return nil, errors.Errorf("opening stdout fifo: %w", err)
 		}
 
-		slog.DebugContext(ctx, "COPYCONSOLE[J] opening stdout fifo", "id", id, "stdout", stdout)
+		slog.DebugContext(ctx, "COPYCONSOLE[J] opening stdout fifo")
 
 		outr, err := fifo.OpenFifo(ctx, stdout, syscall.O_RDONLY, 0)
 		if err != nil {
 			return nil, errors.Errorf("opening stdout fifo: %w", err)
 		}
 
-		slog.DebugContext(ctx, "COPYCONSOLE[K] adding to waitgroup", "id", id, "stdout", stdout)
+		slog.DebugContext(ctx, "COPYCONSOLE[K] adding to waitgroup")
 
 		wg.Add(1)
 		cwg.Add(1)
 		go func() {
 			cwg.Done()
-			slog.DebugContext(ctx, "COPYCONSOLE[L] copying console to fifo", "id", id, "stdout", stdout)
 			buf := bufPool.Get().(*[]byte)
 			defer bufPool.Put(buf)
-			slog.DebugContext(ctx, "COPYCONSOLE[M] copying console to fifo", "id", id, "stdout", stdout)
-			n, err := io.CopyBuffer(outw, kqueueConsole, *buf)
-			slog.DebugContext(ctx, "COPYCONSOLE[N] copied console to fifo", "id", id, "stdout", stdout, "n", n, "error", err)
+			slog.DebugContext(ctx, "COPYCONSOLE[L] copying console to fifo")
+			<-conn.DebugCopyWithBuffer(ctx, "kqueue(read)->stdout(write)", outw, kqueueConsole, *buf)
+			slog.DebugContext(ctx, "COPYCONSOLE[N] copied console to fifo")
 
 			outw.Close()
 			outr.Close()
-			slog.DebugContext(ctx, "COPYCONSOLE[O] done", "id", id, "stdout", stdout)
+			slog.DebugContext(ctx, "COPYCONSOLE[O] done")
 			wg.Done()
 		}()
 		cwg.Wait()
 	}
 
-	slog.DebugContext(ctx, "COPYCONSOLE[P] done", "id", id, "stdout", stdout)
+	slog.DebugContext(ctx, "COPYCONSOLE[P] done")
 
 	return kqueueConsole, nil
 }
 
 func (p *platform[T]) ShutdownConsole(ctx context.Context, cons console.Console) error {
+	slog.DebugContext(ctx, "SHUTDOWNCONSOLE")
+	defer slog.DebugContext(ctx, "SHUTDOWNCONSOLE[DONE]")
 	if p.queue == nil {
 		return errors.New("uninitialized kqueuer")
 	}

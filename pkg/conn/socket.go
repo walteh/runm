@@ -17,6 +17,10 @@ import (
 )
 
 func DebugCopy(ctx context.Context, name string, w io.Writer, r io.Reader) (done chan struct{}) {
+	return DebugCopyWithBuffer(ctx, name, w, r, nil)
+}
+
+func DebugCopyWithBuffer(ctx context.Context, name string, w io.Writer, r io.Reader, buffer []byte) (done chan struct{}) {
 
 	startTime := time.Now()
 
@@ -51,8 +55,14 @@ func DebugCopy(ctx context.Context, name string, w io.Writer, r io.Reader) (done
 			}),
 			ticker.WithStartBurst(5),
 		).RunAsDefer()()
-		mw := io.MultiWriter(w, lw)
-		n, err := io.Copy(mw, lr)
+		// mw := io.MultiWriter(w, lw)
+		var n int64
+		var err error
+		if buffer != nil {
+			n, err = io.CopyBuffer(lw, lr, buffer)
+		} else {
+			n, err = io.Copy(lw, lr)
+		}
 		slog.Debug(fmt.Sprintf("%s[DONE]", id), "name", name, "copy_err", err, "bytes", n, "duration", time.Since(startTime), "read_stats", lr, "write_stats", lw)
 	}()
 
