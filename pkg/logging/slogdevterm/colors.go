@@ -25,6 +25,28 @@ var (
 		Dark:  lipgloss.CompleteColor{TrueColor: "#00ffff", ANSI256: "51", ANSI: "14"},
 	}
 
+	// Duration colours - spectrum based on time magnitude.
+	DurationNanosColor = lipgloss.CompleteAdaptiveColor{
+		Light: lipgloss.CompleteColor{TrueColor: "#00ff00", ANSI256: "46", ANSI: "2"}, // Green (nanoseconds/microseconds)
+		Dark:  lipgloss.CompleteColor{TrueColor: "#00ff00", ANSI256: "46", ANSI: "2"},
+	}
+	DurationMicrosColor = lipgloss.CompleteAdaptiveColor{
+		Light: lipgloss.CompleteColor{TrueColor: "#7fff00", ANSI256: "118", ANSI: "2"}, // Chartreuse (milliseconds)
+		Dark:  lipgloss.CompleteColor{TrueColor: "#7fff00", ANSI256: "118", ANSI: "2"},
+	}
+	DurationMillisColor = lipgloss.CompleteAdaptiveColor{
+		Light: lipgloss.CompleteColor{TrueColor: "#ffff00", ANSI256: "226", ANSI: "3"}, // Yellow (seconds)
+		Dark:  lipgloss.CompleteColor{TrueColor: "#ffff00", ANSI256: "226", ANSI: "3"},
+	}
+	DurationSecondsColor = lipgloss.CompleteAdaptiveColor{
+		Light: lipgloss.CompleteColor{TrueColor: "#ff8000", ANSI256: "208", ANSI: "3"}, // Orange (minutes)
+		Dark:  lipgloss.CompleteColor{TrueColor: "#ff8000", ANSI256: "208", ANSI: "3"},
+	}
+	DurationLargeColor = lipgloss.CompleteAdaptiveColor{
+		Light: lipgloss.CompleteColor{TrueColor: "#ff0000", ANSI256: "196", ANSI: "1"}, // Red (hours+)
+		Dark:  lipgloss.CompleteColor{TrueColor: "#ff0000", ANSI256: "196", ANSI: "1"},
+	}
+
 	// Level colours.
 	LevelDebugColor = lipgloss.CompleteAdaptiveColor{
 		Light: lipgloss.CompleteColor{TrueColor: "#5f5fff", ANSI256: "63", ANSI: "4"},

@@ -139,6 +139,12 @@ func (e *execProcess) delete(ctx context.Context) error {
 }
 
 func (e *execProcess) Resize(ws console.WinSize) error {
+	start := time.Now()
+	ctx := context.Background()
+	slog.DebugContext(ctx, "SHIM:PROCESS:EXEC:START[RESIZE_PTY]", "id", e.id, "ws", ws, "e.console==nil", e.console == nil)
+	defer func() {
+		slog.DebugContext(ctx, "SHIM:PROCESS:EXEC:END  [RESIZE_PTY]", "id", e.id, "ws", ws, "e.console==nil", e.console == nil, "duration", time.Since(start))
+	}()
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -146,6 +152,7 @@ func (e *execProcess) Resize(ws console.WinSize) error {
 }
 
 func (e *execProcess) resize(ws console.WinSize) error {
+	slog.DebugContext(context.Background(), "SHIM:PROCESS:EXEC:RESIZE", "id", e.id, "ws", ws, "e.console==nil", e.console == nil)
 	if e.console == nil {
 		return nil
 	}

@@ -23,9 +23,9 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/errdefs"
+	"gitlab.com/tozd/go/errors"
 
 	google_protobuf "github.com/containerd/containerd/v2/pkg/protobuf/types"
-	"gitlab.com/tozd/go/errors"
 
 	"github.com/walteh/runm/core/runc/process"
 )

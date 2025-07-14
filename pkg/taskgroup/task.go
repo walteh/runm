@@ -50,6 +50,8 @@ func (s TaskStatus) String() string {
 
 type TaskState struct {
 	ID          string
+	IDX         int
+	Group       *TaskGroup
 	Name        string
 	Status      TaskStatus
 	StartTime   time.Time
@@ -82,10 +84,9 @@ var _ slog.LogValuer = (*TaskState)(nil)
 
 func (t *TaskState) LogValue() slog.Value {
 	attrs := []slog.Attr{
-		slog.String("id", t.ID),
-		slog.String("name", t.Name),
+		slog.String("name", t.Group.opts.name+":"+t.Name),
 		slog.String("status", t.Status.String()),
-		slog.Duration("duration", time.Since(t.StartTime)),
+		slog.Duration("dur", time.Since(t.StartTime)),
 	}
 
 	if t.IsCompleted() {

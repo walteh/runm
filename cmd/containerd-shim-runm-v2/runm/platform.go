@@ -31,7 +31,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/stdio"
 	"github.com/containerd/fifo"
-	slogctx "github.com/veqryn/slog-context"
 	"gitlab.com/tozd/go/errors"
 
 	"github.com/walteh/runm/cmd/containerd-shim-runm-v2/process"
@@ -110,7 +109,9 @@ func (p *platform[T]) CopyConsole(ctx context.Context, console console.Console, 
 		return nil, errors.Errorf("unable to parse stdout uri: %w", err)
 	}
 
-	ctx = slogctx.Append(ctx, "id", id, "stdout", stdout)
+	// ctx = slogctx.Append(ctx, "id", id)
+
+	slog.DebugContext(ctx, "COPYCONSOLE[A] copying console to binary", "id", id, "stdout", stdout)
 
 	switch uri.Scheme {
 	case "binary":

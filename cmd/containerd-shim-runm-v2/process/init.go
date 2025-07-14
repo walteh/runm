@@ -371,6 +371,13 @@ func (p *Init) delete(ctx context.Context) error {
 
 // Resize the init processes console
 func (p *Init) Resize(ws console.WinSize) error {
+	start := time.Now()
+	ctx := context.Background()
+	slog.DebugContext(ctx, "SHIM:PROCESS:INIT:START[RESIZE_PTY]", "id", p.ID, "ws", ws, "p.console==nil", p.console == nil)
+
+	defer func() {
+		slog.DebugContext(ctx, "SHIM:PROCESS:INIT:END  [RESIZE_PTY]", "id", p.ID, "ws", ws, "p.console==nil", p.console == nil, "duration", time.Since(start))
+	}()
 	p.mu.Lock()
 	defer p.mu.Unlock()
 

@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/api/runtime/task/v3"
@@ -618,8 +619,11 @@ func (c *Container) Resume(ctx context.Context) error {
 
 // ResizePty of a process
 func (c *Container) ResizePty(ctx context.Context, r *task.ResizePtyRequest) error {
+	start := time.Now()
 	slog.DebugContext(ctx, "SHIM:CONTAINER:START[RESIZE_PTY]", "id", c.ID, "execID", r.ExecID)
-	defer slog.DebugContext(ctx, "SHIM:CONTAINER:END  [RESIZE_PTY]", "id", c.ID, "execID", r.ExecID)
+	defer func() {
+		slog.DebugContext(ctx, "SHIM:CONTAINER:END  [RESIZE_PTY]", "id", c.ID, "execID", r.ExecID, "duration", time.Since(start))
+	}()
 	p, err := c.Process(r.ExecID)
 	if err != nil {
 		return err

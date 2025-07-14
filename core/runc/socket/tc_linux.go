@@ -3,9 +3,10 @@
 package socket
 
 import (
+	"golang.org/x/sys/unix"
+
 	"github.com/containerd/console"
 	"gitlab.com/tozd/go/errors"
-	"golang.org/x/sys/unix"
 )
 
 const (

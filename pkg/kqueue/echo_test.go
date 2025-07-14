@@ -21,11 +21,11 @@ import (
 func TestKqueueConsoleEchoDuplication(t *testing.T) {
 	// Run multiple attempts to catch the race condition
 	bugReproduced := false
-	maxAttempts := 100  // Increase attempts
-	
+	maxAttempts := 100 // Increase attempts
+
 	for attempt := 1; attempt <= maxAttempts && !bugReproduced; attempt++ {
 		t.Logf("Attempt %d/%d", attempt, maxAttempts)
-		
+
 		// Create a PTY pair with echo enabled (default behavior)
 		ptyMaster, ptySlave, err := pty.Open()
 		require.NoError(t, err)
@@ -49,7 +49,7 @@ func TestKqueueConsoleEchoDuplication(t *testing.T) {
 		// Create a more aggressive scenario to trigger the race condition
 		// Start multiple goroutines writing to PTY to increase the chances of timing collision
 		testCommand := "hello world! this is a test\n"
-		
+
 		// Write data in rapid succession to increase likelihood of echo accumulation
 		go func() {
 			for i := 0; i < 3; i++ {
@@ -64,7 +64,7 @@ func TestKqueueConsoleEchoDuplication(t *testing.T) {
 		// Read from kqueue console - this is where the bug occurs
 		buf := make([]byte, 1024)
 		n, err := kqueueConsole.Read(buf)
-		
+
 		if err != nil {
 			t.Logf("Attempt %d: Read error: %v", attempt, err)
 			cons.Close()
@@ -86,7 +86,7 @@ func TestKqueueConsoleEchoDuplication(t *testing.T) {
 				commandOccurrences++
 			}
 		}
-		
+
 		if commandOccurrences > 1 || n > 50 { // 50+ bytes suggests duplication
 			bugReproduced = true
 			t.Logf("BUG REPRODUCED on attempt %d!", attempt)
@@ -109,7 +109,7 @@ func TestKqueueConsoleEchoDuplication(t *testing.T) {
 		assert.Greater(t, n, 0, "Should have read some output")
 		assert.Contains(t, output, "hello world! this is a test", "Output should contain our test command")
 	}
-	
+
 	if bugReproduced {
 		t.Logf("SUCCESS: Echo duplication bug reproduced!")
 		t.Fail() // Mark test as failed when bug is reproduced
@@ -123,7 +123,7 @@ func TestKqueueConsoleEchoFixed(t *testing.T) {
 	// This test will be enabled after we implement the fix
 	t.Skip("Will be enabled after implementing the fix")
 
-	// Create PTY with echo prevention 
+	// Create PTY with echo prevention
 	ptyMaster, ptySlave, err := pty.Open()
 	require.NoError(t, err)
 	defer ptyMaster.Close()

@@ -865,6 +865,66 @@ func (l *TermLogger) isSimpleValue(v interface{}) bool {
 	return false
 }
 
+// func convertSlogValueToString(v slog.Value) string {
+// 	switch v.Kind() {
+// 	case slog.KindDuration:
+// 		if v.Duration()%time.Second != 0 {
+// 			return v.Duration().Truncate(time.Microsecond).String()
+// 		} else if v.Duration()%time.Millisecond != 0 {
+// 			return v.Duration().Truncate(time.Nanosecond).String()
+// 		}
+// 		return v.Duration().String()
+// 	case slog.KindFloat64:
+// 		return fmt.Sprintf("%f", v.Float64())
+// 	case slog.KindInt64:
+// 		return fmt.Sprintf("%d", v.Int64())
+// 	}
+// 	return fmt.Sprint(v)
+// }
+
+func renderDuration(v slog.Value, styles *Styles, render renderFunc) string {
+	d := v.Duration()
+	dStr := d.String()
+
+	// Determine the appropriate color based on the primary time unit
+	var color lipgloss.CompleteAdaptiveColor
+	switch {
+	case d >= time.Hour:
+		color = DurationLargeColor // Red (minutes, hours, days)
+	case d >= time.Minute:
+		color = DurationSecondsColor // Red (minutes, hours, days)
+	case d >= time.Second:
+		color = DurationMillisColor // Orange (seconds)
+	case d >= time.Millisecond:
+		color = DurationMicrosColor // Yellow (milliseconds)
+	case d >= time.Microsecond:
+		color = DurationNanosColor // Chartreuse (microseconds)
+	default:
+		color = DurationNanosColor // Green (nanoseconds)
+	}
+
+	// Replace time units with bold+colored versions
+	unitStyle := lipgloss.NewStyle().Faint(true).Foreground(color)
+	result := dStr
+
+	// Check for each unit and replace only if present (using TrimSuffix for speed)
+	if strings.HasSuffix(result, "µs") {
+		result = strings.TrimSuffix(result, "µs") + render(unitStyle, "µs")
+	} else if strings.HasSuffix(result, "ms") {
+		result = strings.TrimSuffix(result, "ms") + render(unitStyle, "ms")
+	} else if strings.HasSuffix(result, "ns") {
+		result = strings.TrimSuffix(result, "ns") + render(unitStyle, "ns")
+	} else if strings.HasSuffix(result, "h") {
+		result = strings.TrimSuffix(result, "h") + render(unitStyle, "h")
+	} else if strings.HasSuffix(result, "m") {
+		result = strings.TrimSuffix(result, "m") + render(unitStyle, "m")
+	} else if strings.HasSuffix(result, "s") {
+		result = strings.TrimSuffix(result, "s") + render(unitStyle, "s")
+	}
+
+	return render(styles.Value, result)
+}
+
 // processAttribute processes a single attribute, handling groups and nested structures
 func (l *TermLogger) processAttribute(a slog.Attr, keyStyle lipgloss.Style, valStyle lipgloss.Style, result *strings.Builder, appendage *strings.Builder) {
 	// Resolve the attribute value
@@ -923,6 +983,8 @@ func (l *TermLogger) processAttribute(a slog.Attr, keyStyle lipgloss.Style, valS
 
 		// Add a placeholder in the main log line
 		valColored = l.render(l.styles.ValueAppendage, "[multiline value below]")
+	} else if a.Value.Kind() == slog.KindDuration {
+		valColored = renderDuration(a.Value, l.styles, l.renderFunc)
 	} else {
 		// Regular value handling
 		valColored = l.render(valStyle, val)

@@ -7,9 +7,8 @@ import (
 	"os"
 	"sync"
 
-	"github.com/creack/pty"
-
 	"github.com/containerd/console"
+	"github.com/creack/pty"
 	"gitlab.com/tozd/go/errors"
 
 	"github.com/walteh/runm/pkg/conn"
@@ -45,7 +44,18 @@ func NewRemotePTYConsoleAdapter(ctx context.Context, wrcon io.ReadWriteCloser, r
 		return nil, errors.Errorf("failed to create console: %w", err)
 	}
 
-	kqueueConsole, err := newConsole(consoleInstance)
+	adapter := &RemoteConsole{
+		conn:        wrcon,
+		ttyFile:     ttyFile,
+		ptyFile:     ptyFile,
+		console:     consoleInstance,
+		done:        make(chan struct{}),
+		wg:          sync.WaitGroup{},
+		resizeFunc:  resizeFunc,
+		creationCtx: ctx,
+	}
+
+	kqueueConsole, err := newConsole(adapter)
 	if err != nil {
 		return nil, errors.Errorf("failed to add console to kqueue: %w", err)
 	}
@@ -62,17 +72,6 @@ func NewRemotePTYConsoleAdapter(ctx context.Context, wrcon io.ReadWriteCloser, r
 	// 	slog.Error("failed to clear ONLCR on master", "error", err)
 	// }
 
-	adapter := &RemoteConsole{
-		conn:        wrcon,
-		ttyFile:     ttyFile,
-		ptyFile:     ptyFile,
-		console:     consoleInstance,
-		done:        make(chan struct{}),
-		wg:          sync.WaitGroup{},
-		resizeFunc:  resizeFunc,
-		creationCtx: ctx,
-	}
-
 	adapter.wg.Add(2)
 
 	// Network -> PTY (stdin from network to container)
@@ -88,7 +87,7 @@ func NewRemotePTYConsoleAdapter(ctx context.Context, wrcon io.ReadWriteCloser, r
 		defer adapter.wg.Done()
 		<-conn.DebugCopy(ctx, "kqueue(read)->network(write)", adapter.conn, kqueueConsole)
 	}()
-	return adapter.console, nil
+	return adapter, nil
 }
 
 // Console returns the containerd console interface
@@ -144,12 +143,16 @@ func (r *RemoteConsole) Reset() error {
 
 // Resize implements runtime.RuntimeConsole.
 func (r *RemoteConsole) Resize(sz console.WinSize) error {
+	slog.DebugContext(r.creationCtx, "SHIM:REMOTE_CONSOLE:RESIZE", "sz", sz)
 	if err := r.console.Resize(sz); err != nil {
 		return err
 	}
 
+	slog.DebugContext(r.creationCtx, "SHIM:REMOTE_CONSOLE:RESIZE:AFTER", "sz", sz, "r.resizeFunc", r.resizeFunc != nil)
+
 	if r.resizeFunc != nil {
-		return r.resizeFunc(r.creationCtx, console.WinSize{})
+		slog.DebugContext(r.creationCtx, "SHIM:REMOTE_CONSOLE:RESIZE", "sz", sz)
+		return r.resizeFunc(r.creationCtx, sz)
 	}
 
 	return nil

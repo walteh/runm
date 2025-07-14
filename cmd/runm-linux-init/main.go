@@ -390,9 +390,9 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 		return reapOnSignals(ctx, signals)
 	})
 
-	taskgroupz.GoWithName("psnotify", func(ctx context.Context) error {
-		return r.runPsnotify(ctx, r.exitChan)
-	})
+	// taskgroupz.GoWithName("psnotify", func(ctx context.Context) error {
+	// 	return r.runPsnotify(ctx, r.exitChan)
+	// })
 
 	taskgroupz.GoWithName("delim-writer-unix-proxy", func(ctx context.Context) error {
 		return r.runVsockUnixProxy(ctx, constants.DelimitedWriterProxyGuestUnixPath, r.logWriter)

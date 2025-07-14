@@ -3,10 +3,12 @@
 package socket
 
 import (
-	"github.com/containerd/console"
-	"github.com/walteh/runm/pkg/kqueue"
-	"gitlab.com/tozd/go/errors"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/console"
+	"gitlab.com/tozd/go/errors"
+
+	"github.com/walteh/runm/pkg/kqueue"
 )
 
 const (

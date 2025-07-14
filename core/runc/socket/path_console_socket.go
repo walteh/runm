@@ -47,13 +47,14 @@ func (g *PathConsoleSocket) ReceiveMaster() (console.Console, error) {
 
 func (g *PathConsoleSocket) BindToAllocatedSocket(ctx context.Context, sock runtime.AllocatedSocket) error {
 
-	console, err := recvtty.NewRecvttyProxy(ctx, g.path, sock.Conn())
-	if err != nil {
-		return errors.Errorf("creating recvtty proxy: %w", err)
-	}
-	g.console = console
-
 	go func() {
+		console, err := recvtty.NewRecvttyProxy(ctx, g.path, sock.Conn())
+		if err != nil {
+			slog.Error("creating recvtty proxy", "error", err)
+			return
+		}
+		g.console = console
+
 		err = console.Run(ctx)
 		if err != nil {
 			slog.Error("running recvtty proxy", "error", err)

@@ -567,44 +567,72 @@ tasks:
           - cmd: |-
                 {{.TIMEOUT_CMD}} {{.TIMEOUT}} {{.NERDCTL_CMD}} exec {{.FLAGS}} {{.CONTAINER_ID}} {{.COMMAND}} {{.PRETTY_FORMAT}}
 
-    dev:nerdctl-test:exec:debug-pty:
-        desc: executes a command in a running container
-        deps: ['test:binary:nerdctl-test', 'test:binary:containerd-shim-runm-v2-test']
-        requires: {vars: [CONTAINER_ID]}
-        interactive: true
+    dev:pty-resize-test:
+        desc: Test PTY resize functionality using custom PTY environment
+        aliases: [pty-resize-test]
+        deps: ['test:linux:runtime', 'test:binaries']
+
         vars:
+            CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
+            FLAGS: '{{.FLAGS | default "-it"}}'
             TIMEOUT: '{{.TIMEOUT | default ""}}'
             TIMEOUT_CMD: '{{.TIMEOUT | empty | ternary "" "timeout"}}'
-            CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
-            COMMAND: '{{.COMMAND | default "sh"}}'
-            FLAGS: '{{.FLAGS | default "-it"}}'
-            TMP_DIR:
-                sh: mktemp -d -t runm-nerdctl-test-exec-debug-pty-XXXXXX
-            RC_0: |-
-                {{.TIMEOUT_CMD}} {{.TIMEOUT}} {{.TEST_BIN_DIR}}/nerdctl-test exec {{.FLAGS}} {{.CONTAINER_ID}} {{.COMMAND}}
+            SEQUENCE: '{{.SEQUENCE | default "22x55@0s,81x230@2s,100x300@2s,120x400@2s,82x290@2s"}}'
 
-            RC_1: |-
-                unbuffer -p {{.RC_0}}
+            COMMAND_TO_RUN:
+                sh: |-
+                    go tool pty-resize-test {{.SEQUENCE}} -generate-shell-script
+            BASE_CMD: |-
+                {{.TIMEOUT_CMD}} {{.TIMEOUT}} {{.TEST_BIN_DIR}}/nerdctl-test exec {{.FLAGS}} {{.CONTAINER_ID}} sh -c '{{.COMMAND_TO_RUN}}'
+            PTY_RESIZE_TEST_CMD: |-
+                go tool pty-resize-test {{.SEQUENCE}} {{.BASE_CMD}}
 
-            RC_2: |-
-                script -F -k -e {{.TMP_DIR}}/terminal_capture_2.log tty && {{.RC_0}}
-
-            RC_3: |-
-                go tool interceptty --debug --raw {{.RC_0}}
-
-        # interactive: true
         cmds:
-          - defer: 'rm -rf {{.TMP_DIR}}'
-            silent: true
-          - cmd: |-
-                echo 'sudo -A -E {{.RC_0}}'
-                sleep 300
-            #   - cmd: sudo -A -E {{.RC_0}} 2>&1 | tee {{.TMP_DIR}}/terminal_capture_0.log
-            #   - cmd: sudo -A -E {{.RC_1}} 2>&1 | tee {{.TMP_DIR}}/terminal_capture_1.log
-            #   - cmd: sudo -A -E {{.RC_2}}
-            #   - cmd: sudo -A -E hexdump -C {{.TMP_DIR}}/terminal_capture_0.log
-            #   - cmd: sudo -A -E hexdump -C {{.TMP_DIR}}/terminal_capture_1.log
-            #   - cmd: sudo -A -E hexdump -C {{.TMP_DIR}}/terminal_capture_2.log
+          - task: dev:nerdctl-test:kill-all-running-containers
+          - cmd: >-
+                sudo -A -E {{.PTY_RESIZE_TEST_CMD}}
+
+    # dev:nerdctl-test:exec:debug-pty:
+    #     desc: executes a command in a running container
+    #     deps: ['test:binary:nerdctl-test', 'test:binary:containerd-shim-runm-v2-test']
+    #     requires: {vars: [CONTAINER_ID]}
+    #     interactive: true
+    #     vars:
+    #         TIMEOUT: '{{.TIMEOUT | default ""}}'
+    #         TIMEOUT_CMD: '{{.TIMEOUT | empty | ternary "" "timeout"}}'
+    #         CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
+    #         COMMAND: '{{.COMMAND | default "sh"}}'
+    #         FLAGS: '{{.FLAGS | default "-it"}}'
+    #         TMP_DIR:
+    #             sh: mktemp -d -t runm-nerdctl-test-exec-debug-pty-XXXXXX
+    #         RC_0: |-
+    #             {{.TIMEOUT_CMD}} {{.TIMEOUT}} {{.TEST_BIN_DIR}}/nerdctl-test exec {{.FLAGS}} {{.CONTAINER_ID}} {{.COMMAND}}
+
+    #         RC_1: |-
+    #             unbuffer -p {{.RC_0}}
+
+    #         RC_2: |-
+    #             script -F -k -e {{.TMP_DIR}}/terminal_capture_2.log tty && {{.RC_0}}
+
+    #         RC_3: |-
+    #             go tool interceptty --debug --raw {{.RC_0}}
+    #         PTY_RESIZE_TEST_CMD: |-
+    #             go tool pty-resize-test -start-width={{.START_WIDTH}} -start-height={{.START_HEIGHT}} -end-width={{.END_WIDTH}}
+    #             -end-height={{.END_HEIGHT}} -delay={{.DELAY}} {{if .SEQUENCE}}-sequence="{{.SEQUENCE}}"{{end}}
+
+    #     # interactive: true
+    #     cmds:
+    #       - defer: 'rm -rf {{.TMP_DIR}}'
+    #         silent: true
+    #       - cmd: |-
+    #             go tool pty-resize-test -start-width={{.START_WIDTH}} -start-height={{.START_HEIGHT}} -end-width={{.END_WIDTH}}
+    #             -end-height={{.END_HEIGHT}} -delay={{.DELAY}} {{if .SEQUENCE}}-sequence="{{.SEQUENCE}}"{{end}}
+    #         #   - cmd: sudo -A -E {{.RC_0}} 2>&1 | tee {{.TMP_DIR}}/terminal_capture_0.log
+    #         #   - cmd: sudo -A -E {{.RC_1}} 2>&1 | tee {{.TMP_DIR}}/terminal_capture_1.log
+    #         #   - cmd: sudo -A -E {{.RC_2}}
+    #         #   - cmd: sudo -A -E hexdump -C {{.TMP_DIR}}/terminal_capture_0.log
+    #         #   - cmd: sudo -A -E hexdump -C {{.TMP_DIR}}/terminal_capture_1.log
+    #         #   - cmd: sudo -A -E hexdump -C {{.TMP_DIR}}/terminal_capture_2.log
 
     dev:nerdctl-test:stop:
         desc: stops a running container
@@ -702,7 +730,7 @@ tasks:
                 IMAGE: 'docker.io/library/alpine:latest'
                 STDOUT_FILE: '{{.TMP_DIR}}/stdout.txt'
                 ARGS: |-
-                    sh -c 'echo "Container PID 1: $$"; ps aux; sleep 30'
+                    sh -c 'echo "Container PID 1: $$"; ps aux; sleep 300'
           - cmd: bat {{.TMP_DIR}}/stdout.txt
             silent: true
           - task: dev:nerdctl-test:ps
@@ -711,7 +739,7 @@ tasks:
                 CONTAINER_ID:
                     sh: cat {{.TMP_DIR}}/stdout.txt
                 STATUS: 'Up'
-          - task: dev:nerdctl-test:exec:debug-pty
+          - task: dev:pty-resize-test
             vars:
                 COMMAND: 'echo "hello world! this is a test"'
                 CONTAINER_ID:
@@ -727,12 +755,6 @@ tasks:
             vars:
                 CONTAINER_ID:
                     sh: cat {{.TMP_DIR}}/stdout.txt
-          - task: dev:nerdctl-test:ps
-          - task: dev:nerdctl-test:rm
-            vars:
-                CONTAINER_ID:
-                    sh: cat {{.TMP_DIR}}/stdout.txt
-          - task: dev:nerdctl-test:ps
 
     dev:containerd-test:
         desc: runs the shim for 2025-07-01

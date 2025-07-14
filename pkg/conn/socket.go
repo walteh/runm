@@ -32,12 +32,12 @@ func DebugCopyWithBuffer(ctx context.Context, name string, w io.Writer, r io.Rea
 	done = make(chan error)
 
 	go func() {
-		if w, ok := w.(io.WriteCloser); ok {
-			defer w.Close()
-		}
-		if r, ok := r.(io.ReadCloser); ok {
-			defer r.Close()
-		}
+		// if w, ok := w.(io.WriteCloser); ok {
+		// 	defer w.Close()
+		// }
+		// if r, ok := r.(io.ReadCloser); ok {
+		// 	defer r.Close()
+		// }
 		var err error
 		defer func() {
 			done <- err
@@ -49,8 +49,8 @@ func DebugCopyWithBuffer(ctx context.Context, name string, w io.Writer, r io.Rea
 			ticker.WithAttrFunc(func() []slog.Attr {
 				return []slog.Attr{
 					slog.String("name", name),
-					slog.Any("read_stats", lr),
-					slog.Any("write_stats", lw),
+					slog.Any("r", lr),
+					slog.Any("w", lw),
 				}
 			}),
 			ticker.WithMessageFunc(func() string {
@@ -65,7 +65,7 @@ func DebugCopyWithBuffer(ctx context.Context, name string, w io.Writer, r io.Rea
 		} else {
 			n, err = io.Copy(lw, lr)
 		}
-		slog.Debug(fmt.Sprintf("%s[DONE]", id), "name", name, "copy_err", err, "bytes", n, "duration", time.Since(startTime), "read_stats", lr, "write_stats", lw)
+		slog.Debug(fmt.Sprintf("%s[DONE]", id), "name", name, "copy_err", err, "bytes", n, "duration", time.Since(startTime), "r", lr, "w", lw)
 	}()
 
 	return done
@@ -110,9 +110,8 @@ func OsPipeProxyReader(ctx context.Context, name string, r io.ReadCloser) (FileR
 			ticker.WithSlogBaseContext(ctx),
 			ticker.WithAttrFunc(func() []slog.Attr {
 				return []slog.Attr{
-					slog.String("name", name),
-					slog.Any("read_stats", lr),
-					// slog.Any("write_stats", lw),
+					slog.Any("r", lr),
+					// slog.Any("w", lw),
 				}
 			}),
 			ticker.WithMessageFunc(func() string {
@@ -121,7 +120,7 @@ func OsPipeProxyReader(ctx context.Context, name string, r io.ReadCloser) (FileR
 			ticker.WithStartBurst(5),
 		).RunAsDefer()()
 		n, err := io.Copy(lw, lr)
-		slog.Debug(fmt.Sprintf("%s[DONE]", id), "name", name, "duration", time.Since(startTime), "copy_err", err, "bytes", n, "read_stats", lr)
+		slog.Debug(fmt.Sprintf("%s[DONE]", id), "name", name, "duration", time.Since(startTime), "copy_err", err, "bytes", n, "r", lr)
 	}()
 
 	return pr, []io.Closer{pw, r}
@@ -189,8 +188,7 @@ func OsPipeProxyWriter(ctx context.Context, name string, w io.WriteCloser) (File
 			ticker.WithSlogBaseContext(ctx),
 			ticker.WithAttrFunc(func() []slog.Attr {
 				return []slog.Attr{
-					slog.String("name", name),
-					slog.Any("write_stats", lw),
+					slog.Any("w", lw),
 				}
 			}),
 			ticker.WithMessageFunc(func() string {
@@ -199,7 +197,7 @@ func OsPipeProxyWriter(ctx context.Context, name string, w io.WriteCloser) (File
 			ticker.WithStartBurst(5),
 		).RunAsDefer()()
 		n, err := io.Copy(lw, lr)
-		slog.Debug(fmt.Sprintf("%s[DONE]", id), "name", name, "duration", time.Since(startTime), "copy_err", err, "bytes", n, "write_stats", lw)
+		slog.Debug(fmt.Sprintf("%s[DONE]", id), "name", name, "duration", time.Since(startTime), "copy_err", err, "bytes", n, "w", lw)
 	}()
 
 	return pw, []io.Closer{pr, w, pw}

@@ -33,6 +33,10 @@ type pidInfo struct {
 	forkEvent *psnotify.ProcEventFork
 }
 
+func formattedCgroup(cgroup string) string {
+	return strings.ReplaceAll(cgroup, containerId, "<container-id>")
+}
+
 func (p *pidInfo) id() string {
 	switch {
 	case p.pid == 1:
@@ -49,7 +53,7 @@ func (p *pidInfo) id() string {
 		}
 		return fmt.Sprintf("busybox[%d]", p.pid)
 	case filepath.Base(p.argc) == "runc" || filepath.Base(p.argc) == "runc-test":
-		knownRuncNames := []string{"start", "create", "run", "init", "exec"}
+		knownRuncNames := []string{"start", "create", "run", "init", "exec", "kill"}
 		for _, name := range knownRuncNames {
 			for _, arg := range p.argv {
 				if arg == name {
@@ -81,7 +85,7 @@ func (p *pidInfo) LogValue() slog.Value {
 	if p.parent != nil {
 		attrs = append(attrs, slog.Group("parent",
 			slog.Int("pid", p.parent.pid),
-			slog.String("cgroup", p.parent.cgroup),
+			slog.String("cgroup", formattedCgroup(p.parent.cgroup)),
 			slog.String("argc", p.parent.argc),
 			slog.String("id", p.parent.id()),
 			// slog.String("argv", strings.Join(p.parent.argv, " ")),
@@ -103,14 +107,14 @@ func (p *pidInfo) LogValue() slog.Value {
 	))
 
 	attrs = append(attrs, slog.Int("pid", p.pid),
-		slog.String("cgroup", p.cgroup),
+		slog.String("cgroup", formattedCgroup(p.cgroup)),
 		slog.String("argc", p.argc),
 		// slog.String("argv", strings.Join(p.argv, " ")),
 	)
 
 	if p.exitEvent != nil {
 		exitGroup := slog.Group("exit",
-			slog.Time("timestamp", p.exitEvent.Timestamp),
+			slog.Duration("dur", p.exitEvent.Timestamp.Sub(p.forkEvent.Timestamp)),
 			slog.Int("exitCode", p.exitEvent.ExitCode),
 			slog.Int("exitSignal", int(p.exitEvent.ExitSignal)),
 		)
@@ -119,7 +123,7 @@ func (p *pidInfo) LogValue() slog.Value {
 
 	if p.execEvent != nil {
 		execGroup := slog.Group("exec",
-			slog.Time("timestamp", p.execEvent.Timestamp),
+			slog.Duration("dur", p.execEvent.Timestamp.Sub(p.forkEvent.Timestamp)),
 		)
 		attrs = append(attrs, execGroup)
 	}

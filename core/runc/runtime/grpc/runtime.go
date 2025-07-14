@@ -11,12 +11,12 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/containerd/console"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"gitlab.com/tozd/go/errors"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/containerd/console"
 	gorunc "github.com/containerd/go-runc"
 
 	"github.com/walteh/runm/core/runc/conversion"

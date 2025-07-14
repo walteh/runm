@@ -219,14 +219,14 @@ func (tg *TaskGroup) executeTask(name string, metadata map[string]any, fn TaskFu
 		return !tryMode // Go() doesn't return, TryGo() returns false
 	}
 
-	taskID := fmt.Sprintf("%s-%d", tg.opts.name, atomic.AddInt64(&tg.taskCounter, 1))
-	if name == "" {
-		name = fmt.Sprintf("task-%d", tg.taskCounter)
-	}
+	taskIDX := atomic.AddInt64(&tg.taskCounter, 1)
+	taskID := fmt.Sprintf("%s-%d", tg.opts.name, taskIDX)
 
 	taskState := &TaskState{
 		ID:          taskID,
-		Name:        name,
+		IDX:         int(taskIDX),
+		Group:       tg,
+		Name:        fmt.Sprintf("%s-%d", tg.opts.name, taskIDX),
 		Status:      TaskStatusPending,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
@@ -326,9 +326,9 @@ func (tg *TaskGroup) executeTask(name string, metadata map[string]any, fn TaskFu
 
 		if tg.opts.logTaskEnd {
 			attrs := []slog.Attr{
-				slog.String("task_id", taskID),
-				slog.String("task_name", name),
-				slog.Duration("duration", duration),
+				slog.String("tid", taskID),
+				slog.String("tname", name),
+				slog.Duration("dur", duration),
 				slog.Uint64("goroutine_id", getGoroutineID()),
 			}
 			if err != nil {
@@ -655,8 +655,8 @@ func (tg *TaskGroup) executeTaskWithRecovery(ctx context.Context, taskState *Tas
 	}()
 
 	// Enhance slog context with task information using groups
-	ctx = slogctx.Append(ctx, "task", taskState)
-	ctx = slogctx.Append(ctx, slog.String("taskgroup", tg.opts.name))
+	ctx = slogctx.Append(ctx, "t", taskState)
+	// ctx = slogctx.Append(ctx, slog.String("tg.name", tg.opts.name))
 
 	*err = fn(ctx)
 }

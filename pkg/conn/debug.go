@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -40,12 +39,14 @@ func NewDebugWriter(ctx context.Context, name string, w io.Writer) io.Writer {
 }
 
 func (l *debugWriter) LogValue() slog.Value {
-	return slog.GroupValue(
-		slog.Int64("bytes_written", int64(l.writeCount)),
-		slog.Int64("calls", int64(l.callCount)),
-		slog.Any("sessions", l.sessionManager),
-		slog.String("write_target", getNameFromReadWriter(l.w)),
-	)
+	attrs := []slog.Attr{
+		slog.Int64("n_written", int64(l.writeCount)),
+		slog.Int64("n_calls", int64(l.callCount)),
+		slog.String("target", getNameFromReadWriter(l.w)),
+	}
+	attrs = append(attrs, l.sessionManager.Attrs()...)
+
+	return slog.GroupValue(attrs...)
 }
 
 func (l *debugWriter) Write(p []byte) (int, error) {
@@ -65,9 +66,9 @@ func (l *debugWriter) Write(p []byte) (int, error) {
 			failedWriteData = ""
 			successfulWriteData = escapeString(p)
 		}
-		slog.ErrorContext(l.ctx, fmt.Sprintf("%s[WRITE-ERROR]", l.name), "error", err, "stats", l, "current_write_data", successfulWriteData, "failed_write_data", failedWriteData)
+		slog.ErrorContext(l.ctx, fmt.Sprintf("%s[WRITE-ERROR]", l.name), "error", err, "w", l, "current_write_data", successfulWriteData, "failed_write_data", failedWriteData)
 	} else {
-		slog.DebugContext(l.ctx, fmt.Sprintf("%s[WRITE]", l.name), "data", escapeString(p[:n]), "stats", l)
+		slog.DebugContext(l.ctx, fmt.Sprintf("%s[WRITE]", l.name), "data", escapeString(p[:n]), "w", l)
 	}
 
 	// for {
@@ -104,10 +105,10 @@ type debugReader struct {
 }
 
 func NewDebugReader(ctx context.Context, name string, r io.Reader) io.Reader {
-	if strings.Contains(name, "network(read)->pty(write)") {
-		// log a stack trace
-		slog.DebugContext(ctx, "stack trace", "stack", string(debug.Stack()))
-	}
+	// if strings.Contains(name, "network(read)->pty(write)") {
+	// 	// log a stack trace
+	// 	slog.DebugContext(ctx, "stack trace", "stack", string(debug.Stack()))
+	// }
 	return &debugReader{
 		ctx:           ctx,
 		name:          name,
@@ -140,12 +141,13 @@ func chainString(w any) string {
 }
 
 func (l *debugReader) LogValue() slog.Value {
-	return slog.GroupValue(
-		slog.Int64("bytes_read", int64(l.readCount)),
-		slog.Int64("calls", int64(l.callCount)),
-		slog.Any("sessions", l.sessionManager),
-		slog.String("read_target", getNameFromReadWriter(l.r)),
-	)
+	attrs := []slog.Attr{
+		slog.Int64("n_read", int64(l.readCount)),
+		slog.Int64("n_calls", int64(l.callCount)),
+		slog.String("target", getNameFromReadWriter(l.r)),
+	}
+	attrs = append(attrs, l.sessionManager.Attrs()...)
+	return slog.GroupValue(attrs...)
 }
 
 func (l *debugReader) Read(p []byte) (int, error) {
@@ -164,9 +166,9 @@ func (l *debugReader) Read(p []byte) (int, error) {
 			failedReadData = ""
 			successfulReadData = escapeString(p)
 		}
-		slog.DebugContext(l.ctx, fmt.Sprintf("%s[READ-ERROR]", l.name), "error", err, "stats", l, "current_read_data", successfulReadData, "failed_read_data", failedReadData)
+		slog.DebugContext(l.ctx, fmt.Sprintf("%s[READ-ERROR]", l.name), "error", err, "r", l, "current_read_data", successfulReadData, "failed_read_data", failedReadData)
 	} else {
-		slog.DebugContext(l.ctx, fmt.Sprintf("%s[READ]", l.name), "data", escapeString(p[:n]), "stats", l)
+		slog.DebugContext(l.ctx, fmt.Sprintf("%s[READ]", l.name), "data", escapeString(p[:n]), "r", l)
 	}
 
 	return n, err
@@ -213,10 +215,10 @@ func (s *sessionManager) Start() func() {
 	}
 }
 
-func (s *sessionManager) LogValue() slog.Value {
-	return slog.GroupValue(
+func (s *sessionManager) Attrs() []slog.Attr {
+	return []slog.Attr{
 		slog.Int64("active", int64(len(s.sessions))),
 		slog.Int64("deleted", int64(s.deletedSessionCount)),
-		slog.Duration("total_time", s.CurrentTotalSessionTime()),
-	)
+		slog.Duration("dur", s.CurrentTotalSessionTime()),
+	}
 }

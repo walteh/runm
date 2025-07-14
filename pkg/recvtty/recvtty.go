@@ -7,15 +7,18 @@ import (
 	"os"
 	"sync"
 
-	"github.com/containerd/console"
-	"github.com/walteh/runm/pkg/conn"
-	"gitlab.com/tozd/go/errors"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/console"
+	"gitlab.com/tozd/go/errors"
+
+	"github.com/walteh/runm/pkg/conn"
 )
 
 type RecvttyConnProxy struct {
 	console console.Console
 	proxy   net.Conn
+	closers []func()
 }
 
 func (r *RecvttyConnProxy) Console() console.Console {
@@ -24,6 +27,7 @@ func (r *RecvttyConnProxy) Console() console.Console {
 
 func NewRecvttyProxy(ctx context.Context, path string, proxy net.Conn) (*RecvttyConnProxy, error) {
 	slog.DebugContext(ctx, "RECVTTYPROXY[A] opening socket", "path", path)
+	closers := []func(){}
 	// Open a socket.
 	ln, err := net.Listen("unix", path)
 	if err != nil {
@@ -33,6 +37,12 @@ func NewRecvttyProxy(ctx context.Context, path string, proxy net.Conn) (*Recvtty
 	defer os.Remove(path)
 	defer ln.Close()
 
+	defer func() {
+		for _, closer := range closers {
+			closer()
+		}
+	}()
+
 	slog.DebugContext(ctx, "RECVTTYPROXY[B] accepting connection", "path", path)
 
 	// We only accept a single connection, since we can only really have
@@ -41,7 +51,9 @@ func NewRecvttyProxy(ctx context.Context, path string, proxy net.Conn) (*Recvtty
 	if err != nil {
 		return nil, err
 	}
-	defer connz.Close()
+	closers = append(closers, func() {
+		connz.Close()
+	})
 
 	slog.DebugContext(ctx, "RECVTTYPROXY[C] closing socket", "path", path)
 
@@ -56,13 +68,16 @@ func NewRecvttyProxy(ctx context.Context, path string, proxy net.Conn) (*Recvtty
 	if err != nil {
 		return nil, err
 	}
-	defer socket.Close()
+	closers = append(closers, func() {
+		socket.Close()
+	})
 
 	slog.DebugContext(ctx, "RECVTTYPROXY[F] getting master file descriptor from runC", "path", path)
 
 	// Get the master file descriptor from runC.
 	master, err := recvFile(socket)
 	if err != nil {
+
 		return nil, err
 	}
 
@@ -81,9 +96,13 @@ func NewRecvttyProxy(ctx context.Context, path string, proxy net.Conn) (*Recvtty
 
 	slog.DebugContext(ctx, "RECVTTYPROXY[I] copying from our stdio to the master fd", "path", path)
 
+	prevClosers := closers
+	closers = []func(){}
+
 	return &RecvttyConnProxy{
 		console: c,
-		proxy:   connz,
+		proxy:   proxy,
+		closers: prevClosers,
 	}, nil
 }
 
@@ -117,6 +136,13 @@ func (r *RecvttyConnProxy) Run(ctx context.Context) error {
 	}
 
 	return inErr
+}
+
+func (r *RecvttyConnProxy) Close() error {
+	for _, closer := range r.closers {
+		closer()
+	}
+	return nil
 }
 
 func RecvFd(socket *net.UnixConn) (*os.File, error) {
