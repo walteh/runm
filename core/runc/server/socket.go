@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 
+	"github.com/containerd/console"
 	"github.com/mdlayher/vsock"
 	"gitlab.com/tozd/go/errors"
 
@@ -111,7 +112,7 @@ func (s *Server) AllocateIO(ctx context.Context, req *runmv1.AllocateIORequest) 
 		opts.OpenStderr = req.GetOpenStderr()
 	})
 	if err != nil {
-		return nil, errors.Errorf("failed to allocate io: %w", err)
+		return nil, errors.Errorf("allocating io: %w", err)
 	}
 	s.state.StoreOpenIO(ioref, pio)
 	res := &runmv1.AllocateIOResponse{}
@@ -127,32 +128,20 @@ func (s *Server) BindConsoleToSocket(ctx context.Context, req *runmv1.BindConsol
 		return nil, errors.Errorf("cannot bind console to socket: console not found")
 	}
 
+	sbcs, ok := cs.(runtime.BindableConsoleSocket)
+	if !ok {
+		return nil, errors.Errorf("cannot bind console to socket: console is not a socket bindable console")
+	}
+
 	as, err := loadSocket(s.state, req.GetSocketType())
 	if err != nil {
 		return nil, errors.Errorf("cannot bind console to socket: socket not found: %w", err)
 	}
 
-	go func() {
-		err := socket.BindAllocatedSocketConsole(ctx, as, cs)
-		if err != nil {
-			slog.Error("error binding console to socket", "error", err)
-		}
-	}()
-
-	// err = socket.BindGuestConsoleToSocket(ctx, cs, as)
-	// if err != nil {
-	// 	return nil, errors.Errorf("cannot bind console to socket: %w", err)
-	// }
-
-	// if asock, ok := as.(runtime.AllocatedSocketWithUnixConn); ok {
-	// 	consock, err := socket.NewAllocatedSocketConsole(ctx, asock)
-	// 	if err != nil {
-	// 		return nil, errors.Errorf("cannot bind console to socket: %w", err)
-	// 	}
-	// 	s.state.StoreOpenConsole(req.GetConsoleReferenceId(), consock)
-	// } else {
-	// 	return nil, errors.Errorf("cannot bind console to socket: socket is not a unix socket")
-	// }
+	err = sbcs.BindToAllocatedSocket(ctx, as)
+	if err != nil {
+		return nil, errors.Errorf("cannot bind console to socket: %w", err)
+	}
 
 	return &runmv1.BindConsoleToSocketResponse{}, nil
 }
@@ -304,4 +293,35 @@ func (s *Server) CloseSockets(ctx context.Context, req *runmv1.CloseSocketsReque
 	// 	}
 	// }
 	return &runmv1.CloseSocketsResponse{}, nil
+}
+
+// ResizeConsole implements runmv1.SocketAllocatorServiceServer.
+func (s *Server) ResizeConsole(ctx context.Context, req *runmv1.ResizeConsoleRequest) (*runmv1.ResizeConsoleResponse, error) {
+	cs, ok := s.state.GetOpenConsole(req.GetConsoleReferenceId())
+	if !ok {
+		return nil, errors.Errorf("console not found: %s", req.GetConsoleReferenceId())
+	}
+
+	master, err := cs.ReceiveMaster()
+	if err != nil {
+		return nil, errors.Errorf("failed to receive master console: %w", err)
+	}
+
+	windowSize := req.GetWindowSize()
+	winSize := console.WinSize{
+		Width:  uint16(windowSize.GetWidth()),
+		Height: uint16(windowSize.GetHeight()),
+	}
+
+	err = master.Resize(winSize)
+	if err != nil {
+		return nil, errors.Errorf("failed to resize console: %w", err)
+	}
+
+	slog.InfoContext(ctx, "console resized successfully",
+		"console_reference_id", req.GetConsoleReferenceId(),
+		"width", winSize.Width,
+		"height", winSize.Height)
+
+	return &runmv1.ResizeConsoleResponse{}, nil
 }

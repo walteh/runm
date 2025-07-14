@@ -333,3 +333,39 @@ func (x *CloseConsoleResponse) LogValue() slog.Value {
 	attrs := make([]slog.Attr, 0, 0)
 	return slog.GroupValue(attrs...)
 }
+
+func (x *WindowSize) LogValue() slog.Value {
+	if x == nil {
+		return slog.AnyValue(nil)
+	}
+	attrs := make([]slog.Attr, 0, 4)
+	attrs = append(attrs, slog.Uint64("width", uint64(x.GetWidth())))
+	attrs = append(attrs, slog.Uint64("height", uint64(x.GetHeight())))
+	attrs = append(attrs, slog.Uint64("x", uint64(x.GetX())))
+	attrs = append(attrs, slog.Uint64("y", uint64(x.GetY())))
+	return slog.GroupValue(attrs...)
+}
+
+func (x *ResizeConsoleRequest) LogValue() slog.Value {
+	if x == nil {
+		return slog.AnyValue(nil)
+	}
+	attrs := make([]slog.Attr, 0, 2)
+	attrs = append(attrs, slog.String("console_reference_id", x.GetConsoleReferenceId()))
+	if x.GetWindowSize() != nil {
+		if v, ok := interface{}(x.GetWindowSize()).(slog.LogValuer); ok {
+			attrs = append(attrs, slog.Attr{Key: "window_size", Value: v.LogValue()})
+		} else {
+			attrs = append(attrs, slog.Any("window_size", x.GetWindowSize()))
+		}
+	}
+	return slog.GroupValue(attrs...)
+}
+
+func (x *ResizeConsoleResponse) LogValue() slog.Value {
+	if x == nil {
+		return slog.AnyValue(nil)
+	}
+	attrs := make([]slog.Attr, 0, 0)
+	return slog.GroupValue(attrs...)
+}

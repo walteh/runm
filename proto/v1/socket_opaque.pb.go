@@ -430,3 +430,45 @@ func NewCloseConsoleResponseE(b *CloseConsoleResponse_builder) (*CloseConsoleRes
 	}
 	return m, nil
 }
+
+// NewWindowSize creates a new WindowSize using the builder
+func NewWindowSize(b *WindowSize_builder) *WindowSize {
+	return b.Build()
+}
+
+// NewWindowSizeE creates a new WindowSize using the builder with validation
+func NewWindowSizeE(b *WindowSize_builder) (*WindowSize, error) {
+	m := b.Build()
+	if err := protovalidate.Validate(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// NewResizeConsoleRequest creates a new ResizeConsoleRequest using the builder
+func NewResizeConsoleRequest(b *ResizeConsoleRequest_builder) *ResizeConsoleRequest {
+	return b.Build()
+}
+
+// NewResizeConsoleRequestE creates a new ResizeConsoleRequest using the builder with validation
+func NewResizeConsoleRequestE(b *ResizeConsoleRequest_builder) (*ResizeConsoleRequest, error) {
+	m := b.Build()
+	if err := protovalidate.Validate(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// NewResizeConsoleResponse creates a new ResizeConsoleResponse using the builder
+func NewResizeConsoleResponse(b *ResizeConsoleResponse_builder) *ResizeConsoleResponse {
+	return b.Build()
+}
+
+// NewResizeConsoleResponseE creates a new ResizeConsoleResponse using the builder with validation
+func NewResizeConsoleResponseE(b *ResizeConsoleResponse_builder) (*ResizeConsoleResponse, error) {
+	m := b.Build()
+	if err := protovalidate.Validate(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}

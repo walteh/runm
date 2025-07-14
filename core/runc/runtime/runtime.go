@@ -161,6 +161,11 @@ type RuntimeConsole interface {
 	Size() (console.WinSize, error)
 }
 
+type BindableConsoleSocket interface {
+	ConsoleSocket
+	BindToAllocatedSocket(ctx context.Context, sock AllocatedSocket) error
+}
+
 type IO interface {
 	Stdin() io.WriteCloser
 	Stdout() io.ReadCloser

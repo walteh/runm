@@ -28,6 +28,7 @@ const (
 	SocketAllocatorService_CloseSockets_FullMethodName        = "/runm.v1.SocketAllocatorService/CloseSockets"
 	SocketAllocatorService_CloseIO_FullMethodName             = "/runm.v1.SocketAllocatorService/CloseIO"
 	SocketAllocatorService_CloseConsole_FullMethodName        = "/runm.v1.SocketAllocatorService/CloseConsole"
+	SocketAllocatorService_ResizeConsole_FullMethodName       = "/runm.v1.SocketAllocatorService/ResizeConsole"
 )
 
 // SocketAllocatorServiceClient is the client API for SocketAllocatorService service.
@@ -45,6 +46,8 @@ type SocketAllocatorServiceClient interface {
 	CloseSockets(ctx context.Context, in *CloseSocketsRequest, opts ...grpc.CallOption) (*CloseSocketsResponse, error)
 	CloseIO(ctx context.Context, in *CloseIORequest, opts ...grpc.CallOption) (*CloseIOResponse, error)
 	CloseConsole(ctx context.Context, in *CloseConsoleRequest, opts ...grpc.CallOption) (*CloseConsoleResponse, error)
+	// Window resize functionality for console references
+	ResizeConsole(ctx context.Context, in *ResizeConsoleRequest, opts ...grpc.CallOption) (*ResizeConsoleResponse, error)
 }
 
 type socketAllocatorServiceClient struct {
@@ -145,6 +148,16 @@ func (c *socketAllocatorServiceClient) CloseConsole(ctx context.Context, in *Clo
 	return out, nil
 }
 
+func (c *socketAllocatorServiceClient) ResizeConsole(ctx context.Context, in *ResizeConsoleRequest, opts ...grpc.CallOption) (*ResizeConsoleResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResizeConsoleResponse)
+	err := c.cc.Invoke(ctx, SocketAllocatorService_ResizeConsole_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SocketAllocatorServiceServer is the server API for SocketAllocatorService service.
 // All implementations should embed UnimplementedSocketAllocatorServiceServer
 // for forward compatibility.
@@ -160,6 +173,8 @@ type SocketAllocatorServiceServer interface {
 	CloseSockets(context.Context, *CloseSocketsRequest) (*CloseSocketsResponse, error)
 	CloseIO(context.Context, *CloseIORequest) (*CloseIOResponse, error)
 	CloseConsole(context.Context, *CloseConsoleRequest) (*CloseConsoleResponse, error)
+	// Window resize functionality for console references
+	ResizeConsole(context.Context, *ResizeConsoleRequest) (*ResizeConsoleResponse, error)
 }
 
 // UnimplementedSocketAllocatorServiceServer should be embedded to have
@@ -195,6 +210,9 @@ func (UnimplementedSocketAllocatorServiceServer) CloseIO(context.Context, *Close
 }
 func (UnimplementedSocketAllocatorServiceServer) CloseConsole(context.Context, *CloseConsoleRequest) (*CloseConsoleResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CloseConsole not implemented")
+}
+func (UnimplementedSocketAllocatorServiceServer) ResizeConsole(context.Context, *ResizeConsoleRequest) (*ResizeConsoleResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ResizeConsole not implemented")
 }
 func (UnimplementedSocketAllocatorServiceServer) testEmbeddedByValue() {}
 
@@ -378,6 +396,24 @@ func _SocketAllocatorService_CloseConsole_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SocketAllocatorService_ResizeConsole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResizeConsoleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SocketAllocatorServiceServer).ResizeConsole(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SocketAllocatorService_ResizeConsole_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SocketAllocatorServiceServer).ResizeConsole(ctx, req.(*ResizeConsoleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SocketAllocatorService_ServiceDesc is the grpc.ServiceDesc for SocketAllocatorService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -420,6 +456,10 @@ var SocketAllocatorService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CloseConsole",
 			Handler:    _SocketAllocatorService_CloseConsole_Handler,
+		},
+		{
+			MethodName: "ResizeConsole",
+			Handler:    _SocketAllocatorService_ResizeConsole_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

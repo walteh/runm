@@ -1767,6 +1767,230 @@ func (b0 CloseConsoleResponse_builder) Build() *CloseConsoleResponse {
 	return m0
 }
 
+type WindowSize struct {
+	state             protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Width  uint32                 `protobuf:"varint,1,opt,name=width"`
+	xxx_hidden_Height uint32                 `protobuf:"varint,2,opt,name=height"`
+	xxx_hidden_X      uint32                 `protobuf:"varint,3,opt,name=x"`
+	xxx_hidden_Y      uint32                 `protobuf:"varint,4,opt,name=y"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *WindowSize) Reset() {
+	*x = WindowSize{}
+	mi := &file_v1_socket_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WindowSize) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WindowSize) ProtoMessage() {}
+
+func (x *WindowSize) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_socket_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *WindowSize) GetWidth() uint32 {
+	if x != nil {
+		return x.xxx_hidden_Width
+	}
+	return 0
+}
+
+func (x *WindowSize) GetHeight() uint32 {
+	if x != nil {
+		return x.xxx_hidden_Height
+	}
+	return 0
+}
+
+func (x *WindowSize) GetX() uint32 {
+	if x != nil {
+		return x.xxx_hidden_X
+	}
+	return 0
+}
+
+func (x *WindowSize) GetY() uint32 {
+	if x != nil {
+		return x.xxx_hidden_Y
+	}
+	return 0
+}
+
+func (x *WindowSize) SetWidth(v uint32) {
+	x.xxx_hidden_Width = v
+}
+
+func (x *WindowSize) SetHeight(v uint32) {
+	x.xxx_hidden_Height = v
+}
+
+func (x *WindowSize) SetX(v uint32) {
+	x.xxx_hidden_X = v
+}
+
+func (x *WindowSize) SetY(v uint32) {
+	x.xxx_hidden_Y = v
+}
+
+type WindowSize_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	Width  uint32
+	Height uint32
+	X      uint32
+	Y      uint32
+}
+
+func (b0 WindowSize_builder) Build() *WindowSize {
+	m0 := &WindowSize{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Width = b.Width
+	x.xxx_hidden_Height = b.Height
+	x.xxx_hidden_X = b.X
+	x.xxx_hidden_Y = b.Y
+	return m0
+}
+
+type ResizeConsoleRequest struct {
+	state                         protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_ConsoleReferenceId string                 `protobuf:"bytes,1,opt,name=console_reference_id,json=consoleReferenceId"`
+	xxx_hidden_WindowSize         *WindowSize            `protobuf:"bytes,2,opt,name=window_size,json=windowSize"`
+	unknownFields                 protoimpl.UnknownFields
+	sizeCache                     protoimpl.SizeCache
+}
+
+func (x *ResizeConsoleRequest) Reset() {
+	*x = ResizeConsoleRequest{}
+	mi := &file_v1_socket_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResizeConsoleRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResizeConsoleRequest) ProtoMessage() {}
+
+func (x *ResizeConsoleRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_socket_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *ResizeConsoleRequest) GetConsoleReferenceId() string {
+	if x != nil {
+		return x.xxx_hidden_ConsoleReferenceId
+	}
+	return ""
+}
+
+func (x *ResizeConsoleRequest) GetWindowSize() *WindowSize {
+	if x != nil {
+		return x.xxx_hidden_WindowSize
+	}
+	return nil
+}
+
+func (x *ResizeConsoleRequest) SetConsoleReferenceId(v string) {
+	x.xxx_hidden_ConsoleReferenceId = v
+}
+
+func (x *ResizeConsoleRequest) SetWindowSize(v *WindowSize) {
+	x.xxx_hidden_WindowSize = v
+}
+
+func (x *ResizeConsoleRequest) HasWindowSize() bool {
+	if x == nil {
+		return false
+	}
+	return x.xxx_hidden_WindowSize != nil
+}
+
+func (x *ResizeConsoleRequest) ClearWindowSize() {
+	x.xxx_hidden_WindowSize = nil
+}
+
+type ResizeConsoleRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	ConsoleReferenceId string
+	WindowSize         *WindowSize
+}
+
+func (b0 ResizeConsoleRequest_builder) Build() *ResizeConsoleRequest {
+	m0 := &ResizeConsoleRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_ConsoleReferenceId = b.ConsoleReferenceId
+	x.xxx_hidden_WindowSize = b.WindowSize
+	return m0
+}
+
+type ResizeConsoleResponse struct {
+	state         protoimpl.MessageState `protogen:"opaque.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResizeConsoleResponse) Reset() {
+	*x = ResizeConsoleResponse{}
+	mi := &file_v1_socket_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResizeConsoleResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResizeConsoleResponse) ProtoMessage() {}
+
+func (x *ResizeConsoleResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_socket_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+type ResizeConsoleResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+}
+
+func (b0 ResizeConsoleResponse_builder) Build() *ResizeConsoleResponse {
+	m0 := &ResizeConsoleResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	return m0
+}
+
 var File_v1_socket_proto protoreflect.FileDescriptor
 
 const file_v1_socket_proto_rawDesc = "" +
@@ -1836,7 +2060,18 @@ const file_v1_socket_proto_rawDesc = "" +
 	"\x0fCloseIOResponse\"G\n" +
 	"\x13CloseConsoleRequest\x120\n" +
 	"\x14console_reference_id\x18\x01 \x01(\tR\x12consoleReferenceId\"\x16\n" +
-	"\x14CloseConsoleResponse2\xfa\x05\n" +
+	"\x14CloseConsoleResponse\"V\n" +
+	"\n" +
+	"WindowSize\x12\x14\n" +
+	"\x05width\x18\x01 \x01(\rR\x05width\x12\x16\n" +
+	"\x06height\x18\x02 \x01(\rR\x06height\x12\f\n" +
+	"\x01x\x18\x03 \x01(\rR\x01x\x12\f\n" +
+	"\x01y\x18\x04 \x01(\rR\x01y\"~\n" +
+	"\x14ResizeConsoleRequest\x120\n" +
+	"\x14console_reference_id\x18\x01 \x01(\tR\x12consoleReferenceId\x124\n" +
+	"\vwindow_size\x18\x02 \x01(\v2\x13.runm.v1.WindowSizeR\n" +
+	"windowSize\"\x17\n" +
+	"\x15ResizeConsoleResponse2\xcc\x06\n" +
 	"\x16SocketAllocatorService\x12Y\n" +
 	"\x10DialOpenListener\x12 .runm.v1.DialOpenListenerRequest\x1a!.runm.v1.DialOpenListenerResponse\"\x00\x12G\n" +
 	"\n" +
@@ -1847,10 +2082,11 @@ const file_v1_socket_proto_rawDesc = "" +
 	"\vCloseSocket\x12\x1b.runm.v1.CloseSocketRequest\x1a\x1c.runm.v1.CloseSocketResponse\"\x00\x12M\n" +
 	"\fCloseSockets\x12\x1c.runm.v1.CloseSocketsRequest\x1a\x1d.runm.v1.CloseSocketsResponse\"\x00\x12>\n" +
 	"\aCloseIO\x12\x17.runm.v1.CloseIORequest\x1a\x18.runm.v1.CloseIOResponse\"\x00\x12M\n" +
-	"\fCloseConsole\x12\x1c.runm.v1.CloseConsoleRequest\x1a\x1d.runm.v1.CloseConsoleResponse\"\x00B\x89\x01\n" +
+	"\fCloseConsole\x12\x1c.runm.v1.CloseConsoleRequest\x1a\x1d.runm.v1.CloseConsoleResponse\"\x00\x12P\n" +
+	"\rResizeConsole\x12\x1d.runm.v1.ResizeConsoleRequest\x1a\x1e.runm.v1.ResizeConsoleResponse\"\x00B\x89\x01\n" +
 	"\vcom.runm.v1B\vSocketProtoP\x01Z&github.com/walteh/runm/proto/v1;runmv1\xa2\x02\x03RXX\xaa\x02\aRunm.V1\xca\x02\aRunm\\V1\xe2\x02\x13Runm\\V1\\GPBMetadata\xea\x02\bRunm::V1\x92\x03\a\xd2>\x02\x10\x03\b\x02b\beditionsp\xe8\a"
 
-var file_v1_socket_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
+var file_v1_socket_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
 var file_v1_socket_proto_goTypes = []any{
 	(*VsockPort)(nil),                    // 0: runm.v1.VsockPort
 	(*UnixSocketPath)(nil),               // 1: runm.v1.UnixSocketPath
@@ -1879,6 +2115,9 @@ var file_v1_socket_proto_goTypes = []any{
 	(*CloseIOResponse)(nil),              // 24: runm.v1.CloseIOResponse
 	(*CloseConsoleRequest)(nil),          // 25: runm.v1.CloseConsoleRequest
 	(*CloseConsoleResponse)(nil),         // 26: runm.v1.CloseConsoleResponse
+	(*WindowSize)(nil),                   // 27: runm.v1.WindowSize
+	(*ResizeConsoleRequest)(nil),         // 28: runm.v1.ResizeConsoleRequest
+	(*ResizeConsoleResponse)(nil),        // 29: runm.v1.ResizeConsoleResponse
 }
 var file_v1_socket_proto_depIdxs = []int32{
 	0,  // 0: runm.v1.SocketType.vsock_port:type_name -> runm.v1.VsockPort
@@ -1893,29 +2132,32 @@ var file_v1_socket_proto_depIdxs = []int32{
 	2,  // 9: runm.v1.BindConsoleToSocketRequest.socket_type:type_name -> runm.v1.SocketType
 	2,  // 10: runm.v1.AllocateSocketResponse.socket_type:type_name -> runm.v1.SocketType
 	2,  // 11: runm.v1.CloseSocketRequest.socket_type:type_name -> runm.v1.SocketType
-	3,  // 12: runm.v1.SocketAllocatorService.DialOpenListener:input_type -> runm.v1.DialOpenListenerRequest
-	7,  // 13: runm.v1.SocketAllocatorService.AllocateIO:input_type -> runm.v1.AllocateIORequest
-	9,  // 14: runm.v1.SocketAllocatorService.AllocateConsole:input_type -> runm.v1.AllocateConsoleRequest
-	17, // 15: runm.v1.SocketAllocatorService.BindConsoleToSocket:input_type -> runm.v1.BindConsoleToSocketRequest
-	15, // 16: runm.v1.SocketAllocatorService.BindIOToSockets:input_type -> runm.v1.BindIOToSocketsRequest
-	21, // 17: runm.v1.SocketAllocatorService.CloseSocket:input_type -> runm.v1.CloseSocketRequest
-	11, // 18: runm.v1.SocketAllocatorService.CloseSockets:input_type -> runm.v1.CloseSocketsRequest
-	23, // 19: runm.v1.SocketAllocatorService.CloseIO:input_type -> runm.v1.CloseIORequest
-	25, // 20: runm.v1.SocketAllocatorService.CloseConsole:input_type -> runm.v1.CloseConsoleRequest
-	4,  // 21: runm.v1.SocketAllocatorService.DialOpenListener:output_type -> runm.v1.DialOpenListenerResponse
-	8,  // 22: runm.v1.SocketAllocatorService.AllocateIO:output_type -> runm.v1.AllocateIOResponse
-	10, // 23: runm.v1.SocketAllocatorService.AllocateConsole:output_type -> runm.v1.AllocateConsoleResponse
-	18, // 24: runm.v1.SocketAllocatorService.BindConsoleToSocket:output_type -> runm.v1.BindConsoleToSocketResponse
-	16, // 25: runm.v1.SocketAllocatorService.BindIOToSockets:output_type -> runm.v1.BindIOToSocketsResponse
-	22, // 26: runm.v1.SocketAllocatorService.CloseSocket:output_type -> runm.v1.CloseSocketResponse
-	12, // 27: runm.v1.SocketAllocatorService.CloseSockets:output_type -> runm.v1.CloseSocketsResponse
-	24, // 28: runm.v1.SocketAllocatorService.CloseIO:output_type -> runm.v1.CloseIOResponse
-	26, // 29: runm.v1.SocketAllocatorService.CloseConsole:output_type -> runm.v1.CloseConsoleResponse
-	21, // [21:30] is the sub-list for method output_type
-	12, // [12:21] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	27, // 12: runm.v1.ResizeConsoleRequest.window_size:type_name -> runm.v1.WindowSize
+	3,  // 13: runm.v1.SocketAllocatorService.DialOpenListener:input_type -> runm.v1.DialOpenListenerRequest
+	7,  // 14: runm.v1.SocketAllocatorService.AllocateIO:input_type -> runm.v1.AllocateIORequest
+	9,  // 15: runm.v1.SocketAllocatorService.AllocateConsole:input_type -> runm.v1.AllocateConsoleRequest
+	17, // 16: runm.v1.SocketAllocatorService.BindConsoleToSocket:input_type -> runm.v1.BindConsoleToSocketRequest
+	15, // 17: runm.v1.SocketAllocatorService.BindIOToSockets:input_type -> runm.v1.BindIOToSocketsRequest
+	21, // 18: runm.v1.SocketAllocatorService.CloseSocket:input_type -> runm.v1.CloseSocketRequest
+	11, // 19: runm.v1.SocketAllocatorService.CloseSockets:input_type -> runm.v1.CloseSocketsRequest
+	23, // 20: runm.v1.SocketAllocatorService.CloseIO:input_type -> runm.v1.CloseIORequest
+	25, // 21: runm.v1.SocketAllocatorService.CloseConsole:input_type -> runm.v1.CloseConsoleRequest
+	28, // 22: runm.v1.SocketAllocatorService.ResizeConsole:input_type -> runm.v1.ResizeConsoleRequest
+	4,  // 23: runm.v1.SocketAllocatorService.DialOpenListener:output_type -> runm.v1.DialOpenListenerResponse
+	8,  // 24: runm.v1.SocketAllocatorService.AllocateIO:output_type -> runm.v1.AllocateIOResponse
+	10, // 25: runm.v1.SocketAllocatorService.AllocateConsole:output_type -> runm.v1.AllocateConsoleResponse
+	18, // 26: runm.v1.SocketAllocatorService.BindConsoleToSocket:output_type -> runm.v1.BindConsoleToSocketResponse
+	16, // 27: runm.v1.SocketAllocatorService.BindIOToSockets:output_type -> runm.v1.BindIOToSocketsResponse
+	22, // 28: runm.v1.SocketAllocatorService.CloseSocket:output_type -> runm.v1.CloseSocketResponse
+	12, // 29: runm.v1.SocketAllocatorService.CloseSockets:output_type -> runm.v1.CloseSocketsResponse
+	24, // 30: runm.v1.SocketAllocatorService.CloseIO:output_type -> runm.v1.CloseIOResponse
+	26, // 31: runm.v1.SocketAllocatorService.CloseConsole:output_type -> runm.v1.CloseConsoleResponse
+	29, // 32: runm.v1.SocketAllocatorService.ResizeConsole:output_type -> runm.v1.ResizeConsoleResponse
+	23, // [23:33] is the sub-list for method output_type
+	13, // [13:23] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_v1_socket_proto_init() }
@@ -1933,7 +2175,7 @@ func file_v1_socket_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_socket_proto_rawDesc), len(file_v1_socket_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   27,
+			NumMessages:   30,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

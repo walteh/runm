@@ -17,6 +17,7 @@ type TTRPCSocketAllocatorServiceService interface {
 	CloseSockets(context.Context, *CloseSocketsRequest) (*CloseSocketsResponse, error)
 	CloseIO(context.Context, *CloseIORequest) (*CloseIOResponse, error)
 	CloseConsole(context.Context, *CloseConsoleRequest) (*CloseConsoleResponse, error)
+	ResizeConsole(context.Context, *ResizeConsoleRequest) (*ResizeConsoleResponse, error)
 }
 
 func RegisterTTRPCSocketAllocatorServiceService(srv *ttrpc.Server, svc TTRPCSocketAllocatorServiceService) {
@@ -84,6 +85,13 @@ func RegisterTTRPCSocketAllocatorServiceService(srv *ttrpc.Server, svc TTRPCSock
 					return nil, err
 				}
 				return svc.CloseConsole(ctx, &req)
+			},
+			"ResizeConsole": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+				var req ResizeConsoleRequest
+				if err := unmarshal(&req); err != nil {
+					return nil, err
+				}
+				return svc.ResizeConsole(ctx, &req)
 			},
 		},
 	})
@@ -166,6 +174,14 @@ func (c *ttrpcsocketallocatorserviceClient) CloseIO(ctx context.Context, req *Cl
 func (c *ttrpcsocketallocatorserviceClient) CloseConsole(ctx context.Context, req *CloseConsoleRequest) (*CloseConsoleResponse, error) {
 	var resp CloseConsoleResponse
 	if err := c.client.Call(ctx, "runm.v1.SocketAllocatorService", "CloseConsole", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *ttrpcsocketallocatorserviceClient) ResizeConsole(ctx context.Context, req *ResizeConsoleRequest) (*ResizeConsoleResponse, error) {
+	var resp ResizeConsoleResponse
+	if err := c.client.Call(ctx, "runm.v1.SocketAllocatorService", "ResizeConsole", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil

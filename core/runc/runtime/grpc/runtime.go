@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/containerd/console"
 	gorunc "github.com/containerd/go-runc"
 
 	"github.com/walteh/runm/core/runc/conversion"
@@ -87,7 +88,9 @@ func (c *GRPCClientRuntime) NewTempConsoleSocket(ctx context.Context) (runtime.C
 		},
 	}
 
-	consock, err := runmsocket.NewHostUnixConsoleSocketV2(ctx, cons.GetConsoleReferenceId(), allocatedSock, closeCallbacks...)
+	resizeFunc := c.resizeFunc(cons.GetConsoleReferenceId())
+
+	consock, err := runmsocket.NewHostUnixConsoleSocketV2(ctx, cons.GetConsoleReferenceId(), allocatedSock, resizeFunc, closeCallbacks...)
 	if err != nil {
 		return nil, errors.Errorf("creating host console socket: %w", err)
 	}
@@ -101,6 +104,22 @@ func (c *GRPCClientRuntime) NewTempConsoleSocket(ctx context.Context) (runtime.C
 	// so now we need to creater a new socket
 
 	return consock, nil
+}
+
+func (c *GRPCClientRuntime) resizeFunc(referenceId string) func(ctx context.Context, winSize console.WinSize) error {
+	return func(ctx context.Context, winSize console.WinSize) error {
+		req := &runmv1.ResizeConsoleRequest{}
+		req.SetConsoleReferenceId(referenceId)
+		sz := &runmv1.WindowSize{}
+		sz.SetWidth(uint32(winSize.Width))
+		sz.SetHeight(uint32(winSize.Height))
+		req.SetWindowSize(sz)
+		_, err := c.socketAllocatorGrpcService.ResizeConsole(ctx, req)
+		if err != nil {
+			return errors.Errorf("resizing console: %w", err)
+		}
+		return nil
+	}
 }
 
 // ReadPidFile implements runtime.Runtime.

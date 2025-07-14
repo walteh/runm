@@ -16,11 +16,11 @@ import (
 	"github.com/walteh/runm/pkg/ticker"
 )
 
-func DebugCopy(ctx context.Context, name string, w io.Writer, r io.Reader) (done chan struct{}) {
+func DebugCopy(ctx context.Context, name string, w io.Writer, r io.Reader) (done chan error) {
 	return DebugCopyWithBuffer(ctx, name, w, r, nil)
 }
 
-func DebugCopyWithBuffer(ctx context.Context, name string, w io.Writer, r io.Reader, buffer []byte) (done chan struct{}) {
+func DebugCopyWithBuffer(ctx context.Context, name string, w io.Writer, r io.Reader, buffer []byte) (done chan error) {
 
 	startTime := time.Now()
 
@@ -29,7 +29,7 @@ func DebugCopyWithBuffer(ctx context.Context, name string, w io.Writer, r io.Rea
 	lw := NewDebugWriter(ctx, id, w)
 	lr := NewDebugReader(ctx, id, r)
 
-	done = make(chan struct{})
+	done = make(chan error)
 
 	go func() {
 		if w, ok := w.(io.WriteCloser); ok {
@@ -38,7 +38,10 @@ func DebugCopyWithBuffer(ctx context.Context, name string, w io.Writer, r io.Rea
 		if r, ok := r.(io.ReadCloser); ok {
 			defer r.Close()
 		}
-		defer close(done)
+		var err error
+		defer func() {
+			done <- err
+		}()
 		defer ticker.NewTicker(
 			ticker.WithLogLevel(slog.LevelDebug),
 			ticker.WithFrequency(15),
@@ -57,7 +60,6 @@ func DebugCopyWithBuffer(ctx context.Context, name string, w io.Writer, r io.Rea
 		).RunAsDefer()()
 		// mw := io.MultiWriter(w, lw)
 		var n int64
-		var err error
 		if buffer != nil {
 			n, err = io.CopyBuffer(lw, lr, buffer)
 		} else {

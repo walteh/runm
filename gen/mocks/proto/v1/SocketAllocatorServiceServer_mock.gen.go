@@ -48,6 +48,9 @@ var _ runmv1.SocketAllocatorServiceServer = &MockSocketAllocatorServiceServer{}
 //			DialOpenListenerFunc: func(context1 context.Context, dialOpenListenerRequest *runmv1.DialOpenListenerRequest) (*runmv1.DialOpenListenerResponse, error) {
 //				panic("mock out the DialOpenListener method")
 //			},
+//			ResizeConsoleFunc: func(context1 context.Context, resizeConsoleRequest *runmv1.ResizeConsoleRequest) (*runmv1.ResizeConsoleResponse, error) {
+//				panic("mock out the ResizeConsole method")
+//			},
 //		}
 //
 //		// use mockedSocketAllocatorServiceServer in code that requires runmv1.SocketAllocatorServiceServer
@@ -81,6 +84,9 @@ type MockSocketAllocatorServiceServer struct {
 
 	// DialOpenListenerFunc mocks the DialOpenListener method.
 	DialOpenListenerFunc func(context1 context.Context, dialOpenListenerRequest *runmv1.DialOpenListenerRequest) (*runmv1.DialOpenListenerResponse, error)
+
+	// ResizeConsoleFunc mocks the ResizeConsole method.
+	ResizeConsoleFunc func(context1 context.Context, resizeConsoleRequest *runmv1.ResizeConsoleRequest) (*runmv1.ResizeConsoleResponse, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -147,6 +153,13 @@ type MockSocketAllocatorServiceServer struct {
 			// DialOpenListenerRequest is the dialOpenListenerRequest argument value.
 			DialOpenListenerRequest *runmv1.DialOpenListenerRequest
 		}
+		// ResizeConsole holds details about calls to the ResizeConsole method.
+		ResizeConsole []struct {
+			// Context1 is the context1 argument value.
+			Context1 context.Context
+			// ResizeConsoleRequest is the resizeConsoleRequest argument value.
+			ResizeConsoleRequest *runmv1.ResizeConsoleRequest
+		}
 	}
 	lockAllocateConsole     sync.RWMutex
 	lockAllocateIO          sync.RWMutex
@@ -157,6 +170,7 @@ type MockSocketAllocatorServiceServer struct {
 	lockCloseSocket         sync.RWMutex
 	lockCloseSockets        sync.RWMutex
 	lockDialOpenListener    sync.RWMutex
+	lockResizeConsole       sync.RWMutex
 }
 
 // AllocateConsole calls AllocateConsoleFunc.
@@ -480,5 +494,41 @@ func (mock *MockSocketAllocatorServiceServer) DialOpenListenerCalls() []struct {
 	mock.lockDialOpenListener.RLock()
 	calls = mock.calls.DialOpenListener
 	mock.lockDialOpenListener.RUnlock()
+	return calls
+}
+
+// ResizeConsole calls ResizeConsoleFunc.
+func (mock *MockSocketAllocatorServiceServer) ResizeConsole(context1 context.Context, resizeConsoleRequest *runmv1.ResizeConsoleRequest) (*runmv1.ResizeConsoleResponse, error) {
+	if mock.ResizeConsoleFunc == nil {
+		panic("MockSocketAllocatorServiceServer.ResizeConsoleFunc: method is nil but SocketAllocatorServiceServer.ResizeConsole was just called")
+	}
+	callInfo := struct {
+		Context1             context.Context
+		ResizeConsoleRequest *runmv1.ResizeConsoleRequest
+	}{
+		Context1:             context1,
+		ResizeConsoleRequest: resizeConsoleRequest,
+	}
+	mock.lockResizeConsole.Lock()
+	mock.calls.ResizeConsole = append(mock.calls.ResizeConsole, callInfo)
+	mock.lockResizeConsole.Unlock()
+	return mock.ResizeConsoleFunc(context1, resizeConsoleRequest)
+}
+
+// ResizeConsoleCalls gets all the calls that were made to ResizeConsole.
+// Check the length with:
+//
+//	len(mockedSocketAllocatorServiceServer.ResizeConsoleCalls())
+func (mock *MockSocketAllocatorServiceServer) ResizeConsoleCalls() []struct {
+	Context1             context.Context
+	ResizeConsoleRequest *runmv1.ResizeConsoleRequest
+} {
+	var calls []struct {
+		Context1             context.Context
+		ResizeConsoleRequest *runmv1.ResizeConsoleRequest
+	}
+	mock.lockResizeConsole.RLock()
+	calls = mock.calls.ResizeConsole
+	mock.lockResizeConsole.RUnlock()
 	return calls
 }
