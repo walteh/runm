@@ -39,7 +39,6 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/walteh/run"
 	"gitlab.com/tozd/go/errors"
 
 	gorunc "github.com/containerd/go-runc"
@@ -58,7 +57,6 @@ func NewContainer(
 	r *task.CreateTaskRequest,
 	spec *oci.Spec,
 	publisher events.Publisher,
-	reapereventChan chan<- gorunc.Exit,
 	rtc runtime.RuntimeCreator,
 ) (_ *Container, retErr error) {
 
@@ -184,16 +182,16 @@ func NewContainer(
 
 	slog.InfoContext(ctx, "created container runtime", "id", r.ID)
 
-	var runner run.Runnable
-	if runnable, ok := rt.(run.Runnable); ok {
-		runner = runnable
-		go func() {
-			slog.InfoContext(ctx, "running container runtime", "id", r.ID)
-			if err := runnable.Run(ctx); err != nil {
-				slog.ErrorContext(ctx, "failed to run container runtime", "id", r.ID, "error", err)
-			}
-		}()
-	}
+	// var runner run.Runnable
+	// if runnable, ok := rt.(run.Runnable); ok {
+	// 	runner = runnable
+	// 	go func() {
+	// 		slog.InfoContext(ctx, "running container runtime", "id", r.ID)
+	// 		if err := runnable.Run(ctx); err != nil {
+	// 			slog.ErrorContext(ctx, "failed to run container runtime", "id", r.ID, "error", err)
+	// 		}
+	// 	}()
+	// }
 
 	var cgroupAdapter runtime.CgroupAdapter
 
@@ -250,7 +248,7 @@ func NewContainer(
 		process:         p,
 		processes:       make(map[string]process.Process),
 		reservedProcess: make(map[string]struct{}),
-		runner:          runner,
+		// runner:          runner,
 	}
 	pid := p.Pid()
 	if pid > 0 {
@@ -259,31 +257,31 @@ func NewContainer(
 		// }
 	}
 
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				slog.ErrorContext(ctx, "panic in SubscribeToReaperExits", "error", r)
-				panic(r)
-			}
-		}()
-		exits, err := rt.SubscribeToReaperExits(ctx)
-		if err != nil {
-			slog.ErrorContext(ctx, "failed to subscribe to reaper exits", "id", r.ID, "error", err)
-			return
-		}
-		for e := range exits {
-			slog.InfoContext(ctx, "reaper event", "id", r.ID, "exit", e)
-			reapereventChan <- e
-		}
-	}()
+	// go func() {
+	// 	defer func() {
+	// 		if r := recover(); r != nil {
+	// 			slog.ErrorContext(ctx, "panic in SubscribeToReaperExits", "error", r)
+	// 			panic(r)
+	// 		}
+	// 	}()
+	// 	exits, err := rt.SubscribeToReaperExits(ctx)
+	// 	if err != nil {
+	// 		slog.ErrorContext(ctx, "failed to subscribe to reaper exits", "id", r.ID, "error", err)
+	// 		return
+	// 	}
+	// 	for e := range exits {
+	// 		slog.InfoContext(ctx, "reaper event", "id", r.ID, "exit", e)
+	// 		reapereventChan <- e
+	// 	}
+	// }()
 
 	slog.InfoContext(ctx, "container struct created", "id", r.ID, "pid", pid)
 
 	return container, nil
 }
 
-func (c *Container) ProcessExits(ctx context.Context, rt runtime.Runtime) (<-chan gorunc.Exit, error) {
-	exits, err := rt.SubscribeToReaperExits(ctx)
+func (c *Container) ProcessExits(ctx context.Context) (<-chan gorunc.Exit, error) {
+	exits, err := c.process.Runtime().SubscribeToReaperExits(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to subscribe to reaper exits", "id", c.ID, "error", err)
 		return nil, err
@@ -436,10 +434,6 @@ type Container struct {
 	process         process.Process
 	processes       map[string]process.Process
 	reservedProcess map[string]struct{}
-
-	runner run.Runnable
-
-	// vm *RunmVMRuntime[vmm.VirtualMachine]
 }
 
 // All processes in the container

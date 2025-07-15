@@ -272,14 +272,17 @@ func (s *service) Create(ctx context.Context, r *taskv3.CreateTaskRequest) (_ *t
 		return nil, grpcerr.ToContainerdTTRPCf(ctx, err, "reading spec")
 	}
 
-	reapereventChan := make(chan gorunc.Exit)
-
-	container, err := runm.NewContainer(ctx, s.platform, r, spec, s.publisher, reapereventChan, s.creator)
+	container, err := runm.NewContainer(ctx, s.platform, r, spec, s.publisher, s.creator)
 	if err != nil {
 		return nil, err
 	}
 
 	go func() {
+		reapereventChan, err := container.ProcessExits(ctx)
+		if err != nil {
+			slog.ErrorContext(ctx, "failed to subscribe to reaper exits", "id", container.ID, "error", err)
+			return
+		}
 		for e := range reapereventChan {
 			slog.InfoContext(ctx, "reaper event", "id", container.ID, "exit", e)
 			s.ec <- containerReaperExit{
@@ -859,6 +862,10 @@ func (s *service) handleInitExit(e gorunc.Exit, c *runm.Container, p *process.In
 
 func (s *service) handleProcessExit(e gorunc.Exit, c *runm.Container, p process.Process) {
 	p.SetExited(e.Status)
+
+	// Clean up process resources (sockets, file descriptors, etc.) when process exits
+	p.CloseIO()
+
 	s.send(&eventstypes.TaskExit{
 		ContainerID: c.ID,
 		ID:          p.ID(),

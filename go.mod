@@ -72,7 +72,6 @@ require (
 	github.com/urfave/cli v1.22.17
 	github.com/urfave/cli/v2 v2.27.7
 	github.com/veqryn/slog-context v0.8.0
-	github.com/walteh/run v0.0.0-20250510150917-6f8074766f03
 	gitlab.com/tozd/go/errors v0.10.0
 	go.opentelemetry.io/contrib/bridges/otelslog v0.12.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.62.0

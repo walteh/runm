@@ -184,25 +184,40 @@ func xmain() error {
 		return err
 	}
 
-	ctx := context.Background()
+	prevPreRun := app.PersistentPreRunE
 
-	l, _, err := env.SetupOtelForNerdctl(ctx)
-	if err != nil {
-		return err
+	app.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
+
+		l, _, err := env.SetupOtelForNerdctl(ctx, cmd.Name())
+		if err != nil {
+			return err
+		}
+
+		goodStdLogger = logrus.StandardLogger()
+
+		log.L = &logrus.Entry{
+			Logger: goodStdLogger,
+			Data:   make(log.Fields, 6),
+		}
+
+		ctx = log.WithLogger(ctx, log.L)
+
+		ctx = slogctx.NewCtx(ctx, l)
+
+		cmd.SetContext(ctx)
+
+		if err := env.EnableDebugging(); err != nil {
+			return err
+		}
+
+		if prevPreRun != nil {
+			return prevPreRun(cmd, args)
+		}
+		return nil
 	}
 
-	goodStdLogger = logrus.StandardLogger()
-
-	log.L = &logrus.Entry{
-		Logger: goodStdLogger,
-		Data:   make(log.Fields, 6),
-	}
-
-	ctx = log.WithLogger(ctx, log.L)
-
-	ctx = slogctx.NewCtx(ctx, l)
-
-	return app.ExecuteContext(ctx)
+	return app.ExecuteContext(context.Background())
 }
 
 func initRootCmdFlags(rootCmd *cobra.Command, tomlPath string) (*pflag.FlagSet, error) {

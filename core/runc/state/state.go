@@ -1,6 +1,8 @@
 package state
 
 import (
+	"log/slog"
+
 	"github.com/walteh/runm/core/runc/runtime"
 	"github.com/walteh/runm/pkg/syncmap"
 )
@@ -71,6 +73,7 @@ func (s *State) StoreOpenConsole(referenceId string, console runtime.ConsoleSock
 }
 
 func (s *State) DeleteOpenIO(referenceId string) {
+	slog.Info("deleting open io", "referenceId", referenceId)
 	io, ok := s.openIOs.LoadAndDelete(referenceId)
 	if ok {
 		s.closedIOs.Store(referenceId, io)
@@ -82,6 +85,7 @@ func (s *State) DeleteOpenIO(referenceId string) {
 // }
 
 func (s *State) DeleteOpenConsole(referenceId string) {
+	slog.Info("deleting open console", "referenceId", referenceId)
 	console, ok := s.openConsoles.LoadAndDelete(referenceId)
 	if ok {
 		s.closedConsoles.Store(referenceId, console)

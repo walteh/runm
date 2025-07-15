@@ -18,6 +18,7 @@ type TickerOpts struct {
 	attrFunc        func() []slog.Attr
 	doneMessage     string
 	callerSkip      int `default:"1"`
+	callerUintptr   uintptr
 	slogBaseContext context.Context
 	messageFunc     func() string
 }
@@ -35,7 +36,10 @@ type Ticker struct {
 
 func NewTicker(opts ...TickerOpt) *Ticker {
 	t := newTickerOpts(opts...)
-	caller, _, _, _ := runtime.Caller(t.callerSkip)
+	if t.callerUintptr == 0 {
+		caller, _, _, _ := runtime.Caller(t.callerSkip)
+		t.callerUintptr = caller
+	}
 	if t.slogBaseContext == nil {
 		t.slogBaseContext = context.Background()
 	}
@@ -50,7 +54,7 @@ func NewTicker(opts ...TickerOpt) *Ticker {
 	return &Ticker{
 		ticker:      time.NewTicker(t.Interval()),
 		opts:        t,
-		caller:      caller,
+		caller:      t.callerUintptr,
 		context:     context.WithoutCancel(t.slogBaseContext),
 		messageFunc: messageFunc,
 	}

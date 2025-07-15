@@ -62,6 +62,10 @@ func WithCallerSkip(opt int) TickerOpt {
 	return func(o *TickerOpts) { o.callerSkip = opt }
 }
 
+func WithCallerUintptr(opt uintptr) TickerOpt {
+	return func(o *TickerOpts) { o.callerUintptr = opt }
+}
+
 func WithSlogBaseContext(opt context.Context) TickerOpt {
 	return func(o *TickerOpts) { o.slogBaseContext = opt }
 }
@@ -91,6 +95,8 @@ func (o TickerOpts) AttrFunc() func() []slog.Attr { return o.attrFunc }
 func (o TickerOpts) DoneMessage() string { return o.doneMessage }
 
 func (o TickerOpts) CallerSkip() int { return o.callerSkip }
+
+func (o TickerOpts) CallerUintptr() uintptr { return o.callerUintptr }
 
 func (o TickerOpts) SlogBaseContext() context.Context { return o.slogBaseContext }
 

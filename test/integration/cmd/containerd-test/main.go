@@ -2,6 +2,9 @@ package main
 
 import (
 	_ "github.com/containerd/containerd/v2/cmd/containerd/builtins"
+	"github.com/containerd/containerd/v2/cmd/containerd/command"
+	"github.com/containerd/containerd/v2/cmd/containerd/server"
+	"google.golang.org/grpc"
 
 	"context"
 	"flag"
@@ -19,12 +22,14 @@ import (
 
 	slogctx "github.com/veqryn/slog-context"
 
+	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/pkg/logging"
 	"github.com/walteh/runm/test/integration/env"
 )
 
 func init() {
-
+	server.AddHackedServerOption(grpc.ChainUnaryInterceptor(grpcerr.UnaryServerInterceptor))
+	server.AddHackedServerOption(grpc.ChainStreamInterceptor(grpcerr.NewStreamServerInterceptor(context.Background())))
 }
 
 var ctrCommands = FlagArray[string]{}
@@ -88,7 +93,7 @@ func main() {
 		"debug", debug,
 		"ctr-commands", ctrCommands.Get())
 
-	server, err := env.NewDevContainerdServer(ctx, debug)
+	server, err := env.NewDevContainerdServer(ctx, command.App(), debug)
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to create containerd server", "error", err)
 		os.Exit(1)
@@ -114,6 +119,11 @@ func main() {
 		os.Exit(0)
 	}
 
+	if err := env.EnableDebugging(); err != nil {
+		slog.ErrorContext(ctx, "Failed to enable debugging", "error", err)
+		os.Exit(1)
+	}
+
 	if background {
 		slog.InfoContext(ctx, "Starting containerd in background mode")
 		if err := server.StartBackground(ctx); err != nil {
@@ -122,13 +132,13 @@ func main() {
 		}
 
 		// Print connection info and exit
-		server.PrintConnectionInfoBackground()
+		// server.PrintConnectionInfoBackground()
 
 	} else {
 		// Foreground mode - handle signals gracefully
 		slog.InfoContext(ctx, "Starting containerd in foreground mode")
 
-		server.PrintConnectionInfoForground()
+		// server.PrintConnectionInfoForground()
 
 		// Set up signal handling
 		sigChan := make(chan os.Signal, 1)

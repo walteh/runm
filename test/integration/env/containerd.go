@@ -2,7 +2,7 @@ package env
 
 import (
 	"context"
-	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"os"
@@ -13,19 +13,23 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containerd/containerd/v2/cmd/containerd/command"
 	"github.com/containerd/log"
 	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli/v2"
+	"github.com/walteh/runm/linux/constants"
+	"github.com/walteh/runm/pkg/logging"
 	"gitlab.com/tozd/go/errors"
 )
 
 type DevContainerdServer struct {
 	debug bool
+	app   *cli.App
 }
 
-func NewDevContainerdServer(ctx context.Context, debug bool) (*DevContainerdServer, error) {
+func NewDevContainerdServer(ctx context.Context, app *cli.App, debug bool) (*DevContainerdServer, error) {
 	server := &DevContainerdServer{
 		debug: debug,
+		app:   app,
 	}
 
 	if err := server.EnsureOnlyOneInstanceRunning(ctx); err != nil {
@@ -124,14 +128,12 @@ func (s *DevContainerdServer) Start(ctx context.Context) error {
 
 	slog.InfoContext(ctx, "Starting containerd with args", "args", args)
 
-	app := command.App()
-
 	log.L = &logrus.Entry{
 		Logger: logrus.StandardLogger(),
 		Data:   make(log.Fields, 6),
 	}
 
-	return app.RunContext(ctx, args)
+	return s.app.RunContext(ctx, args)
 }
 
 func (s *DevContainerdServer) StartBackground(ctx context.Context) error {
@@ -173,61 +175,90 @@ func (s *DevContainerdServer) isReady(ctx context.Context) bool {
 	return true
 }
 
-// func (s *DevContainerdServer) waitForContainerdReady(ctx context.Context) error {
-// 	slog.InfoContext(ctx, "Waiting for containerd to be ready")
+func SetupContainerdLogReceiver(ctx context.Context) error {
 
-// 	timeout := time.After(s.config.Timeout)
-// 	ticker := time.NewTicker(500 * time.Millisecond)
-// 	defer ticker.Stop()
+	proxySock, err := net.Listen("unix", ShimRawWriterSockPath())
+	if err != nil {
+		slog.Error("Failed to create log proxy socket", "error", err, "path", ShimRawWriterSockPath())
+		os.Exit(1)
+	}
 
-// 	for {
-// 		select {
-// 		case <-ctx.Done():
-// 			return errors.Errorf("context cancelled")
-// 		case <-timeout:
-// 			return errors.Errorf("timeout waiting for containerd to be ready")
-// 		case <-ticker.C:
-// 			if s.isReady(ctx) {
-// 				slog.InfoContext(ctx, "Containerd is ready")
-// 				return nil
-// 			}
-// 		}
-// 	}
+	// fwd logs from the proxy socket to stdout
+	go func() {
+		defer proxySock.Close()
+		for {
+			conn, err := proxySock.Accept()
+			if err != nil {
+				slog.Error("Failed to accept log proxy connection", "error", err)
+				return
+			}
+			go func() { _, _ = io.Copy(os.Stdout, conn) }()
+		}
+	}()
+
+	proxySockDelim, err := net.Listen("unix", ShimDelimitedWriterSockPath())
+	if err != nil {
+		slog.Error("Failed to create log proxy socket", "error", err, "path", ShimDelimitedWriterSockPath())
+		os.Exit(1)
+	}
+
+	go func() {
+		defer proxySockDelim.Close()
+		for {
+			conn, err := proxySockDelim.Accept()
+			if err != nil {
+				slog.Error("Failed to accept log proxy connection", "error", err)
+				return
+			}
+			go func() {
+				err := logging.HandleDelimitedProxy(ctx, conn, os.Stdout, constants.VsockDelimitedLogProxyDelimiter)
+				if err != nil {
+					slog.Error("Failed to handle log proxy connection", "error", err)
+				}
+			}()
+		}
+	}()
+
+	// drop the privileges of the two sockets
+	os.Chmod(ShimRawWriterSockPath(), 0666)
+	os.Chmod(ShimDelimitedWriterSockPath(), 0666)
+
+	return nil
+}
+
+// func (s *DevContainerdServer) PrintConnectionInfoForground() {
+// 	fmt.Printf("\n🎉 Containerd Development Server Running!\n")
+// 	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+// 	fmt.Printf("📁 Work Directory: %s\n", WorkDir())
+// 	fmt.Printf("🔌 Socket Address: %s\n", Address())
+// 	fmt.Printf("🏷️  Default Namespace: %s\n", Namespace())
+// 	fmt.Printf("🔧 Harpoon Runtime: %s\n", shimRuntimeID)
+// 	fmt.Printf("🛠️  Shim Binary: %s\n", ShimSimlinkPath())
+// 	fmt.Printf("\n📋 Useful Commands:\n")
+// 	fmt.Printf("  # List images\n")
+// 	fmt.Printf("  ctr --address %s --namespace %s images list\n\n", Address(), Namespace())
+// 	fmt.Printf("  # Pull an image\n")
+// 	fmt.Printf("  ctr --address %s --namespace %s images pull docker.io/library/alpine:latest\n\n", Address(), Namespace())
+// 	fmt.Printf("  # Run a container with harpoon\n")
+// 	fmt.Printf("  ctr --address %s --namespace %s run --runtime %s --rm docker.io/library/alpine:latest test echo hello\n\n", Address(), Namespace(), shimRuntimeID)
+// 	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+// 	fmt.Printf("Press Ctrl+C to stop\n\n")
 // }
 
-func (s *DevContainerdServer) PrintConnectionInfoForground() {
-	fmt.Printf("\n🎉 Containerd Development Server Running!\n")
-	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-	fmt.Printf("📁 Work Directory: %s\n", WorkDir())
-	fmt.Printf("🔌 Socket Address: %s\n", Address())
-	fmt.Printf("🏷️  Default Namespace: %s\n", Namespace())
-	fmt.Printf("🔧 Harpoon Runtime: %s\n", shimRuntimeID)
-	fmt.Printf("🛠️  Shim Binary: %s\n", ShimSimlinkPath())
-	fmt.Printf("\n📋 Useful Commands:\n")
-	fmt.Printf("  # List images\n")
-	fmt.Printf("  ctr --address %s --namespace %s images list\n\n", Address(), Namespace())
-	fmt.Printf("  # Pull an image\n")
-	fmt.Printf("  ctr --address %s --namespace %s images pull docker.io/library/alpine:latest\n\n", Address(), Namespace())
-	fmt.Printf("  # Run a container with harpoon\n")
-	fmt.Printf("  ctr --address %s --namespace %s run --runtime %s --rm docker.io/library/alpine:latest test echo hello\n\n", Address(), Namespace(), shimRuntimeID)
-	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-	fmt.Printf("Press Ctrl+C to stop\n\n")
-}
-
-func (s *DevContainerdServer) PrintConnectionInfoBackground() {
-	fmt.Printf("\n🎉 Containerd Development Server Running!\n")
-	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-	fmt.Printf("📁 Work Directory: %s\n", WorkDir())
-	fmt.Printf("🔌 Socket Address: %s\n", Address())
-	fmt.Printf("🏷️  Default Namespace: %s\n", Namespace())
-	fmt.Printf("🔧 Harpoon Runtime: %s\n", shimRuntimeID)
-	fmt.Printf("🛠️  Shim Binary: %s\n", ShimSimlinkPath())
-	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-	// tell them how to stop it
-	fmt.Printf("To stop:\n")
-	fmt.Printf("  pkill -f 'containerd.*%s'\n", filepath.Base(Address()))
-	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-}
+// func (s *DevContainerdServer) PrintConnectionInfoBackground() {
+// 	fmt.Printf("\n🎉 Containerd Development Server Running!\n")
+// 	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+// 	fmt.Printf("📁 Work Directory: %s\n", WorkDir())
+// 	fmt.Printf("🔌 Socket Address: %s\n", Address())
+// 	fmt.Printf("🏷️  Default Namespace: %s\n", Namespace())
+// 	fmt.Printf("🔧 Harpoon Runtime: %s\n", shimRuntimeID)
+// 	fmt.Printf("🛠️  Shim Binary: %s\n", ShimSimlinkPath())
+// 	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+// 	// tell them how to stop it
+// 	fmt.Printf("To stop:\n")
+// 	fmt.Printf("  pkill -f 'containerd.*%s'\n", filepath.Base(Address()))
+// 	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+// }
 
 // we need a function that makes sure we are the only one running on this system
 func (s *DevContainerdServer) EnsureOnlyOneInstanceRunning(ctx context.Context) error {

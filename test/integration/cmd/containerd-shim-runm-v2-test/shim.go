@@ -9,7 +9,6 @@ import (
 	"os/signal"
 	"runtime"
 	"runtime/debug"
-	"slices"
 	"strconv"
 	"syscall"
 	"time"
@@ -34,8 +33,14 @@ func main() {
 	// Set up debug environment first
 	// SetupDebugEnvironment()
 
-	// If debugging is enabled, exec to debug script
-	// EnableDebugging()
+	mode := env.GuessCurrentShimMode(os.Args)
+	if mode == "primary" {
+		// If debugging is enabled, exec to debug script
+		if err := env.EnableDebugging(); err != nil {
+			slog.Error("Failed to enable debugging", "error", err)
+			os.Exit(1)
+		}
+	}
 
 	ShimMain()
 }
@@ -49,45 +54,18 @@ func (d *simpleOtelDialer) DialContext(ctx context.Context, _, _ string) (net.Co
 	return net.Dial(d.network, fmt.Sprintf(":%d", d.port))
 }
 
-var mode = guessShimMode()
+var mode = env.GuessCurrentShimMode(os.Args)
 
 func ShimMain() {
 
 	ctx := context.Background()
 
-	logger, sd, err := env.SetupLogForwardingToContainerd(ctx, fmt.Sprintf("shim[%s]", mode), true)
+	logger, sd, err := env.SetupLoggingForShim(ctx)
 	if err != nil {
-		slog.Error("Failed to setup otel", "error", err)
+		slog.Error("Failed to setup logging for shim", "error", err)
 		os.Exit(1)
 	}
 	defer sd()
-
-	if mode == "primary" {
-		slog.InfoContext(ctx, "PRIMARY_SHIM_RUNSHIM_START")
-
-		redirectStderr, err := env.DuplicateFdToWriter(int(os.Stderr.Fd()), logging.GetDefaultRawWriter())
-		if err != nil {
-			slog.Error("Failed to duplicate stderr", "error", err)
-		}
-		defer func() {
-			slog.InfoContext(ctx, "PRIMARY_SHIM_RUNSHIM_CLEANUP")
-			redirectStderr()
-		}()
-
-		redirectStdout, err := env.DuplicateFdToWriter(int(os.Stdout.Fd()), logging.GetDefaultRawWriter())
-		if err != nil {
-			slog.Error("Failed to duplicate stdout", "error", err)
-		}
-		defer func() {
-			slog.InfoContext(ctx, "PRIMARY_SHIM_RUNSHIM_CLEANUP")
-			redirectStdout()
-		}()
-
-		fmt.Fprintln(os.Stderr, "SHIM:PRIMARY:START:TEST:TEST:TEST")
-		slog.InfoContext(ctx, "PRIMARY_SHIM_STDERR_REDIRECT_DONE")
-
-		// EnableDebugging()
-	}
 
 	ctx = slogctx.NewCtx(ctx, logger)
 
@@ -176,23 +154,6 @@ func ShimMain() {
 
 }
 
-func guessShimMode() string {
-
-	if slices.Contains(os.Args, "-info") {
-		return "info"
-	}
-
-	if slices.Contains(os.Args, "delete") {
-		return "delete"
-	}
-
-	if slices.Contains(os.Args, "start") {
-		return "start"
-	}
-
-	return "primary"
-}
-
 func RunShim(ctx context.Context) error {
 
 	sloglogrus.SetLogrusLevel(logrus.DebugLevel)
@@ -211,6 +172,7 @@ func RunShim(ctx context.Context) error {
 
 	shim.Run(ctx, manager.NewDebugManager(manager.NewShimManager("io.containerd.runc.v2")), func(c *shim.Config) {
 		c.NoReaper = true
+		c.NoSubreaper = true
 		c.NoSetupLogger = true
 	})
 

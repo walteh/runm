@@ -2,11 +2,13 @@ package main
 
 import (
 	"fmt"
-	"log/slog"
 	"os"
-	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
+
+	"github.com/walteh/runm/test/integration/env"
+	"gitlab.com/tozd/go/errors"
 )
 
 const (
@@ -15,79 +17,65 @@ const (
 )
 
 func isInDebugSession() bool {
-	return os.Getppid() != 1
+	return os.Getenv("UNDER_DLV") == "1"
+}
+
+func shouldShimExecDlv() bool {
+	return env.GuessCurrentShimMode(os.Args) == "primary" && !isInDebugSession()
 }
 
 // EnableDebugging sets up DAP debugging support for the shim
 // It execs directly to dlv if DEBUG_SHIM is set and mode is primary
-func EnableDebugging() {
+func EnableDebugging() error {
 
-	slog.Info("DEBUG_SHIM enabled, setting up debugging", "ppid", os.Getppid())
+	// if os.Getppid() != 1 {
+	// 	// we are not an orphan so we are being debuggined, return
+	// 	slog.Info("DEBUG_SHIM enabled, but we are not an orphan, returning")
+	// 	return nil
+	// }
 
-	if os.Getppid() != 1 {
-		// we are not an orphan so we are being debuggined, return
-		slog.Info("DEBUG_SHIM enabled, but we are not an orphan, returning")
-		return
+	port, enabled := env.DebugEnabledOnPort()
+	if !enabled {
+		return nil
 	}
 
 	// Only debug primary mode (containerd doesn't let us pass env vars)
-	if mode != "primary" {
-		slog.Info("DEBUG_SHIM enabled, but mode is not primary, returning")
-		return
-	}
-
-	slog.Info("DEBUG_SHIM enabled, setting up debugging")
-
-	// Add a delay to give the primary process more time to start up before debugging
-	slog.Info("Sleeping 2 seconds to let primary process stabilize...")
-
-	// Check if dlv is available
-	dlvPath, err := exec.LookPath("dlv")
-	if err != nil {
-		slog.Error("dlv (Delve debugger) not found in PATH")
-		slog.Error("Install with: go install github.com/go-delve/delve/cmd/dlv@latest")
-		os.Exit(1)
+	if !shouldShimExecDlv() || !enabled {
+		return nil
 	}
 
 	// Get current executable path
 	execPath, err := os.Executable()
 	if err != nil {
-		slog.Error("Failed to get executable path for debugging", "error", err)
-		os.Exit(1)
+		return errors.Errorf("failed to get executable path for debugging: %w", err)
 	}
 
-	slog.Info("Starting dlv debug session", "port", DEBUG_PORT, "executable", execPath)
-	fmt.Printf("Waiting for debugger to attach on port %d\n", DEBUG_PORT)
-	fmt.Printf("In VS Code, use the 'Attach to Shim' launch configuration\n")
+	// Check if dlv is available
+	dlvPath, err := env.FindDlvPath()
+	if err != nil {
+		return errors.Errorf("failed to find dlv: %w", err)
+	}
 
-	dbg := fmt.Sprintf(dbgScript, execPath, DEBUG_PORT, dlvPath, strings.Join(os.Args[1:], " "))
+	dbg := fmt.Sprintf(dbgScript, execPath, port, dlvPath, strings.Join(os.Args[1:], " "))
+
+	tmpDir, err := os.MkdirTemp("", "shim_debug")
+	if err != nil {
+		return errors.Errorf("failed to create temp directory: %w", err)
+	}
 
 	// save to file
-	dbgFile := "/tmp/shim_debug.sh"
+	dbgFile := filepath.Join(tmpDir, "shim_debug.sh")
 	err = os.WriteFile(dbgFile, []byte(dbg), 0755)
 	if err != nil {
-		slog.Error("Failed to write debug script", "error", err)
-		os.Exit(1)
+		return errors.Errorf("failed to write debug script: %w", err)
 	}
-
-	// // Build dlv arguments
-	// dlvArgs := []string{
-	// 	"dlv",
-	// 	"exec",
-	// 	"--headless",
-	// 	fmt.Sprintf("--listen=:%d", DEBUG_PORT),
-	// 	"--api-version=2",
-	// 	"--accept-multiclient",
-	// 	execPath,
-	// 	"--",
-	// }
-	// dlvArgs = append(dlvArgs, os.Args[1:]...)
 
 	// Exec directly to dlv
 	if err := syscall.Exec(dbgFile, []string{dbgFile}, os.Environ()); err != nil {
-		slog.Error("Failed to exec dlv", "error", err)
-		os.Exit(1)
+		return errors.Errorf("failed to exec dlv: %w", err)
 	}
+
+	return nil
 }
 
 var dbgScript = `#!/bin/bash
@@ -167,6 +155,7 @@ SHIMOUTPUT=$(mktemp /tmp/shim_output_XXXXXX)
 
 cat > $LOCK_FILE << EOF
 #!/bin/bash
+export UNDER_DLV=1
 ${DLV_PATH} exec ${SHIM_BINARY} --headless --listen=:$DLV_PORT --accept-multiclient -r stdout:$SHIMOUTPUT -r stderr:$SHIMOUTPUT --check-go-version=false -- %[4]s
 rm $LOCK_FILE
 EOF
@@ -189,4 +178,7 @@ done
 
 # write the adress to stdout
 cat $SHIMOUTPUT
+
+# delete ourself
+rm $0
 exit 0`

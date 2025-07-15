@@ -22,7 +22,8 @@ vars:
     TEST_BIN_DIR: ./gen/build/test-bin
     LINUX_RUNTIME_DIR: ./gen/build/linux-runtime
     CLAUDE_FLOW_PROJECT_DIR: .claude/claude-flow
-    NERDCTL_CMD: 'sudo -A -E {{.TEST_BIN_DIR}}/nerdctl-test'
+    NERDCTL_CMD: '{{.SUDO_CMD}} {{.TEST_BIN_DIR}}/nerdctl-test'
+    SUDO_CMD: '' # 'sudo -A -E'
 
 env:
     COMPOSE_BAKE: true
@@ -517,12 +518,12 @@ tasks:
         desc: builds the linux runtime
         deps: ['test:binaries', 'linux:runtime:kernel', 'linux:runtime:initramfs', 'linux:runtime:mbins']
 
-    dev:nerdctl-test:kill-all-running-containers:
+    dev:nerdctl-test:rm-all-running-containers:
         desc: kills all running containers
         run: once
         cmds:
           - cmd: |-
-                {{.NERDCTL_CMD}} ps -q | xargs -I {} {{.NERDCTL_CMD}} kill {}
+                {{.NERDCTL_CMD}} ps -q | xargs -I {} {{.NERDCTL_CMD}} rm -f {}
 
     dev:nerdctl-test:kill:
         desc: kills a running container
@@ -545,6 +546,8 @@ tasks:
             FLAGS: '{{.FLAGS | default ""}}'
             STDOUT_FILE_PIPE: '{{.STDOUT_FILE | empty | ternary "" ">"}}'
             STATIC_FLAGS: '--platform=linux/arm64 --network=host --runtime=containerd.shim.runc.v2 --pull=missing'
+        # env:
+        #     DEBUG_NERDCTL_TEST: '12347'
         cmds:
           - cmd: |-
                 {{.TIMEOUT}} {{.NERDCTL_CMD}} run {{.STATIC_FLAGS}} {{.FLAGS}} {{.IMAGE}} {{.ARGS}} {{.STDOUT_FILE_PIPE}} {{.STDOUT_FILE}}
@@ -588,9 +591,9 @@ tasks:
                 go tool pty-resize-test {{.SEQUENCE}} {{.BASE_CMD}}
 
         cmds:
-          - task: dev:nerdctl-test:kill-all-running-containers
+          - task: dev:nerdctl-test:rm-all-running-containers
           - cmd: >-
-                sudo -A -E {{.PTY_RESIZE_TEST_CMD}}
+                {{.SUDO_CMD}} {{.PTY_RESIZE_TEST_CMD}}
 
     # dev:nerdctl-test:exec:debug-pty:
     #     desc: executes a command in a running container
@@ -651,6 +654,7 @@ tasks:
         requires: {vars: [CONTAINER_ID]}
         vars:
             CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
+            FLAGS: '{{.FLAGS | default "-f"}}'
         cmds:
           - cmd: |-
                 {{.NERDCTL_CMD}} rm {{.FLAGS}} {{.CONTAINER_ID}}
@@ -723,7 +727,7 @@ tasks:
         cmds:
           - defer: 'rm -rf {{.TMP_DIR}}'
             silent: true
-          - task: dev:nerdctl-test:kill-all-running-containers
+          - task: dev:nerdctl-test:rm-all-running-containers
           - task: dev:nerdctl-test:run
             vars:
                 FLAGS: '-d'
@@ -751,10 +755,13 @@ tasks:
                 CONTAINER_ID:
                     sh: cat {{.TMP_DIR}}/stdout.txt
                 FLAGS: '--tty'
-          - task: dev:nerdctl-test:kill
+
+          - task: dev:nerdctl-test:rm
             vars:
                 CONTAINER_ID:
                     sh: cat {{.TMP_DIR}}/stdout.txt
+
+          - task: dev:nerdctl-test:ps
 
     dev:containerd-test:
         desc: runs the shim for 2025-07-01
@@ -766,9 +773,11 @@ tasks:
                 sh: echo $(pwd)/{{.TEST_BIN_DIR}}/containerd-shim-runm-v2-test
             LINUX_RUNTIME_DIR:
                 sh: echo $(pwd)/{{.LINUX_RUNTIME_DIR}}
+                # DEBUG_CONTAINERD_TEST: '12347'
         cmds:
           - task: test:cleanup-running-shims
-          - cmd: sudo -A -E {{.TEST_BIN_DIR}}/containerd-test
+          - cmd: |-
+                {{.TEST_BIN_DIR}}/containerd-test
 
     dev:containerd-test:pipe-to-file:
         desc: runs the shim for 2025-07-01
@@ -784,7 +793,8 @@ tasks:
             FILE: '{{.CLI_ARGS | default "./.logs/containerd-test-pipe-to-file.log"}}'
         cmds:
           - task: test:cleanup-running-shims
-          - cmd: sudo -A -E {{.TEST_BIN_DIR}}/containerd-test > {{.FILE}}
+          - cmd: |-
+                {{.SUDO_CMD}} {{.TEST_BIN_DIR}}/containerd-test > {{.FILE}}
 
     setup:
         desc: sets up the environment
@@ -865,7 +875,7 @@ tasks:
                 sh: mktemp -d -t runm-2025-07-12-XXXXXX
         cmds:
           - cmd: mkdir -p ./tmp/fonts-raw/origin ./tmp/fonts-patched
-          - task: dev:nerdctl-test:kill-all-running-containers
+          - task: dev:nerdctl-test:rm-all-running-containers
           - task: dev:nerdctl-test:run
             vars:
                 IMAGE: 'docker.io/nerdfonts/patcher:latest'
@@ -895,7 +905,6 @@ tasks:
         requires: {vars: [CMD, VOLUME_FLAGS, IMAGE]}
         interactive: true
         vars:
-            NERDCTL_CMD: 'sudo -A -E {{.TEST_BIN_DIR}}/nerdctl-test'
             DOCKER_CMD: docker
             CUSTOM_ENTRYPOINT_FLAG: '{{.CUSTOM_ENTRYPOINT | empty | ternary "" "--entrypoint="}}'
             SH_MODE: '{{.CUSTOM_ENTRYPOINT | eq "/bin/sh" | ternary "1" "0"}}'

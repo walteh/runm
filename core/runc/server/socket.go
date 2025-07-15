@@ -242,7 +242,7 @@ func (s *Server) BindIOToSockets(ctx context.Context, req *runmv1.BindIOToSocket
 func (s *Server) CloseConsole(ctx context.Context, req *runmv1.CloseConsoleRequest) (*runmv1.CloseConsoleResponse, error) {
 	val, ok := s.state.GetOpenConsole(req.GetConsoleReferenceId())
 	if !ok {
-		return nil, errors.Errorf("console not found")
+		return nil, errors.Errorf("console not found for reference id: %s", req.GetConsoleReferenceId())
 	}
 	val.Close()
 	s.state.DeleteOpenConsole(req.GetConsoleReferenceId())
@@ -254,10 +254,13 @@ func (s *Server) CloseIO(ctx context.Context, req *runmv1.CloseIORequest) (*runm
 
 	val, ok := s.state.GetOpenIO(req.GetIoReferenceId())
 	if !ok {
-		return nil, errors.Errorf("io not found")
+		// Make CloseIO idempotent - don't error if IO is already closed
+		slog.DebugContext(ctx, "CloseIO called for already closed IO", "io_reference_id", req.GetIoReferenceId())
+		return &runmv1.CloseIOResponse{}, nil
 	}
 	val.Close()
 	s.state.DeleteOpenIO(req.GetIoReferenceId())
+	slog.DebugContext(ctx, "CloseIO successfully closed IO", "io_reference_id", req.GetIoReferenceId())
 	return &runmv1.CloseIOResponse{}, nil
 }
 

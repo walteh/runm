@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"reflect"
+	"runtime"
+	"strings"
 	"time"
 
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
@@ -15,6 +18,7 @@ import (
 
 	slogctx "github.com/veqryn/slog-context"
 
+	"github.com/walteh/runm/pkg/logging"
 	"github.com/walteh/runm/pkg/stackerr"
 	"github.com/walteh/runm/pkg/ticker"
 )
@@ -55,6 +59,33 @@ func NewStreamClientInterceptor(ctx context.Context) grpc.StreamClientIntercepto
 	}
 }
 
+// implLocation returns the concrete service implementation’s PC, file and line.
+// Call this *inside* your interceptor.
+func implLocation(info *grpc.UnaryServerInfo) (pc uintptr) {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("panic in implLocation", "error", r)
+			pc = 0
+		}
+	}()
+	// Extract final element of /pkg.Service/Foo  → "Foo"
+	parts := strings.Split(info.FullMethod, "/")
+	meth := parts[len(parts)-1]
+
+	// 1) Work with the *pointer type*; that’s where pointer-receiver methods live.
+	t := reflect.TypeOf(info.Server)        // e.g. *myService
+	m, ok := t.MethodByName(meth)           // try pointer type first
+	if !ok && t.Kind() == reflect.Pointer { // fall back to value type just in case
+		m, ok = t.Elem().MethodByName(meth)
+	}
+	if !ok {
+		return 0
+	}
+
+	pc = m.Func.Pointer()
+	return
+}
+
 func UnaryServerInterceptor(
 	ctx context.Context,
 	req interface{},
@@ -65,13 +96,20 @@ func UnaryServerInterceptor(
 	operation := filepath.Base(info.FullMethod)
 	service := filepath.Base(filepath.Dir(info.FullMethod))
 	id := fmt.Sprintf("GRPC:SERVER:%s:%s", service, operation)
-	slog.DebugContext(ctx, fmt.Sprintf("%s[START]", id), "service", service)
+
+	codePointer := implLocation(info)
+
+	if codePointer == 0 {
+		codePointer, _, _, _ = runtime.Caller(0)
+	}
+
+	logging.LogCaller(ctx, slog.LevelDebug, codePointer, fmt.Sprintf("%s[START]", id), "service", service)
 
 	var errz error
 	var resp interface{}
 
 	defer func() {
-		slog.DebugContext(ctx, fmt.Sprintf("%s[END]", id), "service", service, "error", errz, "duration", time.Since(start))
+		logging.LogCaller(ctx, slog.LevelDebug, codePointer, fmt.Sprintf("%s[END]", id), "service", service, "error", errz, "duration", time.Since(start))
 	}()
 
 	defer ticker.NewTicker(
@@ -79,6 +117,7 @@ func UnaryServerInterceptor(
 		ticker.WithStartBurst(5),
 		ticker.WithFrequency(15),
 		ticker.WithMessage(fmt.Sprintf("%s[RUNNING]", id)),
+		ticker.WithCallerUintptr(codePointer),
 		ticker.WithSlogBaseContext(ctx),
 		ticker.WithLogLevel(slog.LevelDebug),
 	).RunAsDefer()()
@@ -87,6 +126,7 @@ func UnaryServerInterceptor(
 	if errz == nil {
 		return resp, nil
 	}
+
 	// Create a gRPC status with code and top‐level message  [oai_citation:0‡grpc.io](https://grpc.io/docs/guides/error/?utm_source=chatgpt.com).
 	st := status.New(codes.Internal, errz.Error())
 	// Attach the full %+v formatted Tozd error chain as DebugInfo  [oai_citation:1‡pkg.go.dev](https://pkg.go.dev/google.golang.org/genproto/googleapis/rpc/errdetails?utm_source=chatgpt.com) [oai_citation:2‡medium.com](https://medium.com/utility-warehouse-technology/advanced-grpc-error-usage-1b37398f0ff4?utm_source=chatgpt.com).
@@ -132,7 +172,8 @@ func UnaryClientInterceptor(
 	operation := filepath.Base(method)
 	id := fmt.Sprintf("GRPC:CLIENT:%s:%s", service, operation)
 	event := fmt.Sprintf("%s[START]", id)
-	slog.DebugContext(ctx, event, "service", service)
+
+	logging.LogRecord(ctx, slog.LevelDebug, 4, event, "service", service)
 	// if event == "GRPC:CLIENT:runm.v1.SocketAllocatorService:CloseIO[START]" {
 	// 	slog.InfoContext(ctx, string(debug.Stack()))
 	// }
@@ -140,13 +181,14 @@ func UnaryClientInterceptor(
 	defer ticker.NewTicker(
 		ticker.WithInterval(1*time.Second),
 		ticker.WithStartBurst(5),
+		ticker.WithCallerSkip(4),
 		ticker.WithFrequency(15),
 		ticker.WithMessage(fmt.Sprintf("%s[RUNNING]", id)),
 		// ticker.WithDoneMessage(fmt.Sprintf("TICK:GRPC-CLIENT:%s:%s[DONE]", service, operation)),
 	).RunAsDefer()()
 
 	errd := invoker(ctx, method, req, reply, cc, opts...)
-	slog.DebugContext(ctx, fmt.Sprintf("%s[END]", id), "service", service, "error", errd, "duration", time.Since(start))
+	logging.LogRecord(ctx, slog.LevelDebug, 4, fmt.Sprintf("%s[END]", id), "service", service, "error", errd, "duration", time.Since(start))
 	return errd
 }
 

@@ -452,9 +452,8 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 		return errors.Errorf("running initial timesync requests: %w", err)
 	}
 
-	rvm.taskGroup.RegisterCleanup(func(ctx context.Context) error {
-		return rvm.Close(ctx)
-	})
+	// Note: Removed circular cleanup dependency - Close() already calls taskGroup.Wait()
+	// so registering Close() as a cleanup would create infinite recursion
 
 	return nil
 }
