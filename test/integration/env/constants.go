@@ -41,6 +41,7 @@ func ContainerdRootDir() string      { return filepath.Join(PersistentWorkDir(),
 func ContainerdStateDir() string     { return filepath.Join(PersistentWorkDir(), "state") }
 func ContainerdContentDir() string   { return filepath.Join(PersistentWorkDir(), "content") }
 func ContainerdSnapshotsDir() string { return filepath.Join(PersistentWorkDir(), "snapshots") }
+func NerdctlDataRoot() string        { return filepath.Join(PersistentWorkDir(), "nerdctl-data-root") }
 func PullPolicy() string             { return pullPolicy }
 func Snapshotter() string            { return snapshotter }
 

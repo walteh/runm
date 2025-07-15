@@ -48,12 +48,13 @@ debug_full     = false
 address        = "unix://%[2]s"
 namespace      = "%[3]s"
 snapshotter    = "%[4]s"
+data_root      = "%[6]s"
 # pull_policy    = "%[5]s"
 # cgroup_manager = "cgroupfs"
 # hosts_dir      = ["/etc/containerd/certs.d", "/etc/docker/certs.d"]
 experimental   = true
 # userns_remap   = ""
-	`, logLevel == "debug", Address(), Namespace(), Snapshotter(), PullPolicy())
+	`, logLevel == "debug", Address(), Namespace(), Snapshotter(), PullPolicy(), NerdctlDataRoot())
 
 	if err := os.WriteFile(NerdctlConfigTomlPath(), []byte(configContent), 0644); err != nil {
 		return errors.Errorf("writing nerdctl config: %w", err)
