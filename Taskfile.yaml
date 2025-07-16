@@ -33,8 +33,10 @@ env:
     GOPRIVATE: github.com/walteh
     DOCKER_BUILDKIT: 1
     PAGER: less
-    DEBUG_CONTAINERD_TEST: 1
-    DEBUG_NERDCTL_TEST: 1
+    # DEBUG_CONTAINERD_TEST: 1
+    # DEBUG_NERDCTL_TEST: 1
+    DEBUG_CONTAINERD_SHIM_RUNM_V2_TEST:
+        sh: mkdir -p /tmp/tcontainerd-fs-env && echo '1' | tee /tmp/tcontainerd-fs-env/DEBUG_CONTAINERD_SHIM_RUNM_V2_TEST
 
 tasks:
     claude:

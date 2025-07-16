@@ -33,12 +33,6 @@ func main() {
 	// Set up debug environment first
 	// SetupDebugEnvironment()
 
-	mode := env.GuessCurrentShimMode(os.Args)
-	if mode == "primary" {
-		// If debugging is enabled, exec to debug script
-		defer env.EnableDebugging()()
-	}
-
 	ShimMain()
 }
 
@@ -63,6 +57,12 @@ func ShimMain() {
 		os.Exit(1)
 	}
 	defer sd()
+
+	mode := env.GuessCurrentShimMode(os.Args)
+	if mode == "primary" {
+		// If debugging is enabled, exec to debug script
+		defer env.EnableDebugging()()
+	}
 
 	ctx = slogctx.NewCtx(ctx, logger)
 

@@ -112,8 +112,9 @@ func resolveDebugEnvVar() string {
 	envVar := getDebugEnvVarName(exe)
 
 	val := os.Getenv(envVar)
+
 	if val == "" {
-		val = getFsEnvVar(exe)
+		val = getFsEnvVar(envVar)
 	}
 
 	return val
