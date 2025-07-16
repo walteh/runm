@@ -9,15 +9,42 @@ vars:
     SUPPORTED_ARCHS:
       - arm64
     FORKS:
-      - ../console
-      - ../go-runc
-      - ../ttrpc
-      - ../gvisor-tap-vsock
-      - ../go-errors
-      - ../nerdctl
-      - ../containerd
-      - ../runc
-      - ../vz
+
+      - branch: main
+        repo: "github.com/Code-Hex/vz"
+        upstream: "github.com/Code-Hex/vz"
+        path: "../vz"
+
+      - branch: main
+        repo: "github.com/walteh/containerd"
+        upstream: "github.com/containerd/containerd"
+        path: "../containerd"
+
+      - branch: main
+        repo: "github.com/walteh/nerdctl"
+        upstream: "github.com/containerd/nerdctl"
+        path: "../nerdctl"
+
+      - branch: main
+        repo: "github.com/walteh/runc"
+        upstream: "github.com/opencontainers/runc"
+        path: "../runc"
+
+      - branch: main
+        repo: "github.com/walteh/gvisor-tap-vsock"
+        upstream: "github.com/containers/gvisor-tap-vsock"
+        path: "../gvisor-tap-vsock"
+
+      - branch: master
+        repo: "github.com/walteh/buildkit"
+        upstream: "github.com/moby/buildkit"
+        path: "../buildkit"
+
+      - branch: main
+        repo: "github.com/walteh/ttrpc"
+        upstream: "github.com/containerd/ttrpc"
+        path: "../ttrpc"
+
     BUILD_OUT_DIR: gen/build
     TEST_BIN_DIR: ./gen/build/test-bin
     LINUX_RUNTIME_DIR: ./gen/build/linux-runtime
@@ -818,38 +845,35 @@ tasks:
         cmds:
           - task: fork:sync
 
-    fork:sync:
+    fork:sync:*:
         desc: syncs the forks
-        dir: ../
-        vars:
-            FORKS:
-              - branch: main
-                repo: "github.com/Code-Hex/vz"
-
-              - branch: main
-                repo: "github.com/walteh/containerd"
-
-              - branch: main
-                repo: "github.com/walteh/nerdctl"
-
-              - branch: main
-                repo: "github.com/walteh/gvisor-tap-vsock"
-
-              - branch: main
-                repo: "github.com/walteh/tint"
-
-              - branch: main
-                repo: "github.com/walteh/buildkit"
-
-              - branch: main
-                repo: "github.com/walteh/ttrpc"
-
-              - branch: main
-                repo: "github.com/walteh/nerdctl"
-
+        dir: '{{.ITEM.path}}'
         cmds:
+          # create the upstream remote if it doesn't exist
+          - cmd: git remote add upstream {{.ITEM.upstream}}
+          - cmd: git fetch upstream
+
+          - cmd: git checkout {{.ITEM.branch}}
+          - cmd: git branch -b backup/$(date +%Y-%m-%d)
+          - cmd: git push
+          - cmd: git checkout {{.ITEM.branch}}
+          - cmd: git rebase upstream/{{.ITEM.branch}} || echo "manual rebase required for {{.ITEM.repo}}" && exit 1
+          - cmd: git push origin {{.ITEM.branch}} --force
+            # pull the branch
+
+    fork:sync:all:
+        desc: syncs the forks
+        cmds:
+          # first loop thorugh all and if any are dirty throw an error
           - for: {var: FORKS}
-            cmd: git clone {{.ITEM.repo}} --depth 1 && git fetch origin {{.ITEM.branch}} && git checkout {{.ITEM.branch}}
+            cmd: |-
+                cd {{.DIR}} && git checkout {{.ITEM.branch}} && git status --porcelain | grep -q '^M' && echo "{{.DIR}} is dirty" && exit 1
+          - for: {var: FORKS}
+            task: fork:sync:{{.ITEM.repo}}
+            vars:
+                DIR: '{{.DIR}}'
+                BRANCH: '{{.ITEM.branch}}'
+                UPSTREAM: '{{.ITEM.upstream}}'
 
     signoz:git:
         desc: sets up the git repository for the signoz agent
