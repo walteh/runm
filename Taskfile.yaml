@@ -269,7 +269,8 @@ tasks:
             # Build flags with Go 1.25 improvements
             ASAN_FLAG: |-
                 {{.ASAN | default .DEBUG | eq "1" | and (.CGO_ENABLED | eq "1") | and (.CC | eq "clang") | ternary "-asan" ""}}
-            # RACE_FLAG: '{{.RACE | default .DEBUG | eq "1" | ternary "-race" ""}}'
+            RACE_FLAG: |-
+                {{.RACE | default .DEBUG | eq "1" | and (.ASAN | ne "1") | and (.CGO_ENABLED | eq "1") | and (.CC | eq "clang") | ternary "-race" ""}}
 
             BUILD_FLAGS: |-
                 -tags="{{.TAGS}}" -ldflags="{{.LD_FLAGS}}" -gcflags="{{.GC_FLAGS}}" {{.ASAN_FLAG}} {{.RACE_FLAG}} -o="{{.OUT_DIR}}/{{.NAME}}"
