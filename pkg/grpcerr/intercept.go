@@ -103,13 +103,13 @@ func UnaryServerInterceptor(
 		codePointer, _, _, _ = runtime.Caller(0)
 	}
 
-	logging.LogCaller(ctx, slog.LevelDebug, codePointer, fmt.Sprintf("%s[START]", id), "service", service)
+	logging.LogCaller(ctx, slog.LevelDebug, codePointer, fmt.Sprintf("%s[START]", id))
 
 	var errz error
 	var resp interface{}
 
 	defer func() {
-		logging.LogCaller(ctx, slog.LevelDebug, codePointer, fmt.Sprintf("%s[END]", id), "service", service, "error", errz, "duration", time.Since(start))
+		logging.LogCaller(ctx, slog.LevelDebug, codePointer, fmt.Sprintf("%s[END]", id), "error", errz, "duration", time.Since(start))
 	}()
 
 	defer ticker.NewTicker(

@@ -26,8 +26,12 @@ func DebugCopyWithBuffer(ctx context.Context, name string, w io.Writer, r io.Rea
 
 	id := "DEBUGCOPY:" + name
 
-	lw := NewDebugWriter(ctx, id, w)
-	lr := NewDebugReader(ctx, id, r)
+	lw := NewDebugWriter(ctx, id, w).(*debugWriter)
+
+	lr := NewDebugReader(ctx, id, r).(*debugReader)
+
+	lr.copiedWriter = lw
+	lw.copiedReader = lr
 
 	done = make(chan error)
 

@@ -54,9 +54,7 @@ func LogCaller(ctx context.Context, level slog.Level, pc uintptr, msg string, ar
 		Time:    time.Now(),
 		PC:      pc,
 	}
-	for _, arg := range args {
-		rec.AddAttrs(slog.Attr{Key: "arg", Value: slog.AnyValue(arg)})
-	}
+	rec.Add(args...)
 	slog.Default().Handler().Handle(ctx, rec)
 }
 

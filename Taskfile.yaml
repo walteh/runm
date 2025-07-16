@@ -23,6 +23,7 @@ vars:
     LINUX_RUNTIME_DIR: ./gen/build/linux-runtime
     CLAUDE_FLOW_PROJECT_DIR: .claude/claude-flow
     NERDCTL_CMD: '{{.SUDO_CMD}} {{.TEST_BIN_DIR}}/nerdctl-test'
+    # NERDCTL_CMD: 'docker'
     SUDO_CMD: '' # 'sudo -A -E'
 
 env:
@@ -32,6 +33,8 @@ env:
     GOPRIVATE: github.com/walteh
     DOCKER_BUILDKIT: 1
     PAGER: less
+    # DEBUG_CONTAINERD_TEST: 1
+    # DEBUG_NERDCTL_TEST: 1
 
 tasks:
     claude:
@@ -546,8 +549,8 @@ tasks:
             FLAGS: '{{.FLAGS | default ""}}'
             STDOUT_FILE_PIPE: '{{.STDOUT_FILE | empty | ternary "" ">"}}'
             STATIC_FLAGS: '--platform=linux/arm64 --network=host --runtime=containerd.shim.runc.v2 --pull=missing'
-        env:
-            DEBUG_NERDCTL_TEST: '12348'
+        # env:
+        # DEBUG_NERDCTL_TEST: '12348'
         cmds:
           - cmd: |-
                 {{.TIMEOUT}} {{.NERDCTL_CMD}} run {{.STATIC_FLAGS}} {{.FLAGS}} {{.IMAGE}} {{.ARGS}} {{.STDOUT_FILE_PIPE}} {{.STDOUT_FILE}}
@@ -773,7 +776,6 @@ tasks:
                 sh: echo $(pwd)/{{.TEST_BIN_DIR}}/containerd-shim-runm-v2-test
             LINUX_RUNTIME_DIR:
                 sh: echo $(pwd)/{{.LINUX_RUNTIME_DIR}}
-            DEBUG_CONTAINERD_TEST: '12347'
         cmds:
           - task: test:cleanup-running-shims
           - cmd: |-

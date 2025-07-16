@@ -19,6 +19,7 @@ type debugWriter struct {
 	hasBeenClosed  bool
 	w              io.Writer
 	sessionManager *sessionManager
+	copiedReader   *debugReader
 }
 
 func NewDebugWriter(ctx context.Context, name string, w io.Writer) io.Writer {
@@ -65,10 +66,27 @@ func (l *debugWriter) Write(p []byte) (int, error) {
 		} else {
 			failedWriteData = ""
 			successfulWriteData = escapeString(p)
+
 		}
-		slog.ErrorContext(l.ctx, fmt.Sprintf("%s[WRITE-ERROR]", l.name), "error", err, "w", l, "current_write_data", successfulWriteData, "failed_write_data", failedWriteData)
+
+		attrs := []slog.Attr{
+			slog.String("error", err.Error()),
+			slog.String("w", l.name),
+			slog.String("current_write_data", successfulWriteData),
+			slog.String("failed_write_data", failedWriteData),
+		}
+
+		if l.copiedReader == nil {
+			attrs = append(attrs, slog.String("r", l.name))
+		}
+
+		slog.LogAttrs(l.ctx, slog.LevelError, fmt.Sprintf("%s[WRITE-ERROR]", l.name), attrs...)
 	} else {
-		slog.DebugContext(l.ctx, fmt.Sprintf("%s[WRITE]", l.name), "data", escapeString(p[:n]), "w", l)
+		if l.copiedReader == nil {
+			slog.DebugContext(l.ctx, fmt.Sprintf("%s[WRITE]", l.name), "data", escapeString(p[:n]), "w", l)
+		} else {
+			slog.DebugContext(l.ctx, fmt.Sprintf("%s[FWD]", l.name), "data", escapeString(p[:n]), "w", l, "r", l.copiedReader)
+		}
 	}
 
 	// for {
@@ -102,6 +120,7 @@ type debugReader struct {
 	callCount      uint64
 	hasBeenClosed  bool
 	sessionManager *sessionManager
+	copiedWriter   *debugWriter
 }
 
 func NewDebugReader(ctx context.Context, name string, r io.Reader) io.Reader {
@@ -168,7 +187,11 @@ func (l *debugReader) Read(p []byte) (int, error) {
 		}
 		slog.DebugContext(l.ctx, fmt.Sprintf("%s[READ-ERROR]", l.name), "error", err, "r", l, "current_read_data", successfulReadData, "failed_read_data", failedReadData)
 	} else {
-		slog.DebugContext(l.ctx, fmt.Sprintf("%s[READ]", l.name), "data", escapeString(p[:n]), "r", l)
+		if l.copiedWriter == nil {
+			slog.DebugContext(l.ctx, fmt.Sprintf("%s[READ]", l.name), "data", escapeString(p[:n]), "r", l)
+		} else {
+			// no point to log on success unless the read fails
+		}
 	}
 
 	return n, err
