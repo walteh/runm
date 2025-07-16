@@ -119,10 +119,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	if err := env.EnableDebugging(); err != nil {
-		slog.ErrorContext(ctx, "Failed to enable debugging", "error", err)
-		os.Exit(1)
-	}
+	defer env.EnableDebugging()()
 
 	if background {
 		slog.InfoContext(ctx, "Starting containerd in background mode")

@@ -186,6 +186,14 @@ func xmain() error {
 
 	prevPreRun := app.PersistentPreRunE
 
+	var debugCancel func()
+
+	defer func() {
+		if debugCancel != nil {
+			debugCancel()
+		}
+	}()
+
 	app.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
@@ -207,9 +215,7 @@ func xmain() error {
 
 		cmd.SetContext(ctx)
 
-		if err := env.EnableDebugging(); err != nil {
-			return err
-		}
+		debugCancel = env.EnableDebugging()
 
 		if prevPreRun != nil {
 			return prevPreRun(cmd, args)

@@ -36,10 +36,7 @@ func main() {
 	mode := env.GuessCurrentShimMode(os.Args)
 	if mode == "primary" {
 		// If debugging is enabled, exec to debug script
-		if err := env.EnableDebugging(); err != nil {
-			slog.Error("Failed to enable debugging", "error", err)
-			os.Exit(1)
-		}
+		defer env.EnableDebugging()()
 	}
 
 	ShimMain()
