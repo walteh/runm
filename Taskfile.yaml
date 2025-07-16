@@ -33,8 +33,8 @@ env:
     GOPRIVATE: github.com/walteh
     DOCKER_BUILDKIT: 1
     PAGER: less
-    # DEBUG_CONTAINERD_TEST: 1
-    # DEBUG_NERDCTL_TEST: 1
+    DEBUG_CONTAINERD_TEST: 1
+    DEBUG_NERDCTL_TEST: 1
 
 tasks:
     claude:
@@ -235,14 +235,27 @@ tasks:
             GC_FLAGS: '{{.DEBUG | eq "1" | ternary "all=-N -l" ""}}'
             OUT_DIR: '{{.BIN_DIR | default "./gen/build/{{.OS}}_{{.ARCH}}_binaries"}}'
             BUILDMODE: '{{.BUILDMODE | default "default"}}'
+            CGO_ENABLED: '{{.CGO_ENABLED | default "0"}}'
+
+            # Build flags with Go 1.25 improvements
+            ASAN_FLAG: |-
+                {{.ASAN | default .DEBUG | eq "1" | and (.CGO_ENABLED | eq "1") | and (.CC | eq "clang") | ternary "-asan" ""}}
+            # RACE_FLAG: '{{.RACE | default .DEBUG | eq "1" | ternary "-race" ""}}'
+
             BUILD_FLAGS: |-
-                -tags="{{.TAGS}}" -ldflags="{{.LD_FLAGS}}" -gcflags="{{.GC_FLAGS}}"  -o {{.OUT_DIR}}/{{.NAME}}
+                -tags="{{.TAGS}}" -ldflags="{{.LD_FLAGS}}" -gcflags="{{.GC_FLAGS}}" {{.ASAN_FLAG}} {{.RACE_FLAG}} -o="{{.OUT_DIR}}/{{.NAME}}"
+
         env:
             CC: '{{.CC | default "clang"}}'
-            CGO_ENABLED: '{{.CGO_ENABLED | default "0"}}'
+            CGO_ENABLED: '{{.CGO_ENABLED}}'
             GOOS: '{{.OS}}'
             GOARCH: '{{.ARCH}}'
             CGO_LDFLAGS: '{{.CC | empty | ternary "-Wl,-no_warn_duplicate_libraries" ""}}' # https://stackoverflow.com/a/78585264/11025621
+            # Go 1.25 environment variables
+            GOEXPERIMENT: |-
+                greenteagc,jsonv2
+
+            ASAN_OPTIONS: '{{.ASAN_OPTIONS}}'
         generates:
           - '{{.OUT_DIR}}/{{.NAME}}'
         cmds:
@@ -250,7 +263,7 @@ tasks:
           - cmd: if [ "{{.DEBUG}}" != "1" ]; then strip {{.OUT_DIR}}/{{.NAME}}; fi
             silent: true
           - cmd: |-
-                if [ "{{.CODESIGN}}" = "1" ]; then go tool codesign -target {{.OUT_DIR}}/{{.NAME}} -mode=sign --force --entitlement=com.apple.security.virtualization; fi
+                if [ "{{.CODESIGN}}" = "1" ]; then go tool codesign -target {{.OUT_DIR}}/{{.NAME}} -quiet -mode=sign --force --entitlement=com.apple.security.virtualization; fi
             silent: true
           - cmd: if [ "{{.SYMLINK}}" != "" ]; then ln -laf {{.OUT_DIR}}/{{.NAME}} {{.OUT_DIR}}/{{.SYMLINK}}; fi
             silent: true

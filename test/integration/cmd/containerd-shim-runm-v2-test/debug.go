@@ -11,19 +11,6 @@ import (
 	"gitlab.com/tozd/go/errors"
 )
 
-const (
-	// Hard-coded debug port for now
-	DEBUG_PORT = 2346
-)
-
-func isInDebugSession() bool {
-	return os.Getenv("UNDER_DLV") == "1"
-}
-
-func shouldShimExecDlv() bool {
-	return env.GuessCurrentShimMode(os.Args) == "primary" && !isInDebugSession()
-}
-
 // EnableDebugging sets up DAP debugging support for the shim
 // It execs directly to dlv if DEBUG_SHIM is set and mode is primary
 func EnableDebugging() error {
@@ -34,13 +21,12 @@ func EnableDebugging() error {
 	// 	return nil
 	// }
 
-	port, enabled := env.DebugEnabledOnPort()
-	if !enabled {
+	if !env.DebugIsEnabled() {
 		return nil
 	}
 
 	// Only debug primary mode (containerd doesn't let us pass env vars)
-	if !shouldShimExecDlv() || !enabled {
+	if env.GuessCurrentShimMode(os.Args) != "primary" {
 		return nil
 	}
 
@@ -56,7 +42,7 @@ func EnableDebugging() error {
 		return errors.Errorf("failed to find dlv: %w", err)
 	}
 
-	dbg := fmt.Sprintf(dbgScript, execPath, port, dlvPath, strings.Join(os.Args[1:], " "))
+	dbg := fmt.Sprintf(dbgScript, execPath, 0, dlvPath, strings.Join(os.Args[1:], " "))
 
 	tmpDir, err := os.MkdirTemp("", "shim_debug")
 	if err != nil {
