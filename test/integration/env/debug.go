@@ -280,6 +280,7 @@ func EnableDebugging() func() {
 	}
 
 	if err = cm.Start(); err != nil {
+		slog.Error("Failed to start delve", "error", err)
 		panic(err)
 	}
 

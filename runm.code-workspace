@@ -85,7 +85,11 @@
 		"evenBetterToml.formatter.alignComments": true,
 		"evenBetterToml.formatter.indentEntries": true,
 		"evenBetterToml.formatter.indentTables": true,
-
+		"workbench.editor.customLabels.patterns": {
+			"**/go/pkg/mod/**/*.go": "[go-mod] ${dirname}/${filename}",
+			"**/*.go": "[${dirname(-1)}] ${dirname}/${filename}"
+		},
+		"workbench.editor.customLabels.enabled": true,
 		"workbench.colorCustomizations": {
 			"editorOverviewRuler.errorForeground": "#FF0000",
 			"editorError.background": "#FF000033",
@@ -137,6 +141,9 @@
 		"material-icon-theme.folders.associations": {
 			"dynamo": "database",
 			"mw": "middleware"
+		},
+		"[yaml]": {
+			"editor.defaultFoldingRangeProvider": "MohammadBaqer.better-folding"
 		},
 		"[json]": {
 			"editor.defaultFormatter": "esbenp.prettier-vscode"

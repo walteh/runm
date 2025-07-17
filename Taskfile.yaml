@@ -60,12 +60,19 @@ env:
     GOPRIVATE: github.com/walteh
     DOCKER_BUILDKIT: 1
     PAGER: less
-    # DEBUG_CONTAINERD_TEST: 1
+    DEBUG_CONTAINERD_TEST: 1
     # DEBUG_NERDCTL_TEST: 1
     DEBUG_CONTAINERD_SHIM_RUNM_V2_TEST:
         sh: mkdir -p /tmp/tcontainerd-fs-env && echo '1' | tee /tmp/tcontainerd-fs-env/DEBUG_CONTAINERD_SHIM_RUNM_V2_TEST
 
 tasks:
+    #=================================================================================
+    #=================================================================================
+    #=================================================================================
+    #region MISC
+    #=================================================================================
+    #=================================================================================
+    #=================================================================================
     claude:
         desc: runs the claude agent
         vars:
@@ -75,6 +82,40 @@ tasks:
         cmds:
           - cmd: bun install -g @anthropic-ai/claude-code
           - cmd: bun --bun run claude --ide {{.CLI_ARGS}}
+
+    term:
+        desc: opens a terminal in the project root
+        platforms: [darwin]
+        cmds:
+          - cmd: open -a Terminal $(pwd)
+
+    otel:tui:run:
+        desc: runs the otel tui
+        cmds:
+          - cmd: otel-tui
+
+    otel:grafana:run:
+        desc: runs tempo
+        dir: test/integration/grafana
+        cmds:
+          - cmd: docker compose up -d --build --force-recreate --always-recreate-deps --remove-orphans --renew-anon-volumes
+          - cmd: docker compose ps
+
+    zellij:
+        desc: opens zellij
+        platforms: [darwin]
+        cmds:
+          - cmd: zellij --config-dir .zellij
+
+    #endregion
+
+    #=================================================================================
+    #=================================================================================
+    #=================================================================================
+    #region GO
+    #=================================================================================
+    #=================================================================================
+    #=================================================================================
 
     go:tidy:
         run: once
@@ -118,29 +159,15 @@ tasks:
         cmds:
           - cmd: go tool goshim test -function-coverage {{.ARGS}}
 
-    term:
-        desc: opens a terminal in the project root
-        platforms: [darwin]
-        cmds:
-          - cmd: open -a Terminal $(pwd)
+    #endregion
 
-    otel:tui:run:
-        desc: runs the otel tui
-        cmds:
-          - cmd: otel-tui
-
-    otel:grafana:run:
-        desc: runs tempo
-        dir: test/integration/grafana
-        cmds:
-          - cmd: docker compose up -d --build --force-recreate --always-recreate-deps --remove-orphans --renew-anon-volumes
-          - cmd: docker compose ps
-
-    zellij:
-        desc: opens zellij
-        platforms: [darwin]
-        cmds:
-          - cmd: zellij --config-dir .zellij
+    #=================================================================================
+    #=================================================================================
+    #=================================================================================
+    #region GENERATE
+    #=================================================================================
+    #=================================================================================
+    #=================================================================================
 
     gen:all:
         desc: generates all
@@ -232,21 +259,18 @@ tasks:
           - |-
             {{.GO_COMMAND}} tool github.com/bufbuild/buf/cmd/buf generate
 
-    install:bindfs:
-        env:
-            fuse_CFLAGS: "-I/usr/local/include/fuse -D_FILE_OFFSET_BITS=64 -D_DARWIN_C_SOURCE"
-            fuse_LIBS: "-L/usr/local/lib -lfuse-t -pthread"
-        cmds:
-          - git clone https://github.com/mpartel/bindfs.git /tmp/bindfs
-          - defer: rm -rf /tmp/bindfs
-          - cd /tmp/bindfs && ./autogen.sh
-          - cd /tmp/bindfs && ./configure --with-fuse2
-          - cd /tmp/bindfs && make
-          - cd /tmp/bindfs && sudo make install
-          - sudo install_name_tool -add_rpath /usr/local/lib /usr/local/bin/bindfs
+    #endregion
 
-    go-build:*:*:*:
-        label: 'go-build:{{.NAME}}:{{.OS}}:{{.ARCH}}'
+    #=================================================================================
+    #=================================================================================
+    #=================================================================================
+    #region BUILD
+    #=================================================================================
+    #=================================================================================
+    #=================================================================================
+
+    build:go:*:*:*:
+        label: 'build:go:{{.NAME}}:{{.OS}}:{{.ARCH}}'
         requires: {vars: []}
         desc: builds a binary
         vars:
@@ -298,7 +322,7 @@ tasks:
           - cmd: if [ "{{.SYMLINK}}" != "" ]; then ln -laf {{.OUT_DIR}}/{{.NAME}} {{.OUT_DIR}}/{{.SYMLINK}}; fi
             silent: true
 
-    test:binary:nerdctl-test:
+    build:nerdctl-test:
         desc: builds the nerdctl test
         run: once
         sources:
@@ -308,12 +332,12 @@ tasks:
         generates:
           - '{{.TEST_BIN_DIR}}/nerdctl-test'
         cmds:
-          - task: go-build:nerdctl-test:darwin:arm64
+          - task: build:go:nerdctl-test:darwin:arm64
             vars:
                 DEBUG: '1'
                 BIN_DIR: '{{.TEST_BIN_DIR}}'
 
-    test:binary:buildkitd-test:
+    build:buildkitd-test:
         desc: builds the buildkitd test binary
         run: once
         sources:
@@ -323,12 +347,12 @@ tasks:
         generates:
           - '{{.TEST_BIN_DIR}}/buildkitd-test'
         cmds:
-          - task: go-build:buildkitd-test:darwin:arm64
+          - task: build:go:buildkitd-test:darwin:arm64
             vars:
                 DEBUG: '1'
                 BIN_DIR: '{{.TEST_BIN_DIR}}'
 
-    test:binary:containerd-test:
+    build:containerd-test:
         desc: builds the containerd test
         run: once
         sources:
@@ -338,12 +362,12 @@ tasks:
         generates:
           - '{{.TEST_BIN_DIR}}/containerd-test'
         cmds:
-          - task: go-build:containerd-test:darwin:arm64
+          - task: build:go:containerd-test:darwin:arm64
             vars:
                 DEBUG: '1'
                 BIN_DIR: '{{.TEST_BIN_DIR}}'
 
-    test:binary:containerd-shim-runm-v2:
+    build:containerd-shim-runm-v2:
         desc: builds the containerd shim
         run: once
         sources:
@@ -353,13 +377,13 @@ tasks:
         generates:
           - '{{.TEST_BIN_DIR}}/containerd-shim-runm-v2'
         cmds:
-          - task: go-build:containerd-shim-runm-v2:darwin:arm64
+          - task: build:go:containerd-shim-runm-v2:darwin:arm64
             vars:
                 DEBUG: '1'
                 CGO_ENABLED: '1'
                 BIN_DIR: '{{.TEST_BIN_DIR}}'
 
-    test:binary:containerd-shim-runm-v2-test:
+    build:containerd-shim-runm-v2-test:
         desc: builds the containerd shim test
         run: once
         sources:
@@ -369,14 +393,14 @@ tasks:
         generates:
           - '{{.TEST_BIN_DIR}}/containerd-shim-runm-v2-test'
         cmds:
-          - task: go-build:containerd-shim-runm-v2-test:darwin:arm64
+          - task: build:go:containerd-shim-runm-v2-test:darwin:arm64
             vars:
                 DEBUG: '1'
                 CGO_ENABLED: '1'
                 CODESIGN: '1'
                 BIN_DIR: '{{.TEST_BIN_DIR}}'
 
-    test:binary:runm-linux-init:
+    build:runm-linux-init:
         desc: builds the runm-linux-init binary
         run: once
         sources:
@@ -386,13 +410,13 @@ tasks:
         generates:
           - '{{.TEST_BIN_DIR}}/runm-linux-init'
         cmds:
-          - task: go-build:runm-linux-init:linux:arm64
+          - task: build:go:runm-linux-init:linux:arm64
             vars:
                 DEBUG: '1'
                 STATIC: '1'
                 BIN_DIR: '{{.TEST_BIN_DIR}}'
 
-    test:binary:runm-linux-host-fork-exec-proxy:
+    build:runm-linux-host-fork-exec-proxy:
         desc: builds the runm-linux-host-fork-exec-proxy binary
         run: once
         sources:
@@ -400,13 +424,13 @@ tasks:
         generates:
           - '{{.TEST_BIN_DIR}}/runm-linux-host-fork-exec-proxy'
         cmds:
-          - task: go-build:runm-linux-host-fork-exec-proxy:linux:arm64
+          - task: build:go:runm-linux-host-fork-exec-proxy:linux:arm64
             vars:
                 DEBUG: '1'
                 STATIC: '1'
                 BIN_DIR: '{{.TEST_BIN_DIR}}'
 
-    test:binary:runm-linux-mounter:
+    build:runm-linux-mounter:
         desc: builds the runm-linux-mounter binary
         run: once
         sources:
@@ -414,13 +438,13 @@ tasks:
         generates:
           - '{{.TEST_BIN_DIR}}/runm-linux-mounter'
         cmds:
-          - task: go-build:runm-linux-mounter:linux:arm64
+          - task: build:go:runm-linux-mounter:linux:arm64
             vars:
                 DEBUG: '1'
                 STATIC: '1'
                 BIN_DIR: '{{.TEST_BIN_DIR}}'
 
-    test:binary:runc-test:
+    build:runc-test:
         desc: builds the runc binary
         run: once
         sources:
@@ -433,7 +457,7 @@ tasks:
             GIT_COMMIT:
                 sh: git rev-parse HEAD
         cmds:
-          - task: go-build:runc-test:linux:arm64
+          - task: build:go:runc-test:linux:arm64
             vars:
                 DEBUG: '1'
                 STATIC: '1'
@@ -443,7 +467,7 @@ tasks:
                 CGO_ENABLED: 1
                 BIN_DIR: '{{.TEST_BIN_DIR}}'
 
-    test:binary:busybox:
+    build:busybox:
         desc: builds the busybox binary
         run: once
         sources:
@@ -459,47 +483,192 @@ tasks:
                     --output=type=local,dest={{.TEST_BIN_DIR}} \
                     ./linux/initramfs
 
-    test:binaries:
+    build:all-test-binaries:
         run: once
         deps:
-          - test:binary:containerd-test
-          - test:binary:nerdctl-test
-          - test:binary:runc-test
-          - test:binary:containerd-shim-runm-v2-test
-          - test:binary:runm-linux-init
-          - test:binary:runm-linux-host-fork-exec-proxy
-          - test:binary:runm-linux-mounter
-          - test:binary:busybox
-          - test:binary:buildkitd-test
+          - build:containerd-test
+          - build:nerdctl-test
+          - build:runc-test
+          - build:containerd-shim-runm-v2-test
+          - build:runm-linux-init
+          - build:runm-linux-host-fork-exec-proxy
+          - build:runm-linux-mounter
+          - build:busybox
+          - build:buildkitd-test
         desc: builds all test binaries
 
-    dev:kill-process:*:
-        label: 'dev:kill-process:{{.NAME}}'
-        # internal: true
-        desc: kills a process
-        vars:
-            NAME: '{{index .MATCH 0}}'
-        status:
-          - ps aux | grep | grep -qv {{.NAME}}
-        cmds:
-          - defer: '{{if .EXIT_CODE}}echo "{{.TASK_NAME}} exited with code {{.EXIT_CODE}}!"{{end}}'
-            silent: true
-          - cmd: sudo -A pkill -f {{.NAME}} || true
-            silent: true
-          - cmd: sudo -A killall -9 {{.NAME}} || true
-            silent: true
+    #endregion
 
-    test:cleanup-running-shims:
+    #=================================================================================
+    #=================================================================================
+    #=================================================================================
+    #region RUN
+    #=================================================================================
+    #=================================================================================
+    #=================================================================================
+    run:containerd-test:
+        desc: runs the shim for 2025-07-01
+        deps:
+          - linux:runtime:all
+          - build:all-test-binaries
+
+        env:
+            SHIM_BINARY_PATH:
+                sh: echo $(pwd)/{{.TEST_BIN_DIR}}/containerd-shim-runm-v2-test
+            LINUX_RUNTIME_DIR:
+                sh: echo $(pwd)/{{.LINUX_RUNTIME_DIR}}
+        cmds:
+          - task: dev:cleanup-running-shims
+          - cmd: |-
+                {{.TEST_BIN_DIR}}/containerd-test
+
+    run:buildkitd-test:
+        desc: runs the buildkitd test
+        deps:
+          - linux:runtime:all
+          - build:all-test-binaries
+        cmds:
+          - cmd: |-
+                {{.SUDO_CMD}} {{.TEST_BIN_DIR}}/buildkitd-test
+
+    run:containerd-test:pipe-to-file:
+        desc: runs the shim for 2025-07-01
+        deps:
+          - linux:runtime:all
+          - build:all-test-binaries
+        env:
+            SHIM_BINARY_PATH:
+                sh: echo $(pwd)/{{.TEST_BIN_DIR}}/containerd-shim-runm-v2-test
+            LINUX_RUNTIME_DIR:
+                sh: echo $(pwd)/{{.LINUX_RUNTIME_DIR}}
+        vars:
+            FILE: '{{.CLI_ARGS | default "./.logs/containerd-test-pipe-to-file.log"}}'
+        cmds:
+          - task: dev:cleanup-running-shims
+          - cmd: |-
+                {{.SUDO_CMD}} {{.TEST_BIN_DIR}}/containerd-test > {{.FILE}}
+
+    #endregion run
+
+    #=================================================================================
+    #=================================================================================
+    #=================================================================================
+    #region RUN:NERDCTL-TEST
+    #=================================================================================
+
+    run:nerdctl-test:rm-all-running-containers:
         desc: kills all running containers
         run: once
         cmds:
-          - task: dev:kill-process:containerd-shim-runm-v2-test
-          - task: dev:kill-process:containerd-shim-runc-v2
-          - task: dev:kill-process:nerdctl-test
+          - cmd: |-
+                {{.NERDCTL_CMD}} ps -q | xargs -I {} {{.NERDCTL_CMD}} rm -f {}
+
+    run:nerdctl-test:kill:
+        desc: kills a running container
+        deps: ['build:nerdctl-test', 'build:containerd-shim-runm-v2-test']
+        requires: {vars: [CONTAINER_ID]}
+        vars:
+            CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
+            PRETTY_FORMAT: '{{.STDOUT_FILE | empty | ternary " | bat --language=txt --file-name=nerdctl-kill-stdout" ""}}'
+        cmds:
+          - cmd: |-
+                {{.NERDCTL_CMD}} kill {{.CONTAINER_ID}} {{.PRETTY_FORMAT}}
+
+    run:nerdctl-test:run:
+        desc: runs the nerdctl test
+        deps: ['build:nerdctl-test', 'build:containerd-shim-runm-v2-test']
+        vars:
+            TIMEOUT: '{{.TIMEOUT | empty | ternary "" "timeout {{.TIMEOUT}}"}}'
+            IMAGE: '{{.IMAGE | default "docker.io/library/alpine:latest"}}'
+            ARGS: '{{.ARGS | default "echo ''hello world!''"}}'
+            FLAGS: '{{.FLAGS | default ""}}'
+            STDOUT_FILE_PIPE: '{{.STDOUT_FILE | empty | ternary "" ">"}}'
+            STATIC_FLAGS: '--platform=linux/arm64 --network=host --runtime=containerd.shim.runc.v2 --pull=missing'
+        # env:
+        # DEBUG_NERDCTL_TEST: '12348'
+        cmds:
+          - cmd: |-
+                {{.TIMEOUT}} {{.NERDCTL_CMD}} run {{.STATIC_FLAGS}} {{.FLAGS}} {{.IMAGE}} {{.ARGS}} {{.STDOUT_FILE_PIPE}} {{.STDOUT_FILE}}
+
+    run:nerdctl-test:exec:
+        desc: executes a command in a running container
+        deps: ['build:nerdctl-test', 'build:containerd-shim-runm-v2-test']
+        requires: {vars: [CONTAINER_ID]}
+        vars:
+            TIMEOUT: '{{.TIMEOUT | default ""}}'
+            TIMEOUT_CMD: '{{.TIMEOUT | empty | ternary "" "timeout"}}'
+            CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
+            COMMAND: '{{.COMMAND | default "sh"}}'
+            FLAGS: '{{.FLAGS | default "-it"}}'
+            PRETTY_FORMAT: |-
+                {{.STDOUT_FILE | empty | ternary " | bat --language=txt --file-name=nerdctl-exec-stdout" ""}}
+
+        # interactive: true
+        cmds:
+          - cmd: |-
+                {{.TIMEOUT_CMD}} {{.TIMEOUT}} {{.NERDCTL_CMD}} exec {{.FLAGS}} {{.CONTAINER_ID}} {{.COMMAND}} {{.PRETTY_FORMAT}}
+
+    run:nerdctl-test:stop:
+        desc: stops a running container
+        deps: ['build:nerdctl-test', 'build:containerd-shim-runm-v2-test']
+        requires: {vars: [CONTAINER_ID]}
+        vars:
+            TIMEOUT: '{{.TIMEOUT | empty | ternary "" "timeout {{.TIMEOUT}}"}}'
+            CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
+        cmds:
+          - cmd: |-
+                {{.TIMEOUT}} {{.NERDCTL_CMD}} stop {{.FLAGS}} {{.CONTAINER_ID}}
+
+    run:nerdctl-test:rm:
+        desc: deletes a container
+        deps: ['build:nerdctl-test']
+        requires: {vars: [CONTAINER_ID]}
+        vars:
+            CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
+            FLAGS: '{{.FLAGS | default "-f"}}'
+        cmds:
+          - cmd: |-
+                {{.NERDCTL_CMD}} rm {{.FLAGS}} {{.CONTAINER_ID}}
+
+    run:nerdctl-test:ps:
+        desc: lists running containers
+        deps: ['build:nerdctl-test']
+        vars:
+            FLAGS: '{{.FLAGS | default ""}}'
+            STDOUT_FILE: '{{.STDOUT_FILE | default ""}}'
+            STDOUT_FILE_PIPE: '{{.STDOUT_FILE | empty | ternary "" ">"}}'
+            PRETTY_FORMAT: '{{.STDOUT_FILE | empty | ternary " | bat --language=txt --file-name=nerdctl-ps-stdout" ""}}'
+        cmds:
+          - cmd: |-
+                {{.NERDCTL_CMD}} ps {{.FLAGS}} {{.STDOUT_FILE_PIPE}} {{.STDOUT_FILE}} {{.PRETTY_FORMAT}}
+
+    run:nerdctl-test:ps:ensure-container:
+        desc: ensures a container is running
+        deps: ['build:nerdctl-test']
+        vars:
+            FLAGS: '{{.FLAGS | default ""}}'
+            CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
+            STATUS: '{{.STATUS | default "Up"}}'
+        cmds:
+          - cmd: |-
+                {{.NERDCTL_CMD}} ps {{.FLAGS}} | grep $(echo {{.CONTAINER_ID}} | cut -c1-12)  | grep {{.STATUS}} > /dev/null || (echo "container not found in ps output" && exit 1)
+            silent: true
+
+    #endregion
+
+    #=================================================================================
+    #=================================================================================
+    #=================================================================================
+    #region LINUX:RUNTIME
+    #=================================================================================
+
+    linux:runtime:all:
+        desc: builds the linux runtime
+        deps: ['linux:runtime:kernel', 'linux:runtime:initramfs', 'linux:runtime:mbins']
 
     linux:runtime:mbins:
         desc: builds the mbin squashfs
-        deps: ['test:binaries']
+        deps: ['build:all-test-binaries']
         run: once
         sources:
           - '{{.TEST_BIN_DIR}}/runm-linux-init'
@@ -529,7 +698,7 @@ tasks:
     linux:runtime:initramfs:
         desc: builds the initramfs
         run: once
-        deps: ['test:binaries']
+        deps: ['build:all-test-binaries']
         sources:
           - '{{.TEST_BIN_DIR}}/busybox'
           - '{{.TEST_BIN_DIR}}/runm-linux-mounter'
@@ -576,291 +745,13 @@ tasks:
           - cmd: mv -f {{.TMP_DIR}}/* {{.LINUX_RUNTIME_DIR}}
             silent: true
 
-    test:linux:runtime:
-        desc: builds the linux runtime
-        deps: ['test:binaries', 'linux:runtime:kernel', 'linux:runtime:initramfs', 'linux:runtime:mbins']
+    #endregion linux:runtime
 
-    dev:nerdctl-test:rm-all-running-containers:
-        desc: kills all running containers
-        run: once
-        cmds:
-          - cmd: |-
-                {{.NERDCTL_CMD}} ps -q | xargs -I {} {{.NERDCTL_CMD}} rm -f {}
-
-    dev:nerdctl-test:kill:
-        desc: kills a running container
-        deps: ['test:binary:nerdctl-test', 'test:binary:containerd-shim-runm-v2-test']
-        requires: {vars: [CONTAINER_ID]}
-        vars:
-            CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
-            PRETTY_FORMAT: '{{.STDOUT_FILE | empty | ternary " | bat --language=txt --file-name=nerdctl-kill-stdout" ""}}'
-        cmds:
-          - cmd: |-
-                {{.NERDCTL_CMD}} kill {{.CONTAINER_ID}} {{.PRETTY_FORMAT}}
-
-    dev:nerdctl-test:run:
-        desc: runs the nerdctl test
-        deps: ['test:binary:nerdctl-test', 'test:binary:containerd-shim-runm-v2-test']
-        vars:
-            TIMEOUT: '{{.TIMEOUT | empty | ternary "" "timeout {{.TIMEOUT}}"}}'
-            IMAGE: '{{.IMAGE | default "docker.io/library/alpine:latest"}}'
-            ARGS: '{{.ARGS | default "echo ''hello world!''"}}'
-            FLAGS: '{{.FLAGS | default ""}}'
-            STDOUT_FILE_PIPE: '{{.STDOUT_FILE | empty | ternary "" ">"}}'
-            STATIC_FLAGS: '--platform=linux/arm64 --network=host --runtime=containerd.shim.runc.v2 --pull=missing'
-        # env:
-        # DEBUG_NERDCTL_TEST: '12348'
-        cmds:
-          - cmd: |-
-                {{.TIMEOUT}} {{.NERDCTL_CMD}} run {{.STATIC_FLAGS}} {{.FLAGS}} {{.IMAGE}} {{.ARGS}} {{.STDOUT_FILE_PIPE}} {{.STDOUT_FILE}}
-
-    dev:nerdctl-test:exec:
-        desc: executes a command in a running container
-        deps: ['test:binary:nerdctl-test', 'test:binary:containerd-shim-runm-v2-test']
-        requires: {vars: [CONTAINER_ID]}
-        vars:
-            TIMEOUT: '{{.TIMEOUT | default ""}}'
-            TIMEOUT_CMD: '{{.TIMEOUT | empty | ternary "" "timeout"}}'
-            CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
-            COMMAND: '{{.COMMAND | default "sh"}}'
-            FLAGS: '{{.FLAGS | default "-it"}}'
-            PRETTY_FORMAT: |-
-                {{.STDOUT_FILE | empty | ternary " | bat --language=txt --file-name=nerdctl-exec-stdout" ""}}
-
-        # interactive: true
-        cmds:
-          - cmd: |-
-                {{.TIMEOUT_CMD}} {{.TIMEOUT}} {{.NERDCTL_CMD}} exec {{.FLAGS}} {{.CONTAINER_ID}} {{.COMMAND}} {{.PRETTY_FORMAT}}
-
-    dev:pty-resize-test:
-        desc: Test PTY resize functionality using custom PTY environment
-        aliases: [pty-resize-test]
-        deps: ['test:linux:runtime', 'test:binaries']
-
-        vars:
-            CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
-            FLAGS: '{{.FLAGS | default "-it"}}'
-            TIMEOUT: '{{.TIMEOUT | default ""}}'
-            TIMEOUT_CMD: '{{.TIMEOUT | empty | ternary "" "timeout"}}'
-            SEQUENCE: '{{.SEQUENCE | default "22x55@0s,81x230@2s,100x300@2s,120x400@2s,82x290@2s"}}'
-
-            COMMAND_TO_RUN:
-                sh: |-
-                    go tool pty-resize-test {{.SEQUENCE}} -generate-shell-script
-            BASE_CMD: |-
-                {{.TIMEOUT_CMD}} {{.TIMEOUT}} {{.TEST_BIN_DIR}}/nerdctl-test exec {{.FLAGS}} {{.CONTAINER_ID}} sh -c '{{.COMMAND_TO_RUN}}'
-            PTY_RESIZE_TEST_CMD: |-
-                go tool pty-resize-test {{.SEQUENCE}} {{.BASE_CMD}}
-
-        cmds:
-          - task: dev:nerdctl-test:rm-all-running-containers
-          - cmd: >-
-                {{.SUDO_CMD}} {{.PTY_RESIZE_TEST_CMD}}
-
-    # dev:nerdctl-test:exec:debug-pty:
-    #     desc: executes a command in a running container
-    #     deps: ['test:binary:nerdctl-test', 'test:binary:containerd-shim-runm-v2-test']
-    #     requires: {vars: [CONTAINER_ID]}
-    #     interactive: true
-    #     vars:
-    #         TIMEOUT: '{{.TIMEOUT | default ""}}'
-    #         TIMEOUT_CMD: '{{.TIMEOUT | empty | ternary "" "timeout"}}'
-    #         CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
-    #         COMMAND: '{{.COMMAND | default "sh"}}'
-    #         FLAGS: '{{.FLAGS | default "-it"}}'
-    #         TMP_DIR:
-    #             sh: mktemp -d -t runm-nerdctl-test-exec-debug-pty-XXXXXX
-    #         RC_0: |-
-    #             {{.TIMEOUT_CMD}} {{.TIMEOUT}} {{.TEST_BIN_DIR}}/nerdctl-test exec {{.FLAGS}} {{.CONTAINER_ID}} {{.COMMAND}}
-
-    #         RC_1: |-
-    #             unbuffer -p {{.RC_0}}
-
-    #         RC_2: |-
-    #             script -F -k -e {{.TMP_DIR}}/terminal_capture_2.log tty && {{.RC_0}}
-
-    #         RC_3: |-
-    #             go tool interceptty --debug --raw {{.RC_0}}
-    #         PTY_RESIZE_TEST_CMD: |-
-    #             go tool pty-resize-test -start-width={{.START_WIDTH}} -start-height={{.START_HEIGHT}} -end-width={{.END_WIDTH}}
-    #             -end-height={{.END_HEIGHT}} -delay={{.DELAY}} {{if .SEQUENCE}}-sequence="{{.SEQUENCE}}"{{end}}
-
-    #     # interactive: true
-    #     cmds:
-    #       - defer: 'rm -rf {{.TMP_DIR}}'
-    #         silent: true
-    #       - cmd: |-
-    #             go tool pty-resize-test -start-width={{.START_WIDTH}} -start-height={{.START_HEIGHT}} -end-width={{.END_WIDTH}}
-    #             -end-height={{.END_HEIGHT}} -delay={{.DELAY}} {{if .SEQUENCE}}-sequence="{{.SEQUENCE}}"{{end}}
-    #         #   - cmd: sudo -A -E {{.RC_0}} 2>&1 | tee {{.TMP_DIR}}/terminal_capture_0.log
-    #         #   - cmd: sudo -A -E {{.RC_1}} 2>&1 | tee {{.TMP_DIR}}/terminal_capture_1.log
-    #         #   - cmd: sudo -A -E {{.RC_2}}
-    #         #   - cmd: sudo -A -E hexdump -C {{.TMP_DIR}}/terminal_capture_0.log
-    #         #   - cmd: sudo -A -E hexdump -C {{.TMP_DIR}}/terminal_capture_1.log
-    #         #   - cmd: sudo -A -E hexdump -C {{.TMP_DIR}}/terminal_capture_2.log
-
-    dev:nerdctl-test:stop:
-        desc: stops a running container
-        deps: ['test:binary:nerdctl-test', 'test:binary:containerd-shim-runm-v2-test']
-        requires: {vars: [CONTAINER_ID]}
-        vars:
-            TIMEOUT: '{{.TIMEOUT | empty | ternary "" "timeout {{.TIMEOUT}}"}}'
-            CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
-        cmds:
-          - cmd: |-
-                {{.TIMEOUT}} {{.NERDCTL_CMD}} stop {{.FLAGS}} {{.CONTAINER_ID}}
-
-    dev:nerdctl-test:rm:
-        desc: deletes a container
-        deps: ['test:binary:nerdctl-test']
-        requires: {vars: [CONTAINER_ID]}
-        vars:
-            CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
-            FLAGS: '{{.FLAGS | default "-f"}}'
-        cmds:
-          - cmd: |-
-                {{.NERDCTL_CMD}} rm {{.FLAGS}} {{.CONTAINER_ID}}
-
-    dev:nerdctl-test:ps:
-        desc: lists running containers
-        deps: ['test:binary:nerdctl-test']
-        vars:
-            FLAGS: '{{.FLAGS | default ""}}'
-            STDOUT_FILE: '{{.STDOUT_FILE | default ""}}'
-            STDOUT_FILE_PIPE: '{{.STDOUT_FILE | empty | ternary "" ">"}}'
-            PRETTY_FORMAT: '{{.STDOUT_FILE | empty | ternary " | bat --language=txt --file-name=nerdctl-ps-stdout" ""}}'
-        cmds:
-          - cmd: |-
-                {{.NERDCTL_CMD}} ps {{.FLAGS}} {{.STDOUT_FILE_PIPE}} {{.STDOUT_FILE}} {{.PRETTY_FORMAT}}
-
-    dev:nerdctl-test:ps:ensure-container:
-        desc: ensures a container is running
-        deps: ['test:binary:nerdctl-test']
-        vars:
-            FLAGS: '{{.FLAGS | default ""}}'
-            CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
-            STATUS: '{{.STATUS | default "Up"}}'
-        cmds:
-          - cmd: |-
-                {{.NERDCTL_CMD}} ps {{.FLAGS}} | grep $(echo {{.CONTAINER_ID}} | cut -c1-12)  | grep {{.STATUS}} > /dev/null || (echo "container not found in ps output" && exit 1)
-            silent: true
-
-    dev:2025-06-18:01:
-        desc: runs the shim for 2025-06-18 - bun version from entrypoint
-        deps: ['test:linux:runtime']
-        vars:
-            TEST_SCENARIO_DIR:
-                sh: realpath ./test/integration/scenarios/2025-07-02
-        cmds:
-          - task: test:cleanup-running-shims
-          - task: dev:nerdctl-test:run
-            vars:
-                FLAGS: '-rm'
-                IMAGE: 'docker.io/oven/bun:alpine'
-                ARGS: |-
-                    --version
-
-    dev:2025-07-02:01:
-        desc: runs the shim for 2025-07-02 - complex TypeScript compilation and execution
-        deps: ['test:linux:runtime']
-        vars:
-            TEST_SCENARIO_DIR:
-                sh: realpath ./test/integration/scenarios/2025-07-02
-        cmds:
-          - task: test:cleanup-running-shims
-          - task: dev:nerdctl-test:run
-            vars:
-                IMAGE: 'docker.io/oven/bun:alpine'
-                FLAGS: '--rm --workdir=/app --mount=type=bind,src={{.TEST_SCENARIO_DIR}},dst=/app,ro=true'
-                ARGS: |-
-                    sh -c "cat '/proc/self/mountinfo' && echo '📦 Installing dependencies...' && \
-                    bun install --verbose && echo '🧪 Running tests...' && \
-                    bun test && echo '🔨 Building project...' && \
-                    bun run build && echo '🏃 Running compiled app...' && \
-                    bun run start"
-
-    dev:2025-07-05:01:
-        desc: runs the shim for 2025-07-05 - detached mode
-        deps: ['test:linux:runtime', 'test:binaries']
-        # interactive: true
-        vars:
-            TMP_DIR:
-                sh: mktemp -d -t runm-2025-07-05-XXXXXX
-        cmds:
-          - defer: 'rm -rf {{.TMP_DIR}}'
-            silent: true
-          - task: dev:nerdctl-test:rm-all-running-containers
-          - task: dev:nerdctl-test:run
-            vars:
-                FLAGS: '-d'
-                IMAGE: 'docker.io/library/alpine:latest'
-                STDOUT_FILE: '{{.TMP_DIR}}/stdout.txt'
-                ARGS: |-
-                    sh -c 'echo "Container PID 1: $$"; ps aux; sleep 300'
-          - cmd: bat {{.TMP_DIR}}/stdout.txt
-            silent: true
-          - task: dev:nerdctl-test:ps
-          - task: dev:nerdctl-test:ps:ensure-container
-            vars:
-                CONTAINER_ID:
-                    sh: cat {{.TMP_DIR}}/stdout.txt
-                STATUS: 'Up'
-          - task: dev:pty-resize-test
-            vars:
-                COMMAND: 'echo "hello world! this is a test"'
-                CONTAINER_ID:
-                    sh: cat {{.TMP_DIR}}/stdout.txt
-                FLAGS: '--tty'
-          - task: dev:nerdctl-test:exec
-            vars:
-                COMMAND: 'echo "hello world! this is a test"'
-                CONTAINER_ID:
-                    sh: cat {{.TMP_DIR}}/stdout.txt
-                FLAGS: '--tty'
-
-          - task: dev:nerdctl-test:rm
-            vars:
-                CONTAINER_ID:
-                    sh: cat {{.TMP_DIR}}/stdout.txt
-
-          - task: dev:nerdctl-test:ps
-
-    dev:containerd-test:
-        desc: runs the shim for 2025-07-01
-        deps:
-          - test:linux:runtime
-          - test:binaries
-        env:
-            SHIM_BINARY_PATH:
-                sh: echo $(pwd)/{{.TEST_BIN_DIR}}/containerd-shim-runm-v2-test
-            LINUX_RUNTIME_DIR:
-                sh: echo $(pwd)/{{.LINUX_RUNTIME_DIR}}
-        cmds:
-          - task: test:cleanup-running-shims
-          - cmd: |-
-                {{.TEST_BIN_DIR}}/containerd-test
-
-    dev:containerd-test:pipe-to-file:
-        desc: runs the shim for 2025-07-01
-        deps:
-          - test:linux:runtime
-          - test:binaries
-        env:
-            SHIM_BINARY_PATH:
-                sh: echo $(pwd)/{{.TEST_BIN_DIR}}/containerd-shim-runm-v2-test
-            LINUX_RUNTIME_DIR:
-                sh: echo $(pwd)/{{.LINUX_RUNTIME_DIR}}
-        vars:
-            FILE: '{{.CLI_ARGS | default "./.logs/containerd-test-pipe-to-file.log"}}'
-        cmds:
-          - task: test:cleanup-running-shims
-          - cmd: |-
-                {{.SUDO_CMD}} {{.TEST_BIN_DIR}}/containerd-test > {{.FILE}}
-
-    setup:
-        desc: sets up the environment
-        cmds:
-          - task: fork:sync
+    #=================================================================================
+    #=================================================================================
+    #=================================================================================
+    #region FORKS
+    #=================================================================================
 
     fork:sync:*:
         desc: syncs the forks
@@ -892,49 +783,64 @@ tasks:
                 BRANCH: '{{.ITEM.branch}}'
                 UPSTREAM: '{{.ITEM.upstream}}'
 
-    signoz:git:
-        desc: sets up the git repository for the signoz agent
+    #endregion fork:sync
+
+    #=================================================================================
+    #=================================================================================
+    #=================================================================================
+    #region DEV
+    #=================================================================================
+
+    dev:kill-process:*:
+        label: 'dev:kill-process:{{.NAME}}'
+        # internal: true
+        desc: kills a process
         vars:
-            DIR: ./gen/build/signoz-standalone/signoz
+            NAME: '{{index .MATCH 0}}'
         status:
-          - test -d {{.DIR}}/.git.sub
+          - ps aux | grep | grep -qv {{.NAME}}
         cmds:
-          - cmd: rm -rf {{.DIR}}
-          - cmd: mkdir -p {{.DIR}}
-          - cmd: git clone -b main https://github.com/SigNoz/signoz.git {{.DIR}} --depth 1;
-          - cmd: mv -f {{.DIR}}/.git {{.DIR}}/.git.sub
+          - defer: '{{if .EXIT_CODE}}echo "{{.TASK_NAME}} exited with code {{.EXIT_CODE}}!"{{end}}'
+            silent: true
+          - cmd: sudo -A pkill -f {{.NAME}} || true
+            silent: true
+          - cmd: sudo -A killall -9 {{.NAME}} || true
+            silent: true
 
-    signoz:stop:
-        desc: kills all signoz processes
-        dir: ./gen/build/signoz-standalone/signoz
-        status:
-          - test -d ./deploy/docker
-          - cd ./deploy/docker && docker compose ps | grep -vqz signoz
+    dev:cleanup-running-shims:
+        desc: kills all running containers
+        run: once
         cmds:
-          - cmd: cd ./deploy/docker && docker compose down -v
+          - task: dev:kill-process:containerd-shim-runm-v2-test
+          - task: dev:kill-process:containerd-shim-runc-v2
+          - task: dev:kill-process:nerdctl-test
 
-    signoz:start:
-        desc: starts the signoz agent
-        dir: ./gen/build/signoz-standalone/signoz
+    dev:2025-06-18:01:
+        desc: runs the shim for 2025-06-18 - bun version from entrypoint
+        deps: ['linux:runtime:all']
+        vars:
+            TEST_SCENARIO_DIR:
+                sh: realpath ./test/integration/scenarios/2025-07-02
         cmds:
-          - task: signoz:git
-          - task: signoz:stop
-          - cmd: git --git-dir=.git.sub pull
-          - cmd: cd ./deploy && sudo -A ./install.sh
-            # go build -tags="netgo osusergo" -ldflags="-extldflags=-static -X main.gitCommit=81e1ea710f323d9310dfd85b731e894184e1bcbd" -o ./gen/build/linux_binaries_arm64/runc-test ./test/integration/cmd/runc-test
-            #  go build -tags="netgo osusergo" -ldflags="-compressdwarf=false -X main.gitCommit=81e1ea710f323d9310dfd85b731e894184e1bcbd -extldflags=-static " -gcflags="all=-N -l" -buildmode=default -o ./gen/build/linux_arm64_binaries/runc-test ./test/integration/cmd/runc-test
+          - task: dev:cleanup-running-shims
+          - task: run:nerdctl-test:run
+            vars:
+                FLAGS: '-rm'
+                IMAGE: 'docker.io/oven/bun:alpine'
+                ARGS: |-
+                    --version
 
     dev:2025-07-12:01:
         desc: runs the nerd fonts patcher
-        deps: ['test:linux:runtime', 'test:binaries']
+        deps: ['linux:runtime:all', 'build:all-test-binaries']
         interactive: true
         vars:
             TMP_DIR:
                 sh: mktemp -d -t runm-2025-07-12-XXXXXX
         cmds:
           - cmd: mkdir -p ./tmp/fonts-raw/origin ./tmp/fonts-patched
-          - task: dev:nerdctl-test:rm-all-running-containers
-          - task: dev:nerdctl-test:run
+          - task: run:nerdctl-test:rm-all-running-containers
+          - task: run:nerdctl-test:run
             vars:
                 IMAGE: 'docker.io/nerdfonts/patcher:latest'
                 FLAGS: |-
@@ -957,9 +863,9 @@ tasks:
                     --material \
                     --weather
 
-    dev:compare-nerdctl-docker:
+    dev:compare-nerdctl-docker:single:
         desc: compares the nerdctl and docker commands
-        deps: ['test:linux:runtime', 'test:binaries']
+        deps: ['linux:runtime:all', 'build:all-test-binaries']
         requires: {vars: [CMD, VOLUME_FLAGS, IMAGE]}
         interactive: true
         vars:
@@ -989,9 +895,9 @@ tasks:
                 echo -e ""
             # silent: true
 
-    dev:2025-07-12:02:
+    dev:compare-nerdctl-docker:nerd-fonts-patcher:
         desc: runs the nerd fonts patcher
-        deps: ['test:linux:runtime', 'test:binaries']
+        deps: ['linux:runtime:all', 'build:all-test-binaries']
         vars:
             COMMANDS:
               - cmd: |-
@@ -1017,3 +923,99 @@ tasks:
 
                 # Check Python path and modules
 
+    dev:pty-resize-test:
+        desc: Test PTY resize functionality using custom PTY environment
+        aliases: [pty-resize-test]
+        deps: ['linux:runtime:all', 'build:all-test-binaries']
+
+        vars:
+            CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
+            FLAGS: '{{.FLAGS | default "-it"}}'
+            TIMEOUT: '{{.TIMEOUT | default ""}}'
+            TIMEOUT_CMD: '{{.TIMEOUT | empty | ternary "" "timeout"}}'
+            SEQUENCE: '{{.SEQUENCE | default "22x55@0s,81x230@2s,100x300@2s,120x400@2s,82x290@2s"}}'
+
+            COMMAND_TO_RUN:
+                sh: |-
+                    go tool pty-resize-test {{.SEQUENCE}} -generate-shell-script
+            BASE_CMD: |-
+                {{.TIMEOUT_CMD}} {{.TIMEOUT}} {{.TEST_BIN_DIR}}/nerdctl-test exec {{.FLAGS}} {{.CONTAINER_ID}} sh -c '{{.COMMAND_TO_RUN}}'
+            PTY_RESIZE_TEST_CMD: |-
+                go tool pty-resize-test {{.SEQUENCE}} {{.BASE_CMD}}
+
+        cmds:
+          - task: run:nerdctl-test:rm-all-running-containers
+          - cmd: >-
+                {{.SUDO_CMD}} {{.PTY_RESIZE_TEST_CMD}}
+
+    dev:2025-07-02:01:
+        desc: runs the shim for 2025-07-02 - complex TypeScript compilation and execution
+        deps: ['linux:runtime:all']
+        vars:
+            TEST_SCENARIO_DIR:
+                sh: realpath ./test/integration/scenarios/2025-07-02
+        cmds:
+          - task: dev:cleanup-running-shims
+          - task: run:nerdctl-test:run
+            vars:
+                IMAGE: 'docker.io/oven/bun:alpine'
+                FLAGS: '--rm --workdir=/app --mount=type=bind,src={{.TEST_SCENARIO_DIR}},dst=/app,ro=true'
+                ARGS: |-
+                    sh -c "cat '/proc/self/mountinfo' && echo '📦 Installing dependencies...' && \
+                    bun install --verbose && echo '🧪 Running tests...' && \
+                    bun test && echo '🔨 Building project...' && \
+                    bun run build && echo '🏃 Running compiled app...' && \
+                    bun run start"
+
+    dev:2025-07-05:01:
+        desc: runs the shim for 2025-07-05 - detached mode
+        deps: ['linux:runtime:all', 'build:all-test-binaries']
+        # interactive: true
+        vars:
+            TMP_DIR:
+                sh: mktemp -d -t runm-2025-07-05-XXXXXX
+        cmds:
+          - defer: 'rm -rf {{.TMP_DIR}}'
+            silent: true
+          - task: run:nerdctl-test:rm-all-running-containers
+          - task: run:nerdctl-test:run
+            vars:
+                FLAGS: '-d'
+                IMAGE: 'docker.io/library/alpine:latest'
+                STDOUT_FILE: '{{.TMP_DIR}}/stdout.txt'
+                ARGS: |-
+                    sh -c 'echo "Container PID 1: $$"; ps aux; sleep 300'
+          - cmd: bat {{.TMP_DIR}}/stdout.txt
+            silent: true
+          - task: run:nerdctl-test:ps
+          - task: run:nerdctl-test:ps:ensure-container
+            vars:
+                CONTAINER_ID:
+                    sh: cat {{.TMP_DIR}}/stdout.txt
+                STATUS: 'Up'
+          - task: dev:pty-resize-test
+            vars:
+                COMMAND: 'echo "hello world! this is a test"'
+                CONTAINER_ID:
+                    sh: cat {{.TMP_DIR}}/stdout.txt
+                FLAGS: '--tty'
+          - task: run:nerdctl-test:exec
+            vars:
+                COMMAND: 'echo "hello world! this is a test"'
+                CONTAINER_ID:
+                    sh: cat {{.TMP_DIR}}/stdout.txt
+                FLAGS: '--tty'
+
+          - task: run:nerdctl-test:rm
+            vars:
+                CONTAINER_ID:
+                    sh: cat {{.TMP_DIR}}/stdout.txt
+
+          - task: run:nerdctl-test:ps
+    #endregion dev
+
+    end-of-file:
+        internal: true
+        desc: end of file
+        cmds:
+          - cmd: echo "end of file"
