@@ -28,7 +28,7 @@ func (s *Server) RuncRun(ctx context.Context, req *runmv1.RuncRunRequest) (*runm
 		return nil, err
 	}
 
-	status, err := s.runtimeExtras.RuncRun(ctx, req.GetId(), req.GetBundle(), opts)
+	status, err := s.runtime.RuncRun(ctx, req.GetId(), req.GetBundle(), opts)
 	if err != nil {
 		return nil, errors.Errorf("running container: %w", err)
 	}
@@ -76,7 +76,7 @@ func (s *Server) Top(ctx context.Context, req *runmv1.RuncTopRequest) (*runmv1.R
 func (s *Server) State(ctx context.Context, req *runmv1.RuncStateRequest) (*runmv1.RuncStateResponse, error) {
 	resp := &runmv1.RuncStateResponse{}
 
-	container, err := s.runtimeExtras.State(ctx, req.GetId())
+	container, err := s.runtime.State(ctx, req.GetId())
 	if err != nil {
 		return nil, errors.Errorf("getting state: %w", err)
 	}

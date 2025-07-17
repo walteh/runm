@@ -16,7 +16,7 @@ replace (
 	github.com/containerd/ttrpc => ../ttrpc
 	github.com/containers/gvisor-tap-vsock => ../gvisor-tap-vsock
 	github.com/opencontainers/runc => ../runc
-	// github.com/moby/buildkit => ../buildkit
+	github.com/moby/buildkit => ../buildkit
 	gitlab.com/tozd/go/errors => ../go-errors
 )
 

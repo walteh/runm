@@ -39,6 +39,7 @@ type RuntimeOptions struct {
 	OciSpec             *oci.Spec
 	Bundle              string
 	HostOtlpPort        uint32
+	PdeathSignal        syscall.Signal
 }
 
 type RuntimeCreator interface {
@@ -119,6 +120,9 @@ type Runtime interface {
 	Ps(ctx context.Context, id string) ([]int, error)
 	ReadPidFile(ctx context.Context, path string) (int, error)
 	SubscribeToReaperExits(ctx context.Context) (<-chan gorunc.Exit, error)
+	State(context.Context, string) (*gorunc.Container, error)
+	RuncRun(context.Context, string, string, *gorunc.CreateOpts) (int, error)
+
 	Close(ctx context.Context) error
 }
 
@@ -182,10 +186,8 @@ type IO interface {
 //go:mock
 type RuntimeExtras interface {
 	// State returns the state of the container for the given id.
-	State(context.Context, string) (*gorunc.Container, error)
 
 	// Run creates and starts a container and returns its pid.
-	RuncRun(context.Context, string, string, *gorunc.CreateOpts) (int, error)
 
 	// Stats returns runtime specific metrics for a container.
 	Stats(context.Context, string) (*gorunc.Stats, error)

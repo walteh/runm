@@ -313,6 +313,21 @@ tasks:
                 DEBUG: '1'
                 BIN_DIR: '{{.TEST_BIN_DIR}}'
 
+    test:binary:buildkitd-test:
+        desc: builds the buildkitd test binary
+        run: once
+        sources:
+          - test/integration/**
+          - ../buildkit/**
+          - pkg/**
+        generates:
+          - '{{.TEST_BIN_DIR}}/buildkitd-test'
+        cmds:
+          - task: go-build:buildkitd-test:darwin:arm64
+            vars:
+                DEBUG: '1'
+                BIN_DIR: '{{.TEST_BIN_DIR}}'
+
     test:binary:containerd-test:
         desc: builds the containerd test
         run: once
@@ -455,6 +470,7 @@ tasks:
           - test:binary:runm-linux-host-fork-exec-proxy
           - test:binary:runm-linux-mounter
           - test:binary:busybox
+          - test:binary:buildkitd-test
         desc: builds all test binaries
 
     dev:kill-process:*:
@@ -1000,3 +1016,4 @@ tasks:
                 IMAGE: docker.io/nerdfonts/patcher:latest
 
                 # Check Python path and modules
+

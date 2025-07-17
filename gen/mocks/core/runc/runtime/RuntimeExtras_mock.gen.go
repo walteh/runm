@@ -29,12 +29,6 @@ var _ runtime.RuntimeExtras = &MockRuntimeExtras{}
 //			ListFunc: func(context1 context.Context) ([]*runc.Container, error) {
 //				panic("mock out the List method")
 //			},
-//			RuncRunFunc: func(context1 context.Context, s string, s1 string, createOpts *runc.CreateOpts) (int, error) {
-//				panic("mock out the RuncRun method")
-//			},
-//			StateFunc: func(context1 context.Context, s string) (*runc.Container, error) {
-//				panic("mock out the State method")
-//			},
 //			StatsFunc: func(context1 context.Context, s string) (*runc.Stats, error) {
 //				panic("mock out the Stats method")
 //			},
@@ -56,12 +50,6 @@ type MockRuntimeExtras struct {
 
 	// ListFunc mocks the List method.
 	ListFunc func(context1 context.Context) ([]*runc.Container, error)
-
-	// RuncRunFunc mocks the RuncRun method.
-	RuncRunFunc func(context1 context.Context, s string, s1 string, createOpts *runc.CreateOpts) (int, error)
-
-	// StateFunc mocks the State method.
-	StateFunc func(context1 context.Context, s string) (*runc.Container, error)
 
 	// StatsFunc mocks the Stats method.
 	StatsFunc func(context1 context.Context, s string) (*runc.Stats, error)
@@ -88,24 +76,6 @@ type MockRuntimeExtras struct {
 			// Context1 is the context1 argument value.
 			Context1 context.Context
 		}
-		// RuncRun holds details about calls to the RuncRun method.
-		RuncRun []struct {
-			// Context1 is the context1 argument value.
-			Context1 context.Context
-			// S is the s argument value.
-			S string
-			// S1 is the s1 argument value.
-			S1 string
-			// CreateOpts is the createOpts argument value.
-			CreateOpts *runc.CreateOpts
-		}
-		// State holds details about calls to the State method.
-		State []struct {
-			// Context1 is the context1 argument value.
-			Context1 context.Context
-			// S is the s argument value.
-			S string
-		}
 		// Stats holds details about calls to the Stats method.
 		Stats []struct {
 			// Context1 is the context1 argument value.
@@ -130,8 +100,6 @@ type MockRuntimeExtras struct {
 	}
 	lockEvents  sync.RWMutex
 	lockList    sync.RWMutex
-	lockRuncRun sync.RWMutex
-	lockState   sync.RWMutex
 	lockStats   sync.RWMutex
 	lockTop     sync.RWMutex
 	lockVersion sync.RWMutex
@@ -206,86 +174,6 @@ func (mock *MockRuntimeExtras) ListCalls() []struct {
 	mock.lockList.RLock()
 	calls = mock.calls.List
 	mock.lockList.RUnlock()
-	return calls
-}
-
-// RuncRun calls RuncRunFunc.
-func (mock *MockRuntimeExtras) RuncRun(context1 context.Context, s string, s1 string, createOpts *runc.CreateOpts) (int, error) {
-	if mock.RuncRunFunc == nil {
-		panic("MockRuntimeExtras.RuncRunFunc: method is nil but RuntimeExtras.RuncRun was just called")
-	}
-	callInfo := struct {
-		Context1   context.Context
-		S          string
-		S1         string
-		CreateOpts *runc.CreateOpts
-	}{
-		Context1:   context1,
-		S:          s,
-		S1:         s1,
-		CreateOpts: createOpts,
-	}
-	mock.lockRuncRun.Lock()
-	mock.calls.RuncRun = append(mock.calls.RuncRun, callInfo)
-	mock.lockRuncRun.Unlock()
-	return mock.RuncRunFunc(context1, s, s1, createOpts)
-}
-
-// RuncRunCalls gets all the calls that were made to RuncRun.
-// Check the length with:
-//
-//	len(mockedRuntimeExtras.RuncRunCalls())
-func (mock *MockRuntimeExtras) RuncRunCalls() []struct {
-	Context1   context.Context
-	S          string
-	S1         string
-	CreateOpts *runc.CreateOpts
-} {
-	var calls []struct {
-		Context1   context.Context
-		S          string
-		S1         string
-		CreateOpts *runc.CreateOpts
-	}
-	mock.lockRuncRun.RLock()
-	calls = mock.calls.RuncRun
-	mock.lockRuncRun.RUnlock()
-	return calls
-}
-
-// State calls StateFunc.
-func (mock *MockRuntimeExtras) State(context1 context.Context, s string) (*runc.Container, error) {
-	if mock.StateFunc == nil {
-		panic("MockRuntimeExtras.StateFunc: method is nil but RuntimeExtras.State was just called")
-	}
-	callInfo := struct {
-		Context1 context.Context
-		S        string
-	}{
-		Context1: context1,
-		S:        s,
-	}
-	mock.lockState.Lock()
-	mock.calls.State = append(mock.calls.State, callInfo)
-	mock.lockState.Unlock()
-	return mock.StateFunc(context1, s)
-}
-
-// StateCalls gets all the calls that were made to State.
-// Check the length with:
-//
-//	len(mockedRuntimeExtras.StateCalls())
-func (mock *MockRuntimeExtras) StateCalls() []struct {
-	Context1 context.Context
-	S        string
-} {
-	var calls []struct {
-		Context1 context.Context
-		S        string
-	}
-	mock.lockState.RLock()
-	calls = mock.calls.State
-	mock.lockState.RUnlock()
 	return calls
 }
 

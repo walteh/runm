@@ -65,8 +65,14 @@ var _ runtime.Runtime = &MockRuntime{}
 //			ResumeFunc: func(ctx context.Context, id string) error {
 //				panic("mock out the Resume method")
 //			},
+//			RuncRunFunc: func(context1 context.Context, s string, s1 string, createOpts *runc.CreateOpts) (int, error) {
+//				panic("mock out the RuncRun method")
+//			},
 //			StartFunc: func(ctx context.Context, id string) error {
 //				panic("mock out the Start method")
+//			},
+//			StateFunc: func(context1 context.Context, s string) (*runc.Container, error) {
+//				panic("mock out the State method")
 //			},
 //			SubscribeToReaperExitsFunc: func(ctx context.Context) (<-chan runc.Exit, error) {
 //				panic("mock out the SubscribeToReaperExits method")
@@ -123,8 +129,14 @@ type MockRuntime struct {
 	// ResumeFunc mocks the Resume method.
 	ResumeFunc func(ctx context.Context, id string) error
 
+	// RuncRunFunc mocks the RuncRun method.
+	RuncRunFunc func(context1 context.Context, s string, s1 string, createOpts *runc.CreateOpts) (int, error)
+
 	// StartFunc mocks the Start method.
 	StartFunc func(ctx context.Context, id string) error
+
+	// StateFunc mocks the State method.
+	StateFunc func(context1 context.Context, s string) (*runc.Container, error)
 
 	// SubscribeToReaperExitsFunc mocks the SubscribeToReaperExits method.
 	SubscribeToReaperExitsFunc func(ctx context.Context) (<-chan runc.Exit, error)
@@ -250,12 +262,30 @@ type MockRuntime struct {
 			// ID is the id argument value.
 			ID string
 		}
+		// RuncRun holds details about calls to the RuncRun method.
+		RuncRun []struct {
+			// Context1 is the context1 argument value.
+			Context1 context.Context
+			// S is the s argument value.
+			S string
+			// S1 is the s1 argument value.
+			S1 string
+			// CreateOpts is the createOpts argument value.
+			CreateOpts *runc.CreateOpts
+		}
 		// Start holds details about calls to the Start method.
 		Start []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// ID is the id argument value.
 			ID string
+		}
+		// State holds details about calls to the State method.
+		State []struct {
+			// Context1 is the context1 argument value.
+			Context1 context.Context
+			// S is the s argument value.
+			S string
 		}
 		// SubscribeToReaperExits holds details about calls to the SubscribeToReaperExits method.
 		SubscribeToReaperExits []struct {
@@ -286,7 +316,9 @@ type MockRuntime struct {
 	lockReadPidFile            sync.RWMutex
 	lockRestore                sync.RWMutex
 	lockResume                 sync.RWMutex
+	lockRuncRun                sync.RWMutex
 	lockStart                  sync.RWMutex
+	lockState                  sync.RWMutex
 	lockSubscribeToReaperExits sync.RWMutex
 	lockUpdate                 sync.RWMutex
 }
@@ -830,6 +862,50 @@ func (mock *MockRuntime) ResumeCalls() []struct {
 	return calls
 }
 
+// RuncRun calls RuncRunFunc.
+func (mock *MockRuntime) RuncRun(context1 context.Context, s string, s1 string, createOpts *runc.CreateOpts) (int, error) {
+	if mock.RuncRunFunc == nil {
+		panic("MockRuntime.RuncRunFunc: method is nil but Runtime.RuncRun was just called")
+	}
+	callInfo := struct {
+		Context1   context.Context
+		S          string
+		S1         string
+		CreateOpts *runc.CreateOpts
+	}{
+		Context1:   context1,
+		S:          s,
+		S1:         s1,
+		CreateOpts: createOpts,
+	}
+	mock.lockRuncRun.Lock()
+	mock.calls.RuncRun = append(mock.calls.RuncRun, callInfo)
+	mock.lockRuncRun.Unlock()
+	return mock.RuncRunFunc(context1, s, s1, createOpts)
+}
+
+// RuncRunCalls gets all the calls that were made to RuncRun.
+// Check the length with:
+//
+//	len(mockedRuntime.RuncRunCalls())
+func (mock *MockRuntime) RuncRunCalls() []struct {
+	Context1   context.Context
+	S          string
+	S1         string
+	CreateOpts *runc.CreateOpts
+} {
+	var calls []struct {
+		Context1   context.Context
+		S          string
+		S1         string
+		CreateOpts *runc.CreateOpts
+	}
+	mock.lockRuncRun.RLock()
+	calls = mock.calls.RuncRun
+	mock.lockRuncRun.RUnlock()
+	return calls
+}
+
 // Start calls StartFunc.
 func (mock *MockRuntime) Start(ctx context.Context, id string) error {
 	if mock.StartFunc == nil {
@@ -863,6 +939,42 @@ func (mock *MockRuntime) StartCalls() []struct {
 	mock.lockStart.RLock()
 	calls = mock.calls.Start
 	mock.lockStart.RUnlock()
+	return calls
+}
+
+// State calls StateFunc.
+func (mock *MockRuntime) State(context1 context.Context, s string) (*runc.Container, error) {
+	if mock.StateFunc == nil {
+		panic("MockRuntime.StateFunc: method is nil but Runtime.State was just called")
+	}
+	callInfo := struct {
+		Context1 context.Context
+		S        string
+	}{
+		Context1: context1,
+		S:        s,
+	}
+	mock.lockState.Lock()
+	mock.calls.State = append(mock.calls.State, callInfo)
+	mock.lockState.Unlock()
+	return mock.StateFunc(context1, s)
+}
+
+// StateCalls gets all the calls that were made to State.
+// Check the length with:
+//
+//	len(mockedRuntime.StateCalls())
+func (mock *MockRuntime) StateCalls() []struct {
+	Context1 context.Context
+	S        string
+} {
+	var calls []struct {
+		Context1 context.Context
+		S        string
+	}
+	mock.lockState.RLock()
+	calls = mock.calls.State
+	mock.lockState.RUnlock()
 	return calls
 }
 
