@@ -31,10 +31,11 @@ func PersistentWorkDir() string        { return globalPersistentWorkDir }
 func FsEnvDir() string                 { return globalFsEnvDir }
 func ContainerdConfigTomlPath() string { return filepath.Join(WorkDir(), "containerd.toml") }
 func NerdctlConfigTomlPath() string    { return filepath.Join(WorkDir(), "nerdctl.toml") }
+func BuildkitdConfigTomlPath() string  { return filepath.Join(WorkDir(), "buildkitd.toml") }
 func NerdctlCNINetConfPath() string    { return filepath.Join(WorkDir(), "cni", "net.d") }
 func NerdctlCNIPath() string           { return filepath.Join(WorkDir(), "cni", "bin") }
 func Namespace() string                { return namespace }
-func Address() string                  { return filepath.Join(WorkDir(), "containerd.sock") }
+func ContainerdAddress() string        { return filepath.Join(WorkDir(), "containerd.sock") }
 func LockFile() string                 { return filepath.Join(PersistentWorkDir(), "lock.pid") }
 func ShimSimlinkPath() string          { return filepath.Join(WorkDir(), "reexec", shimName) }
 func ShimRuncSimlinkPath() string      { return filepath.Join(WorkDir(), "reexec", "runc") }
@@ -53,8 +54,14 @@ func ContainerdStateDir() string     { return filepath.Join(PersistentWorkDir(),
 func ContainerdContentDir() string   { return filepath.Join(PersistentWorkDir(), "content") }
 func ContainerdSnapshotsDir() string { return filepath.Join(PersistentWorkDir(), "snapshots") }
 func NerdctlDataRoot() string        { return filepath.Join(PersistentWorkDir(), "nerdctl-data-root") }
-func PullPolicy() string             { return pullPolicy }
-func Snapshotter() string            { return snapshotter }
+func BuildkitdRootDir() string       { return filepath.Join(PersistentWorkDir(), "buildkitd-root") }
+func BuildkitdAddress() string       { return filepath.Join(PersistentWorkDir(), "buildkitd.sock") }
+func CDISpecDir() string             { return filepath.Join(PersistentWorkDir(), "cdi-spec") }
+func BuildkitdOtelSocketPath() string {
+	return filepath.Join(PersistentWorkDir(), "buildkitd-otel.sock")
+}
+func PullPolicy() string  { return pullPolicy }
+func Snapshotter() string { return snapshotter }
 
 func MagicHostOtlpGRPCPort() uint32 {
 	return 4317

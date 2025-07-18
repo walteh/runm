@@ -62,6 +62,8 @@ func main() {
 
 	app.Before = func(c *cli.Context) error {
 
+		c.Set("config", env.BuildkitdConfigTomlPath())
+
 		c.App.ExitErrHandler = exitErrHandler
 
 		log.L = &logrus.Entry{

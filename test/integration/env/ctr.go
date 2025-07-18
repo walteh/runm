@@ -23,7 +23,7 @@ var pluginCmds = []*cli.Command{}
 
 var ctrArgs = []string{
 	"ctr",
-	"--address", Address(),
+	"--address", ContainerdAddress(),
 	"--namespace", Namespace(),
 	// "--debug",
 }

@@ -60,7 +60,8 @@ env:
     GOPRIVATE: github.com/walteh
     DOCKER_BUILDKIT: 1
     PAGER: less
-    DEBUG_CONTAINERD_TEST: 1
+    # DEBUG_CONTAINERD_TEST: 1
+    # DEBUG_BUILDKITD_TEST: 1
     # DEBUG_NERDCTL_TEST: 1
     DEBUG_CONTAINERD_SHIM_RUNM_V2_TEST:
         sh: mkdir -p /tmp/tcontainerd-fs-env && echo '1' | tee /tmp/tcontainerd-fs-env/DEBUG_CONTAINERD_SHIM_RUNM_V2_TEST
@@ -297,7 +298,7 @@ tasks:
                 {{.RACE | default .DEBUG | eq "1" | and (.ASAN | ne "1") | and (.CGO_ENABLED | eq "1") | and (.CC | eq "clang") | ternary "-race" ""}}
 
             BUILD_FLAGS: |-
-                -tags="{{.TAGS}}" -ldflags="{{.LD_FLAGS}}" -gcflags="{{.GC_FLAGS}}" {{.ASAN_FLAG}} {{.RACE_FLAG}} -o="{{.OUT_DIR}}/{{.NAME}}"
+                -mod=mod -tags="{{.TAGS}}" -ldflags="{{.LD_FLAGS}}" -gcflags="{{.GC_FLAGS}}" {{.ASAN_FLAG}} {{.RACE_FLAG}} -o="{{.OUT_DIR}}/{{.NAME}}"
 
         env:
             CC: '{{.CC | default "clang"}}'
@@ -308,6 +309,7 @@ tasks:
             # Go 1.25 environment variables
             GOEXPERIMENT: |-
                 greenteagc,jsonv2
+            GOWORK: 'off'
 
             ASAN_OPTIONS: '{{.ASAN_OPTIONS}}'
         generates:
@@ -317,7 +319,7 @@ tasks:
           - cmd: if [ "{{.DEBUG}}" != "1" ]; then strip {{.OUT_DIR}}/{{.NAME}}; fi
             silent: true
           - cmd: |-
-                if [ "{{.CODESIGN}}" = "1" ]; then go tool codesign -target {{.OUT_DIR}}/{{.NAME}} -quiet -mode=sign --force --entitlement=com.apple.security.virtualization; fi
+                if [ "{{.CODESIGN}}" = "1" ]; then cd ./tools && go tool codesign -target ../{{.OUT_DIR}}/{{.NAME}} -quiet -mode=sign --force --entitlement=com.apple.security.virtualization; fi
             silent: true
           - cmd: if [ "{{.SYMLINK}}" != "" ]; then ln -laf {{.OUT_DIR}}/{{.NAME}} {{.OUT_DIR}}/{{.SYMLINK}}; fi
             silent: true

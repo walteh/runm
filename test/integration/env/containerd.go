@@ -56,6 +56,10 @@ func NewDevContainerdServer(ctx context.Context, app *cli.App, debug bool) (*Dev
 		return nil, errors.Errorf("creating nerdctl config: %w", err)
 	}
 
+	if err := server.createBuildkitConfig(ctx); err != nil {
+		return nil, errors.Errorf("creating buildkit config: %w", err)
+	}
+
 	return server, nil
 }
 
@@ -115,7 +119,7 @@ func (s *DevContainerdServer) Start(ctx context.Context) error {
 	args := []string{
 		"containerd",
 		"--config", ContainerdConfigTomlPath(),
-		"--address", Address(),
+		"--address", ContainerdAddress(),
 		"--state", ContainerdStateDir(),
 		"--root", ContainerdRootDir(),
 		"--log-level", func() string {
@@ -167,7 +171,7 @@ func (s *DevContainerdServer) Stop(ctx context.Context) {
 }
 
 func (s *DevContainerdServer) isReady(ctx context.Context) bool {
-	conn, err := net.DialTimeout("unix", Address(), time.Second)
+	conn, err := net.DialTimeout("unix", ContainerdAddress(), time.Second)
 	if err != nil {
 		return false
 	}

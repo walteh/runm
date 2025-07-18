@@ -12,7 +12,7 @@ import (
 )
 
 func NewContainerdClient(ctx context.Context) (*client.Client, error) {
-	return client.New(Address(), client.WithDefaultNamespace(Namespace()), client.WithTimeout(Timeout()))
+	return client.New(ContainerdAddress(), client.WithDefaultNamespace(Namespace()), client.WithTimeout(Timeout()))
 }
 
 func LoadCurrentServerConfig(ctx context.Context) ([]byte, error) {
@@ -36,6 +36,37 @@ func LoadCurrentServerConfig(ctx context.Context) ([]byte, error) {
 	return config, nil
 }
 
+func (s *DevContainerdServer) createBuildkitConfig(ctx context.Context) error {
+	configContent := fmt.Sprintf(`
+root = "%[3]s"
+
+[grpc]
+address = ["unix://%[4]s"]
+
+[otel]
+socketPath = "unix://%[5]s"
+
+[worker.containerd]
+address = "%[6]s" # breaks if we use unix:// for some reason
+
+[worker.containerd.runtime]
+path = "%[1]s"
+name = "%[2]s"
+
+[cdi]
+specDirs = ["%[7]s"]
+
+`, ShimSimlinkPath(), ShimRuntimeID(), BuildkitdRootDir(), BuildkitdAddress(), BuildkitdOtelSocketPath(), ContainerdAddress(), CDISpecDir())
+
+	if err := os.WriteFile(BuildkitdConfigTomlPath(), []byte(configContent), 0644); err != nil {
+		return errors.Errorf("writing buildkit config: %w", err)
+	}
+
+	os.MkdirAll(CDISpecDir(), 0755)
+
+	return nil
+}
+
 func (s *DevContainerdServer) createNerdctlConfig(ctx context.Context) error {
 	logLevel := "info"
 	if s.debug {
@@ -56,7 +87,7 @@ cni_path        = "%[8]s"
 # hosts_dir      = ["/etc/containerd/certs.d", "/etc/docker/certs.d"]
 experimental   = true
 # userns_remap   = ""
-	`, logLevel == "debug", Address(), Namespace(), Snapshotter(), PullPolicy(), NerdctlDataRoot(), NerdctlCNINetConfPath(), NerdctlCNIPath())
+	`, logLevel == "debug", ContainerdAddress(), Namespace(), Snapshotter(), PullPolicy(), NerdctlDataRoot(), NerdctlCNINetConfPath(), NerdctlCNIPath())
 
 	if err := os.WriteFile(NerdctlConfigTomlPath(), []byte(configContent), 0644); err != nil {
 		return errors.Errorf("writing nerdctl config: %w", err)
@@ -124,7 +155,7 @@ state  = "%[2]s"
 `,
 		ContainerdRootDir(),      // %[1]s
 		ContainerdStateDir(),     // %[2]s
-		Address(),                // %[3]s
+		ContainerdAddress(),      // %[3]s
 		logLevel,                 // %[4]s
 		shimRuntimeID,            // %[5]s
 		ShimSimlinkPath(),        // %[6]s
@@ -198,7 +229,7 @@ state  = "%[2]s"
 `,
 		ContainerdRootDir(),      // %[1]s
 		ContainerdStateDir(),     // %[2]s
-		Address(),                // %[3]s
+		ContainerdAddress(),      // %[3]s
 		logLevel,                 // %[4]s
 		shimRuntimeID,            // %[5]s
 		ShimSimlinkPath(),        // %[6]s
