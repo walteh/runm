@@ -442,40 +442,7 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 			return errors.Errorf("problem parsing port: %w", err)
 		}
 		taskgroupz.GoWithName("msock-bind-"+strconv.Itoa(portnum), func(ctx context.Context) error {
-			slog.InfoContext(ctx, "binding msock", "target", target, "port", portnum)
-			defer slog.InfoContext(ctx, "binding msock done", "target", target, "port", portnum)
-
-			conn, err := vsock.Dial(3, uint32(portnum), nil)
-			if err != nil {
-				return errors.Errorf("problem dialing mbind vsock: %w", err)
-			}
-			defer conn.Close()
-			return r.runVsockUnixProxy(ctx, target, conn)
-			// try to listen on the mbind vsock
-			// listener, err := vsock.ListenContextID(3, uint32(portnum), nil)
-			// if err != nil {
-			// 	conn, err := vsock.Dial(3, uint32(portnum), nil)
-			// 	if err != nil {
-			// 		return errors.Errorf("problem dialing mbind vsock: %w", err)
-			// 	}
-			// 	defer conn.Close()
-			// 	return r.runVsockUnixProxy(ctx, target, conn)
-			// }
-			// defer listener.Close()
-
-			// for {
-			// 	acceptConn, err := listener.Accept()
-			// 	if err != nil {
-			// 		return errors.Errorf("problem accepting mbind vsock: %w", err)
-			// 	}
-			// 	go func() {
-			// 		defer acceptConn.Close()
-			// 		err := r.runVsockUnixProxy(ctx, target, acceptConn)
-			// 		if err != nil {
-			// 			slog.ErrorContext(ctx, "problem proxying mbind vsock", "error", err)
-			// 		}
-			// 	}()
-			// }
+			return r.runReverseVsockUnixProxy(ctx, target, uint32(portnum))
 		})
 	}
 
@@ -660,7 +627,45 @@ func (r *runmLinuxInit) runVsockUnixProxy(ctx context.Context, path string, writ
 			io.Copy(writer, conn)
 		}()
 	}
+}
 
+func (r *runmLinuxInit) runReverseVsockUnixProxy(ctx context.Context, path string, port uint32) error {
+	slog.InfoContext(ctx, "running reverse vsock unix proxy", "path", path, "port", port)
+	listener, err := net.Listen("unix", strings.TrimPrefix(path, "unix://"))
+	if err != nil {
+		slog.ErrorContext(ctx, "problem listening vsock for log proxy", "error", err)
+		return errors.Errorf("problem listening vsock for log proxy: %w", err)
+	}
+
+	defer listener.Close()
+
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			slog.ErrorContext(ctx, "problem accepting log proxy connection", "error", err)
+			return errors.Errorf("problem accepting log proxy connection: %w", err)
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
+		// dial a new vsock connection to the host
+		vsockConn, err := vsock.Dial(3, port, nil)
+		if err != nil {
+			slog.ErrorContext(ctx, "problem dialing vsock for log proxy", "error", err)
+			return errors.Errorf("problem dialing vsock for log proxy: %w", err)
+		}
+
+		go func() {
+			defer conn.Close()
+			io.Copy(vsockConn, conn)
+		}()
+
+		go func() {
+			defer vsockConn.Close()
+			io.Copy(conn, vsockConn)
+		}()
+	}
 }
 
 func loadSpec(ctx context.Context) (spec *oci.Spec, exists bool, err error) {

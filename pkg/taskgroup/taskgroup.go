@@ -26,8 +26,8 @@ type TaskGroupOpts struct {
 	logLevel        slog.Level `default:"-4"`
 	logStart        bool       `default:"true"`
 	logEnd          bool       `default:"true"`
-	logTaskStart    bool       `default:"false"`
-	logTaskEnd      bool       `default:"false"`
+	logTaskStart    bool       `default:"true"`
+	logTaskEnd      bool       `default:"true"`
 	logTaskPanic    bool       `default:"true"`
 	timeout         time.Duration
 	callerSkip      int `default:"1"`
