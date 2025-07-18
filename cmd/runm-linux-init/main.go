@@ -27,6 +27,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"github.com/containerd/containerd/v2/pkg/cap"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/mdlayher/vsock"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -51,12 +52,16 @@ import (
 )
 
 var (
-	containerId  string
-	runmMode     string
-	bundleSource string
-	mbinds       string
-	enableOtel   bool
-	timezone     string
+	containerId      string
+	runmMode         string
+	bundleSource     string
+	mfsBindsString   string
+	msockBindsString string
+	enableOtel       bool
+	timezone         string
+
+	mfsBinds   map[string]string
+	msockBinds map[string]string
 )
 
 const (
@@ -72,9 +77,23 @@ func init() {
 	flag.StringVar(&runmMode, "runm-mode", "", "the runm mode")
 	flag.StringVar(&bundleSource, "bundle-source", "", "the bundle source")
 	flag.BoolVar(&enableOtel, "enable-otlp", false, "enable otlp")
-	flag.StringVar(&mbinds, "mbinds", "", "the mbinds") // this errors for some reason
+	flag.StringVar(&mfsBindsString, "mfs-binds", "", "the mfs binds")
+	flag.StringVar(&msockBindsString, "msock-binds", "", "the msock binds")
 	flag.StringVar(&timezone, "timezone", "", "the timezone")
 	flag.Parse()
+
+	mfsBinds = make(map[string]string)
+	msockBinds = make(map[string]string)
+
+	for _, mbind := range strings.Split(mfsBindsString, ",") {
+		parts := strings.Split(mbind, constants.MbindSeparator)
+		mfsBinds[parts[0]] = parts[1]
+	}
+
+	for _, mbind := range strings.Split(msockBindsString, ",") {
+		parts := strings.Split(mbind, constants.MbindSeparator)
+		msockBinds[parts[0]] = parts[1]
+	}
 
 }
 
@@ -417,6 +436,49 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 		return r.runPprofVsockServer(ctx)
 	})
 
+	for target, port := range msockBinds {
+		portnum, err := strconv.Atoi(port)
+		if err != nil {
+			return errors.Errorf("problem parsing port: %w", err)
+		}
+		taskgroupz.GoWithName("msock-bind-"+strconv.Itoa(portnum), func(ctx context.Context) error {
+			slog.InfoContext(ctx, "binding msock", "target", target, "port", portnum)
+			defer slog.InfoContext(ctx, "binding msock done", "target", target, "port", portnum)
+
+			conn, err := vsock.Dial(3, uint32(portnum), nil)
+			if err != nil {
+				return errors.Errorf("problem dialing mbind vsock: %w", err)
+			}
+			defer conn.Close()
+			return r.runVsockUnixProxy(ctx, target, conn)
+			// try to listen on the mbind vsock
+			// listener, err := vsock.ListenContextID(3, uint32(portnum), nil)
+			// if err != nil {
+			// 	conn, err := vsock.Dial(3, uint32(portnum), nil)
+			// 	if err != nil {
+			// 		return errors.Errorf("problem dialing mbind vsock: %w", err)
+			// 	}
+			// 	defer conn.Close()
+			// 	return r.runVsockUnixProxy(ctx, target, conn)
+			// }
+			// defer listener.Close()
+
+			// for {
+			// 	acceptConn, err := listener.Accept()
+			// 	if err != nil {
+			// 		return errors.Errorf("problem accepting mbind vsock: %w", err)
+			// 	}
+			// 	go func() {
+			// 		defer acceptConn.Close()
+			// 		err := r.runVsockUnixProxy(ctx, target, acceptConn)
+			// 		if err != nil {
+			// 			slog.ErrorContext(ctx, "problem proxying mbind vsock", "error", err)
+			// 		}
+			// 	}()
+			// }
+		})
+	}
+
 	r.taskgroup = taskgroupz
 
 	// // Demonstrate pprof helper functionality
@@ -425,6 +487,15 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 	// })
 
 	return taskgroupz.Wait()
+}
+
+func printCaps(ctx context.Context) error {
+	caps, err := cap.Current()
+	if err != nil {
+		return errors.Errorf("failed to get current caps: %w", err)
+	}
+	slog.InfoContext(ctx, "current caps", "caps", caps)
+	return nil
 }
 
 func runProxyHooks(ctx context.Context) error {
@@ -439,21 +510,37 @@ func runProxyHooks(ctx context.Context) error {
 
 	hoooksToProxy := []specs.Hook{}
 
-	hoooksToProxy = append(hoooksToProxy, spec.Hooks.Poststart...)
-	hoooksToProxy = append(hoooksToProxy, spec.Hooks.Poststop...)
-	hoooksToProxy = append(hoooksToProxy, spec.Hooks.CreateRuntime...)
-	hoooksToProxy = append(hoooksToProxy, spec.Hooks.CreateContainer...)
-	hoooksToProxy = append(hoooksToProxy, spec.Hooks.StartContainer...)
-
-	createdSymlinks := make(map[string]bool)
-	// for all the hooks, create symlinks to the host service
-	for _, hook := range hoooksToProxy {
-		if _, ok := createdSymlinks[hook.Path]; !ok {
-			os.MkdirAll(filepath.Dir(hook.Path), 0755)
-			os.Symlink("/mbin/runm-linux-host-fork-exec-proxy", hook.Path)
-			createdSymlinks[hook.Path] = true
-			slog.InfoContext(ctx, "created symlink", "path", hook.Path)
+	if spec.Hooks != nil {
+		if spec.Hooks.Poststart != nil {
+			hoooksToProxy = append(hoooksToProxy, spec.Hooks.Poststart...)
 		}
+		if spec.Hooks.Poststop != nil {
+			hoooksToProxy = append(hoooksToProxy, spec.Hooks.Poststop...)
+		}
+		if spec.Hooks.CreateRuntime != nil {
+			hoooksToProxy = append(hoooksToProxy, spec.Hooks.CreateRuntime...)
+		}
+		if spec.Hooks.CreateContainer != nil {
+			hoooksToProxy = append(hoooksToProxy, spec.Hooks.CreateContainer...)
+		}
+		if spec.Hooks.StartContainer != nil {
+			hoooksToProxy = append(hoooksToProxy, spec.Hooks.StartContainer...)
+		}
+
+		createdSymlinks := make(map[string]bool)
+		// for all the hooks, create symlinks to the host service
+		for _, hook := range hoooksToProxy {
+			if _, ok := createdSymlinks[hook.Path]; !ok {
+				os.MkdirAll(filepath.Dir(hook.Path), 0755)
+				os.Symlink("/mbin/runm-linux-host-fork-exec-proxy", hook.Path)
+				createdSymlinks[hook.Path] = true
+				slog.InfoContext(ctx, "created symlink", "path", hook.Path)
+			}
+		}
+	}
+
+	if err := cleanRootfsSpecMounts(ctx); err != nil {
+		return errors.Errorf("failed to clean rootfs spec mounts: %w", err)
 	}
 
 	// format and print out spec
@@ -462,6 +549,43 @@ func runProxyHooks(ctx context.Context) error {
 		return errors.Errorf("failed to marshal spec: %w", err)
 	}
 	slog.InfoContext(ctx, "spec", "spec", string(specBytes))
+
+	if err := printCaps(ctx); err != nil {
+		return errors.Errorf("failed to print caps: %w", err)
+	}
+
+	return nil
+}
+
+func cleanRootfsSpecMounts(ctx context.Context) error {
+	//real spec
+	moutedSpec := filepath.Join(bundleSource, "config.json")
+	mountedSpec, err := os.ReadFile(moutedSpec)
+	if err != nil {
+		return errors.Errorf("failed to read mounted spec: %w", err)
+	}
+
+	var spec oci.Spec
+	if err := json.Unmarshal(mountedSpec, &spec); err != nil {
+		return errors.Errorf("failed to unmarshal mounted spec: %w", err)
+	}
+
+	for i := range spec.Mounts {
+		if strings.HasPrefix(spec.Mounts[i].Source, "unix://") {
+			before := spec.Mounts[i].Source
+			spec.Mounts[i].Source = strings.TrimPrefix(spec.Mounts[i].Source, "unix://")
+			slog.InfoContext(ctx, "cleaned mount source", "before", before, "after", spec.Mounts[i].Source, "mount", spec.Mounts[i])
+		}
+	}
+
+	specJSON, err := json.MarshalIndent(spec, "", "  ")
+	if err != nil {
+		return errors.Errorf("failed to marshal spec: %w", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(bundleSource, "config.json"), specJSON, 0644); err != nil {
+		return errors.Errorf("failed to write spec: %w", err)
+	}
 
 	return nil
 }

@@ -24,6 +24,10 @@ var (
 		Light: lipgloss.CompleteColor{TrueColor: "#00ffff", ANSI256: "51", ANSI: "14"},
 		Dark:  lipgloss.CompleteColor{TrueColor: "#00ffff", ANSI256: "51", ANSI: "14"},
 	}
+	CallerMainPkgColor = lipgloss.CompleteAdaptiveColor{
+		Light: lipgloss.CompleteColor{TrueColor: "#FF8C00", ANSI256: "208", ANSI: "11"}, // Dark orange for main packages
+		Dark:  lipgloss.CompleteColor{TrueColor: "#FFA500", ANSI256: "214", ANSI: "3"},  // Orange for main packages
+	}
 
 	// Duration colours - spectrum based on time magnitude.
 	DurationNanosColor = lipgloss.CompleteAdaptiveColor{

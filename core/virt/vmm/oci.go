@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -104,7 +105,7 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 	}
 	devices = append(devices, tzDev)
 
-	mbindDevices, proxyDevices, err := findMbindDevices(ctx, ctrconfig.Spec, ctrconfig.RootfsMounts)
+	mbindDevices, mfsBindMounts, msockBindMounts, err := findMbindDevices(ctx, ctrconfig.Spec, ctrconfig.RootfsMounts)
 	if err != nil {
 		return nil, errors.Errorf("finding mbind devices: %w", err)
 	}
@@ -114,20 +115,28 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 		return nil, errors.Errorf("creating ec1 block device: %w", err)
 	}
 	devices = append(devices, ec1Dev)
-	proxyDevices = append(proxyDevices, *ec1Proxy)
+	mfsBindMounts = append(mfsBindMounts, *ec1Proxy)
 
-	proxyDevices = append(proxyDevices, proxyVirtioFs{
+	mfsBindMounts = append(mfsBindMounts, mfsBindMount{
 		Target: ctrconfig.Bundle,
 		Tag:    constants.BundleVirtioTag,
 	})
 
-	proxyMountString := ""
-	for _, proxyDevice := range proxyDevices {
-		slog.InfoContext(ctx, "proxy device", "tag", proxyDevice.Tag, "target", proxyDevice.Target)
-		proxyMountString += proxyDevice.Tag + ":" + proxyDevice.Target + ","
+	mfsBindString := ""
+	for _, mfsBind := range mfsBindMounts {
+		slog.InfoContext(ctx, "mfs bind", "tag", mfsBind.Tag, "target", mfsBind.Target)
+		mfsBindString += mfsBind.Tag + constants.MbindSeparator + mfsBind.Target + ","
 	}
 
-	proxyMountString = strings.TrimSuffix(proxyMountString, ",")
+	mfsBindString = strings.TrimSuffix(mfsBindString, ",")
+
+	msockBindString := ""
+	for _, msockBind := range msockBindMounts {
+		slog.InfoContext(ctx, "msock bind", "destination", msockBind.Source, "port", msockBind.Port)
+		msockBindString += msockBind.Source + constants.MbindSeparator + strconv.Itoa(int(msockBind.Port)) + ","
+	}
+
+	msockBindString = strings.TrimSuffix(msockBindString, ",")
 
 	devices = append(devices, bundleDev)
 	devices = append(devices, mbindDevices...)
@@ -181,7 +190,8 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 			"-runm-mode=oci",
 			"-container-id=" + ctrconfig.ID,
 			otelString,
-			"-mbinds=" + proxyMountString,
+			"-mfs-binds=" + mfsBindString,
+			"-msock-binds=" + msockBindString,
 			"-timezone=" + loc.String(),
 		}
 
@@ -243,6 +253,7 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 		netdev:       netdev,
 		rawWriter:    ctrconfig.RawWriter,
 		delimWriter:  ctrconfig.DelimWriter,
+		msockBinds:   msockBindMounts,
 	}
 
 	slog.InfoContext(ctx, "created oci vm", "id", ctrconfig.ID, "rawWriter==nil", ctrconfig.RawWriter == nil, "delimWriter==nil", ctrconfig.DelimWriter == nil)
@@ -256,11 +267,6 @@ func quickHash(s string) string {
 	out := h.Sum(nil)
 
 	return hex.EncodeToString(out)
-}
-
-type proxyVirtioFs struct {
-	Target string
-	Tag    string
 }
 
 // func findOverlays(ctx context.Context, spec *oci.Spec, rootfsMounts []process.Mount) ([]proxyVirtioFs, error) {
@@ -278,17 +284,46 @@ type proxyVirtioFs struct {
 // 	return proxyDevices, nil
 // }
 
-func findMbindDevices(ctx context.Context, spec *oci.Spec, rootfsMounts []process.Mount) ([]virtio.VirtioDevice, []proxyVirtioFs, error) {
+type msockBindMount struct {
+	Destination string
+	Port        uint32
+	Source      string
+}
+
+type mfsBindMount struct {
+	Target string
+	Tag    string
+}
+
+func findMbindDevices(ctx context.Context, spec *oci.Spec, rootfsMounts []process.Mount) ([]virtio.VirtioDevice, []mfsBindMount, []msockBindMount, error) {
 	devices := []virtio.VirtioDevice{}
 
-	proxyDevices := []proxyVirtioFs{}
+	proxyDevices := []mfsBindMount{}
 
 	seen := map[string]bool{}
+
+	msockCounter := constants.MsockBasePort
+
+	msockBindMounts := []msockBindMount{}
 
 	for _, mount := range spec.Mounts {
 		if mount.Type != "bind" && mount.Type != "rbind" && !slices.Contains(mount.Options, "rbind") {
 			continue
 		}
+
+		if strings.HasPrefix(mount.Source, "unix://") {
+			port := msockCounter
+			msockCounter++
+
+			msockBindMounts = append(msockBindMounts, msockBindMount{
+				Destination: mount.Destination,
+				Port:        uint32(port),
+				Source:      mount.Source,
+			})
+			continue
+		}
+
+		slog.InfoContext(ctx, "found bind mount", "mount", mount.Destination, "type", mount.Type, "options", mount.Options, "source", mount.Source, "gid", mount.GIDMappings, "uid", mount.UIDMappings)
 
 		src := mount.Source
 		// if its a dir, update the source to be the dir
@@ -302,14 +337,14 @@ func findMbindDevices(ctx context.Context, spec *oci.Spec, rootfsMounts []proces
 
 		tag := "mbind-" + quickHash(src)
 
-		proxyDevices = append(proxyDevices, proxyVirtioFs{
+		proxyDevices = append(proxyDevices, mfsBindMount{
 			Target: src,
 			Tag:    tag,
 		})
 
 		shareDev, err := virtio.VirtioFsNew(src, tag)
 		if err != nil {
-			return nil, nil, errors.Errorf("creating share device: %w", err)
+			return nil, nil, nil, errors.Errorf("creating share device: %w", err)
 		}
 
 		devices = append(devices, shareDev)
@@ -320,11 +355,11 @@ func findMbindDevices(ctx context.Context, spec *oci.Spec, rootfsMounts []proces
 	for _, mount := range rootfsMounts {
 		shareDev, err := virtio.VirtioFsNew(mount.Source, "rootfs-"+quickHash(mount.Source))
 		if err != nil {
-			return nil, nil, errors.Errorf("creating share device: %w", err)
+			return nil, nil, nil, errors.Errorf("creating share device: %w", err)
 		}
 
 		devices = append(devices, shareDev)
-		proxyDevices = append(proxyDevices, proxyVirtioFs{
+		proxyDevices = append(proxyDevices, mfsBindMount{
 			Target: mount.Source,
 			Tag:    "rootfs-" + quickHash(mount.Source),
 		})
@@ -332,11 +367,11 @@ func findMbindDevices(ctx context.Context, spec *oci.Spec, rootfsMounts []proces
 
 	slog.InfoContext(ctx, "found mbind devices", "proxyDevices", proxyDevices)
 
-	return devices, proxyDevices, nil
+	return devices, proxyDevices, msockBindMounts, nil
 }
 
 // PrepareContainerVirtioDevicesFromRootfs creates virtio devices using an existing rootfs directory
-func makeEc1BlockDevice(ctx context.Context, wrkdir string, ctrconfig *oci.Spec, rootfsMounts []process.Mount) (virtio.VirtioDevice, *proxyVirtioFs, error) {
+func makeEc1BlockDevice(ctx context.Context, wrkdir string, ctrconfig *oci.Spec, rootfsMounts []process.Mount) (virtio.VirtioDevice, *mfsBindMount, error) {
 	ec1DataPath := filepath.Join(wrkdir, "harpoon-runtime-fs-device")
 
 	err := os.MkdirAll(ec1DataPath, 0755)
@@ -372,7 +407,7 @@ func makeEc1BlockDevice(ctx context.Context, wrkdir string, ctrconfig *oci.Spec,
 		return nil, nil, errors.Errorf("creating ec1 virtio device: %w", err)
 	}
 
-	return device, &proxyVirtioFs{
+	return device, &mfsBindMount{
 		Target: constants.Ec1AbsPath,
 		Tag:    constants.Ec1VirtioTag,
 	}, nil

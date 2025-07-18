@@ -47,6 +47,7 @@ type RunningVM[VM VirtualMachine] struct {
 	delimWriter  io.Writer
 	taskGroup    *taskgroup.TaskGroup
 	stderrUndoFn func() error
+	msockBinds   []msockBindMount
 }
 
 func (r *RunningVM[VM]) GuestService(ctx context.Context) (runmv1.GuestManagementServiceClient, error) {
@@ -441,6 +442,26 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 		return nil
 	})
 
+	for _, msockBind := range rvm.msockBinds {
+		rvm.taskGroup.GoWithName(fmt.Sprintf("msock-bind-%d", msockBind.Port), func(ctx context.Context) error {
+			addr := &net.UnixAddr{Name: msockBind.Source, Net: "unix"}
+			// try to listen on the mbind file
+			listener, err := net.ListenUnix("unix", addr)
+			if err != nil {
+				conn, err := net.DialUnix("unix", nil, addr)
+				if err != nil {
+					return errors.Errorf("dialing msock bind source: %w", err)
+				}
+				defer conn.Close()
+				// run as a client
+				return rvm.RunVsockProxyServer(ctx, msockBind.Port, conn)
+			}
+			defer listener.Close()
+			return rvm.RunVsockProxyClient(ctx, msockBind.Port, listener)
+
+		})
+	}
+
 	// For container runtimes, we want the VM to stay running, not wait for it to stop
 	slog.InfoContext(ctx, "VM is ready for container execution")
 
@@ -569,6 +590,22 @@ func (rvm *RunningVM[VM]) SetupOtelForwarder(ctx context.Context) error {
 		go proxy(ctx, vConn, conn)
 		go proxy(ctx, conn, vConn)
 	}
+}
+
+func (rvm *RunningVM[VM]) dialMsockBind(ctx context.Context, msockBind msockBindMount) (net.Conn, error) {
+	conn, err := net.Dial("unix", msockBind.Source)
+	if err != nil {
+		return nil, errors.Errorf("dialing msock bind source: %w", err)
+	}
+	defer conn.Close()
+	// open up the vsock port
+	vConn, err := rvm.vm.VSockConnect(ctx, msockBind.Port)
+	if err != nil {
+		return nil, errors.Errorf("connecting to vsock port: %w", err)
+	}
+	defer vConn.Close()
+
+	return conn, nil
 }
 
 // proxy copies from src to dst, logs errors, and closes both ends when done.

@@ -2,6 +2,8 @@ package stackerr
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"slices"
@@ -14,12 +16,21 @@ var knownNestedProjects = []string{
 }
 
 var currentMainGoPackage string
+var executableName string
+
+// ExecutableName returns the current executable name for display purposes
+func ExecutableName() string {
+	return executableName
+}
 
 func init() {
 
 	inf, ok := debug.ReadBuildInfo()
 	if ok {
 		currentMainGoPackage = inf.Main.Path
+
+		executableName, _ = os.Executable()
+		executableName = filepath.Base(executableName)
 	}
 
 }
@@ -101,6 +112,11 @@ func GetPackageAndFuncFromFuncName(pc string) (fullpkg, pkg, function string) {
 
 	fullpkg = pkg
 	pkg = strings.TrimPrefix(pkg, currentMainGoPackage+"/")
+
+	// Replace "main" with executable name for better display
+	if pkg == "main" {
+		pkg = executableName
+	}
 
 	return fullpkg, pkg, fname
 }

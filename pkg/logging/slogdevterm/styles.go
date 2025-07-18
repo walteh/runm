@@ -61,6 +61,7 @@ type CallerStyle struct {
 	Line    lipgloss.Style
 	Func    lipgloss.Style
 	Pkg     lipgloss.Style
+	MainPkg lipgloss.Style  // Special style for main package names (executables)
 	Sep     lipgloss.Style
 	Project lipgloss.Style
 }
@@ -129,6 +130,7 @@ func DefaultStyles() *Styles {
 			Line:    lipgloss.NewStyle().Foreground(CallerLineColor),
 			Func:    lipgloss.NewStyle().Foreground(CallerFuncColor),
 			Pkg:     lipgloss.NewStyle().Foreground(CallerPkgColor),
+			MainPkg: lipgloss.NewStyle().Foreground(CallerMainPkgColor).Bold(true),
 			Sep:     lipgloss.NewStyle().Faint(true),
 			Project: lipgloss.NewStyle().Foreground(CallerProjectColor).Bold(true),
 		},

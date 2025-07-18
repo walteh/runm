@@ -40,6 +40,7 @@ const (
 	goStandardIcon   = "\uf07ef "
 	gitlabIcon       = "\ue7eb "
 	externalIcon     = "\uf14c "
+	executableIcon   = "\uf489 " // Terminal/executable icon for main packages
 )
 
 func RenderEnhancedSource(e *stackerr.EnhancedSource, styles *Styles, render renderFunc, hyperlink HyperlinkFunc) string {
@@ -74,6 +75,8 @@ func RenderEnhancedSource(e *stackerr.EnhancedSource, styles *Styles, render ren
 			projIcon = githubIcon
 		} else if first == "gitlab.com" {
 			projIcon = gitlabIcon
+		} else if first == "main" {
+			projIcon = executableIcon
 		} else if !strings.Contains(first, ".") {
 			projIcon = goIcon
 		} else {
@@ -85,9 +88,13 @@ func RenderEnhancedSource(e *stackerr.EnhancedSource, styles *Styles, render ren
 
 	pkgsplt := strings.Split(pkgNoProject, "/")
 	// last := pkgsplt[len(pkgsplt)-1]
-	pkg := render(styles.Caller.Pkg, strings.Join(pkgsplt, "/")) + sep
-	if pkgNoProject == "" {
+
+	var pkg string
+	if pkgNoProject == "" || filepath.Base(e.EnhancedProject) == "main" {
 		pkg = ""
+	} else {
+		// For main executables, don't show the package name at all (it's shown in eproj)
+		pkg = render(styles.Caller.Pkg, strings.Join(pkgsplt, "/")) + sep
 	}
 
 	// var pkg string
@@ -101,7 +108,9 @@ func RenderEnhancedSource(e *stackerr.EnhancedSource, styles *Styles, render ren
 	// [icon] [package]
 
 	var eproj string
-	if e.EnhancedProject == currentMainGoPackage {
+	if filepath.Base(e.EnhancedProject) == "main" {
+		eproj = " " + render(styles.Caller.MainPkg, stackerr.ExecutableName()) + " "
+	} else if e.EnhancedProject == currentMainGoPackage {
 		eproj = " "
 	} else {
 		eproj = " " + render(styles.Caller.Project, filepath.Base(e.EnhancedProject)) + " "

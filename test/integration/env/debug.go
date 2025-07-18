@@ -216,11 +216,8 @@ func DebugIsEnabled() (enabled bool) {
 	}
 
 	envVar := resolveDebugEnvVar()
-	if envVar == "" {
-		return false
-	}
 
-	return true
+	return envVar == "1"
 }
 
 // EnableDebugging sets up DAP debugging support for the shim

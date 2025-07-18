@@ -30,14 +30,16 @@ import (
 // }
 
 var (
-	containerIdFlag string
-	runmModeFlag    string
-	bundleSource    string
-	enableOtel      bool
-	rawMbindsString string
-	timezone        string
+	containerIdFlag  string
+	runmModeFlag     string
+	bundleSource     string
+	enableOtel       bool
+	mfsBindsString   string
+	msockBindsString string
+	timezone         string
 
-	mbinds map[string]string
+	mfsBinds   map[string]string
+	msockBinds map[string]string
 )
 
 type runmLinuxMounter struct {
@@ -105,16 +107,23 @@ func init() {
 	flag.StringVar(&containerIdFlag, "container-id", "", "the container id")
 	flag.StringVar(&runmModeFlag, "runm-mode", "", "the runm mode")
 	flag.StringVar(&bundleSource, "bundle-source", "", "the bundle source")
-	flag.StringVar(&rawMbindsString, "mbinds", "", "the mbinds")
+	flag.StringVar(&mfsBindsString, "mfs-binds", "", "the mfs binds")
+	flag.StringVar(&msockBindsString, "msock-binds", "", "the msock binds")
 	flag.BoolVar(&enableOtel, "enable-otlp", false, "enable otel")
 	flag.StringVar(&timezone, "timezone", "UTC", "the timezone")
 	flag.Parse()
 
-	mbinds = make(map[string]string)
+	mfsBinds = make(map[string]string)
+	msockBinds = make(map[string]string)
 
-	for _, mbind := range strings.Split(rawMbindsString, ",") {
-		parts := strings.Split(mbind, ":")
-		mbinds[parts[0]] = parts[1]
+	for _, mbind := range strings.Split(mfsBindsString, ",") {
+		parts := strings.Split(mbind, constants.MbindSeparator)
+		mfsBinds[parts[0]] = parts[1]
+	}
+
+	for _, mbind := range strings.Split(msockBindsString, ",") {
+		parts := strings.Split(mbind, constants.MbindSeparator)
+		msockBinds[parts[0]] = parts[1]
 	}
 }
 
@@ -245,7 +254,7 @@ func mount(ctx context.Context) error {
 		return errors.Errorf("failed to create mbin: %w", err)
 	}
 
-	for tag, target := range mbinds {
+	for tag, target := range mfsBinds {
 		out := filepath.Join(constants.NewRootAbsPath, target)
 		if _, err := os.Stat(out); os.IsNotExist(err) {
 			os.MkdirAll(out, 0755)

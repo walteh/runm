@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
@@ -59,6 +62,19 @@ func NewStreamClientInterceptor(ctx context.Context) grpc.StreamClientIntercepto
 	}
 }
 
+var ignoredMethods = map[string]bool{
+	"/containerd.services.content.v1.Content/Status": true,
+	"/grpc.health.v1.Health/Check":                   true,
+}
+
+var ignoredMethodsLock sync.Mutex
+
+func isMethodIgnored(method string) bool {
+	ignoredMethodsLock.Lock()
+	defer ignoredMethodsLock.Unlock()
+	return ignoredMethods[method]
+}
+
 // implLocation returns the concrete service implementation’s PC, file and line.
 // Call this *inside* your interceptor.
 func implLocation(info *grpc.UnaryServerInfo) (pc uintptr) {
@@ -92,6 +108,10 @@ func UnaryServerInterceptor(
 	info *grpc.UnaryServerInfo,
 	handler grpc.UnaryHandler,
 ) (_ interface{}, err error) {
+	if isMethodIgnored(info.FullMethod) {
+		return handler(ctx, req)
+	}
+
 	start := time.Now()
 	operation := filepath.Base(info.FullMethod)
 	service := filepath.Base(filepath.Dir(info.FullMethod))
@@ -127,15 +147,19 @@ func UnaryServerInterceptor(
 		return resp, nil
 	}
 
-	// Create a gRPC status with code and top‐level message  [oai_citation:0‡grpc.io](https://grpc.io/docs/guides/error/?utm_source=chatgpt.com).
+	enableStackError := os.Getenv("ENABLE_STACK_ERROR") == "1"
+
+	if !enableStackError {
+		return resp, errz
+	}
+
 	st := status.New(codes.Internal, errz.Error())
-	// Attach the full %+v formatted Tozd error chain as DebugInfo  [oai_citation:1‡pkg.go.dev](https://pkg.go.dev/google.golang.org/genproto/googleapis/rpc/errdetails?utm_source=chatgpt.com) [oai_citation:2‡medium.com](https://medium.com/utility-warehouse-technology/advanced-grpc-error-usage-1b37398f0ff4?utm_source=chatgpt.com).
 
 	se := stackerr.NewStackedEncodableErrorFromError(errz)
 
-	encoded, err := json.Marshal(se)
-	if err != nil {
-		err = errz
+	encoded, errd := json.Marshal(se)
+	if errd != nil {
+		err = errz // ignore errd
 		return
 	}
 
@@ -155,8 +179,45 @@ func UnaryServerInterceptor(
 	} else {
 		err = st2.Err()
 	}
+
 	return
 
+}
+
+var thisProjectModule string
+
+func init() {
+	bi, ok := debug.ReadBuildInfo()
+	if !ok {
+		return
+	}
+	thisProjectModule = bi.Main.Path
+}
+
+func lastNonGrpcCaller(ctx context.Context) uintptr {
+
+	fallback := uintptr(0)
+	for i := 5; i < 20; i++ {
+		pc, file, _, ok := runtime.Caller(i)
+		if !ok {
+			continue
+		}
+		if fallback == 0 {
+			fallback = pc
+		}
+		if strings.HasSuffix(file, ".pb.go") {
+			continue
+		}
+
+		funcd := runtime.FuncForPC(pc)
+		fn := funcd.Name()
+		if strings.HasPrefix(fn, "google.golang.org/grpc") {
+			continue
+		}
+		return pc
+	}
+
+	return fallback
 }
 
 func UnaryClientInterceptor(
@@ -167,13 +228,19 @@ func UnaryClientInterceptor(
 	invoker grpc.UnaryInvoker,
 	opts ...grpc.CallOption,
 ) (err error) {
+	if isMethodIgnored(method) {
+		return invoker(ctx, method, req, reply, cc, opts...)
+	}
+
 	start := time.Now()
 	service := filepath.Base(filepath.Dir(method))
 	operation := filepath.Base(method)
 	id := fmt.Sprintf("GRPC:CLIENT:%s:%s", service, operation)
 	event := fmt.Sprintf("%s[START]", id)
 
-	logging.LogRecord(ctx, slog.LevelDebug, 4, event, "service", service)
+	codePointer := lastNonGrpcCaller(ctx)
+
+	logging.LogCaller(ctx, slog.LevelDebug, codePointer, event, "service", service)
 	// if event == "GRPC:CLIENT:runm.v1.SocketAllocatorService:CloseIO[START]" {
 	// 	slog.InfoContext(ctx, string(debug.Stack()))
 	// }
@@ -188,7 +255,7 @@ func UnaryClientInterceptor(
 	).RunAsDefer()()
 
 	errd := invoker(ctx, method, req, reply, cc, opts...)
-	logging.LogRecord(ctx, slog.LevelDebug, 4, fmt.Sprintf("%s[END]", id), "service", service, "error", errd, "duration", time.Since(start))
+	logging.LogCaller(ctx, slog.LevelDebug, codePointer, fmt.Sprintf("%s[END]", id), "service", service, "error", errd, "duration", time.Since(start))
 	return errd
 }
 

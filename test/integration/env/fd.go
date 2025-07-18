@@ -5,8 +5,9 @@ import (
 	"io"
 	"os"
 
-	"gitlab.com/tozd/go/errors"
 	"golang.org/x/sys/unix"
+
+	"gitlab.com/tozd/go/errors"
 )
 
 // duplicateStderrToWriter duplicates stderr to both its original destination and the given writer

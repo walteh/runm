@@ -1,12 +1,15 @@
 package taskgroup
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
 	"runtime"
 	"runtime/debug"
 	"runtime/pprof"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -156,6 +159,31 @@ func (tg *TaskGroup) getStatusAttrs() []slog.Attr {
 		attrs = append(attrs, slog.Any("running_task_names", runningNames))
 	}
 
+	// Add blocking detection
+	if tg.opts.enablePprof {
+		blockedTasks := tg.detectBlockedTasks(runningTasks)
+		if len(blockedTasks) > 0 {
+			attrs = append(attrs, slog.Int("blocked_tasks", len(blockedTasks)))
+
+			// Add detailed blocking information
+			var blockingDetails []slog.Attr
+			for _, blocked := range blockedTasks {
+				blockingDetails = append(blockingDetails, slog.Group(blocked.TaskID,
+					slog.String("task_name", blocked.TaskName),
+					slog.Uint64("goroutine_id", blocked.GoroutineID),
+					slog.String("block_reason", blocked.BlockReason),
+					slog.Duration("blocked_duration", blocked.Duration),
+					slog.Group("blocked_at",
+						slog.String("function", blocked.BlockedAt.Function),
+						slog.String("file", blocked.BlockedAt.File),
+						slog.Int("line", blocked.BlockedAt.Line),
+					),
+				))
+			}
+			attrs = append(attrs, slog.Group("blocking_details", slog.Any("tasks", blockingDetails)))
+		}
+	}
+
 	return attrs
 }
 
@@ -226,7 +254,7 @@ func (tg *TaskGroup) executeTask(name string, metadata map[string]any, fn TaskFu
 		ID:          taskID,
 		IDX:         int(taskIDX),
 		Group:       tg,
-		Name:        fmt.Sprintf("%s-%d", tg.opts.name, taskIDX),
+		Name:        name,
 		Status:      TaskStatusPending,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
@@ -629,6 +657,196 @@ func (tg *TaskGroup) createPprofLabels(taskID, name string, metadata map[string]
 	}
 
 	return pprof.Labels(labels...)
+}
+
+// detectBlockedTasks analyzes running tasks to find blocked goroutines
+func (tg *TaskGroup) detectBlockedTasks(runningTasks []*TaskState) []BlockedTaskInfo {
+	if !tg.opts.enablePprof || len(runningTasks) == 0 {
+		return nil
+	}
+
+	var blockedTasks []BlockedTaskInfo
+
+	// Get goroutine profile using pprof
+	profile := pprof.Lookup("goroutine")
+	if profile == nil {
+		return nil
+	}
+
+	// Create a buffer to capture the profile data
+	var buf bytes.Buffer
+	if err := profile.WriteTo(&buf, 2); err != nil {
+		return nil
+	}
+
+	// Parse the profile output to find blocked goroutines
+	profileData := buf.String()
+	blockedTasks = tg.parseBlockedGoroutines(profileData, runningTasks)
+
+	return blockedTasks
+}
+
+// parseBlockedGoroutines parses pprof goroutine output to identify blocked tasks
+func (tg *TaskGroup) parseBlockedGoroutines(profileData string, runningTasks []*TaskState) []BlockedTaskInfo {
+	var blockedTasks []BlockedTaskInfo
+
+	// Create a map of goroutine IDs to task states for quick lookup
+	goroutineToTask := make(map[uint64]*TaskState)
+	for _, task := range runningTasks {
+		if task.GoroutineID != 0 {
+			goroutineToTask[task.GoroutineID] = task
+		}
+	}
+
+	// Split profile data into individual goroutine entries
+	lines := strings.Split(profileData, "\n")
+
+	for i := 0; i < len(lines); i++ {
+		line := strings.TrimSpace(lines[i])
+
+		// Look for goroutine headers like "goroutine 123 [blocked]:"
+		if strings.HasPrefix(line, "goroutine ") && strings.Contains(line, "[") {
+			goroutineID, blockReason, blocked := tg.parseGoroutineHeader(line)
+			if !blocked || goroutineID == 0 {
+				continue
+			}
+
+			// Check if this goroutine belongs to one of our running tasks
+			if task, exists := goroutineToTask[goroutineID]; exists {
+				// Parse the stack trace to find the blocking location
+				blockLocation := tg.parseBlockingLocation(lines, i+1)
+
+				blockedTask := BlockedTaskInfo{
+					TaskID:      task.ID,
+					TaskName:    task.Name,
+					GoroutineID: goroutineID,
+					BlockReason: blockReason,
+					BlockedAt:   blockLocation,
+					Duration:    time.Since(task.StartTime),
+				}
+
+				blockedTasks = append(blockedTasks, blockedTask)
+			}
+		}
+	}
+
+	return blockedTasks
+}
+
+// parseGoroutineHeader parses a goroutine header line to extract ID and block reason
+func (tg *TaskGroup) parseGoroutineHeader(line string) (uint64, string, bool) {
+	// Example: "goroutine 123 [chan receive]:"
+	parts := strings.Split(line, " ")
+	if len(parts) < 3 {
+		return 0, "", false
+	}
+
+	// Extract goroutine ID
+	goroutineID := uint64(0)
+	if id, err := strconv.ParseUint(parts[1], 10, 64); err == nil {
+		goroutineID = id
+	}
+
+	// Extract block reason from brackets
+	reasonPart := strings.Join(parts[2:], " ")
+	if start := strings.Index(reasonPart, "["); start != -1 {
+		if end := strings.Index(reasonPart[start:], "]"); end != -1 {
+			blockReason := reasonPart[start+1 : start+end]
+
+			// Check if this is a blocking state
+			isBlocked := tg.isBlockingState(blockReason)
+			return goroutineID, blockReason, isBlocked
+		}
+	}
+
+	return goroutineID, "", false
+}
+
+// isBlockingState determines if a goroutine state indicates blocking
+func (tg *TaskGroup) isBlockingState(state string) bool {
+	blockingStates := []string{
+		"chan receive",
+		"chan send",
+		"select",
+		"IO wait",
+		"sync.Mutex",
+		"sync.RWMutex",
+		"sync.WaitGroup",
+		"sync.Cond",
+		"semacquire",
+		"sleep",
+		"timer goroutine",
+		"chan receive (nil chan)",
+		"chan send (nil chan)",
+	}
+
+	for _, blockingState := range blockingStates {
+		if strings.Contains(state, blockingState) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// parseBlockingLocation parses stack trace lines to find where the goroutine is blocked
+func (tg *TaskGroup) parseBlockingLocation(lines []string, startIndex int) BlockLocation {
+	// Look for the first non-runtime frame in the stack trace
+	for i := startIndex; i < len(lines) && i < startIndex+10; i++ {
+		line := strings.TrimSpace(lines[i])
+
+		// Skip empty lines and runtime frames
+		if line == "" || strings.HasPrefix(line, "runtime.") {
+			continue
+		}
+
+		// Look for function name
+		if strings.Contains(line, "(") {
+			// Next line should contain file:line
+			if i+1 < len(lines) {
+				nextLine := strings.TrimSpace(lines[i+1])
+				if strings.Contains(nextLine, ":") {
+					return tg.parseFileLocation(line, nextLine)
+				}
+			}
+		}
+	}
+
+	return BlockLocation{
+		Function: "unknown",
+		File:     "unknown",
+		Line:     0,
+	}
+}
+
+// parseFileLocation parses function name and file:line information
+func (tg *TaskGroup) parseFileLocation(funcLine, fileLine string) BlockLocation {
+	function := strings.Split(funcLine, "(")[0]
+
+	// Parse file:line
+	if colonIndex := strings.LastIndex(fileLine, ":"); colonIndex != -1 {
+		file := fileLine[:colonIndex]
+		lineStr := fileLine[colonIndex+1:]
+
+		// Remove any additional info after the line number
+		if spaceIndex := strings.Index(lineStr, " "); spaceIndex != -1 {
+			lineStr = lineStr[:spaceIndex]
+		}
+
+		if line, err := strconv.Atoi(lineStr); err == nil {
+			return BlockLocation{
+				Function: function,
+				File:     file,
+				Line:     line,
+			}
+		}
+	}
+
+	return BlockLocation{
+		Function: function,
+		File:     "unknown",
+		Line:     0,
+	}
 }
 
 // executeTaskWithRecovery executes the task function with panic recovery

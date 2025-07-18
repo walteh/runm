@@ -72,6 +72,23 @@ type PanicInfo struct {
 	GoroutineID uint64
 }
 
+// BlockedTaskInfo represents information about a blocked goroutine
+type BlockedTaskInfo struct {
+	TaskID      string
+	TaskName    string
+	GoroutineID uint64
+	BlockReason string
+	BlockedAt   BlockLocation
+	Duration    time.Duration
+}
+
+// BlockLocation represents where a goroutine is blocked
+type BlockLocation struct {
+	Function string
+	File     string
+	Line     int
+}
+
 func (t *TaskState) IsRunning() bool {
 	return t.Status == TaskStatusRunning
 }

@@ -192,6 +192,7 @@ func (r *GoRuncRuntime) Create(ctx context.Context, id, bundle string, options *
 	// options.Started = pidchan
 
 	return WrapWithRuntimeError(ctx, r, func() error {
+		slog.InfoContext(ctx, "creating container", "id", id, "bundle", bundle, "options", options)
 		// defer options.IO.Close()
 		return r.internal.Create(ctx, id, bundle, options)
 	})

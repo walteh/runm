@@ -7,8 +7,9 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/walteh/runm/test/integration/env"
 	"gitlab.com/tozd/go/errors"
+
+	"github.com/walteh/runm/test/integration/env"
 )
 
 // EnableDebugging sets up DAP debugging support for the shim

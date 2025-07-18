@@ -3,6 +3,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -222,6 +223,9 @@ type runner struct {
 }
 
 func (r *runner) run(config *specs.Process) (int, error) {
+
+	configJson, _ := json.MarshalIndent(config, "", "\t")
+	slog.Error("config", "config", string(configJson))
 	defer slog.Debug("DEBUG: run done")
 	var err error
 	defer func() {

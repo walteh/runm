@@ -32,12 +32,12 @@ func NewStackedEncodableErrorFromError(err error) *StackedEncodableError {
 		return nil
 	}
 
-	if st, ok := status.FromError(err); ok {
-		err = FromGRPCStatusError(st)
-	}
-
 	if enc, ok := err.(*StackedEncodableError); ok {
 		return enc
+	}
+
+	if st, ok := status.FromError(err); ok {
+		err = FromGRPCStatusError(st)
 	}
 
 	var enhancedSource *EnhancedSource

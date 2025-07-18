@@ -12,16 +12,19 @@ import (
 	"strings"
 	"syscall"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/containerd/console"
-	runc "github.com/containerd/go-runc"
 	"github.com/moby/buildkit/executor"
-	gatewayapi "github.com/moby/buildkit/frontend/gateway/pb"
 	"github.com/moby/buildkit/util/bklog"
 	"github.com/moby/sys/signal"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
+	"gitlab.com/tozd/go/errors"
+
+	runc "github.com/containerd/go-runc"
+	gatewayapi "github.com/moby/buildkit/frontend/gateway/pb"
+
 	"github.com/walteh/runm/core/runc/runtime"
-	"golang.org/x/sync/errgroup"
 )
 
 func updateRuncFieldsForHostOS(runtime *runtime.RuntimeOptions) {

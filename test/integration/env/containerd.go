@@ -16,9 +16,10 @@ import (
 	"github.com/containerd/log"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
+	"gitlab.com/tozd/go/errors"
+
 	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/logging"
-	"gitlab.com/tozd/go/errors"
 )
 
 type DevContainerdServer struct {
@@ -138,6 +139,27 @@ func (s *DevContainerdServer) Start(ctx context.Context) error {
 	}
 
 	return s.app.RunContext(ctx, args)
+}
+
+func (s *DevContainerdServer) RunWithArgs(ctx context.Context, args []string) error {
+
+	extraArgs := []string{
+		"containerd",
+		"--config", ContainerdConfigTomlPath(),
+		"--address", ContainerdAddress(),
+		"--state", ContainerdStateDir(),
+		"--root", ContainerdRootDir(),
+		"--log-level", func() string {
+			if s.debug {
+				return "debug"
+			}
+			return "info"
+		}(),
+	}
+
+	slog.InfoContext(ctx, "Running containerd with args", "args", append(extraArgs, args...))
+
+	return s.app.RunContext(ctx, append(extraArgs, args...))
 }
 
 func (s *DevContainerdServer) StartBackground(ctx context.Context) error {

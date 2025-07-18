@@ -19,6 +19,7 @@ replace (
 	github.com/moby/buildkit => ../buildkit
 	github.com/opencontainers/runc => ../runc
 	gitlab.com/tozd/go/errors => ../go-errors
+	github.com/tonistiigi/fsutil => ../fsutil
 )
 
 replace gvisor.dev/gvisor => gvisor.dev/gvisor v0.0.0-20250611222258-0fe9a4bf489c
@@ -187,6 +188,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.1.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
+	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-immutable-radix/v2 v2.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
@@ -230,6 +232,7 @@ require (
 	github.com/moby/term v0.5.2 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
+	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/mrunalp/fileutils v0.5.1 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
@@ -282,6 +285,7 @@ require (
 	github.com/tonistiigi/go-actions-cache v0.0.0-20250626083717-378c5ed1ddd9 // indirect
 	github.com/tonistiigi/go-csvvalue v0.0.0-20240814133006-030d3b2625d0 // indirect
 	github.com/tonistiigi/units v0.0.0-20180711220420-6950e57a87ea // indirect
+	github.com/tonistiigi/vt100 v0.0.0-20240514184818-90bafcd6abab // indirect
 	github.com/u-root/uio v0.0.0-20240224005618-d2acac8f3701 // indirect
 	github.com/ulikunitz/xz v0.5.12 // indirect
 	github.com/vbatts/tar-split v0.12.1 // indirect

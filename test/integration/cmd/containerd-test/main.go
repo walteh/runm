@@ -1,24 +1,31 @@
 package main
 
 import (
+	_ "net/http/pprof"
+
 	_ "github.com/containerd/containerd/v2/cmd/containerd/builtins"
-	"github.com/containerd/containerd/v2/cmd/containerd/command"
-	"github.com/containerd/containerd/v2/cmd/containerd/server"
-	"google.golang.org/grpc"
 
 	"context"
 	"flag"
 	"fmt"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
+	"github.com/containerd/containerd/v2/cmd/containerd/command"
+	"github.com/containerd/containerd/v2/cmd/containerd/server"
 	"github.com/containerd/log"
 	"github.com/sirupsen/logrus"
+	"gitlab.com/tozd/go/errors"
+	"google.golang.org/grpc"
 
 	slogctx "github.com/veqryn/slog-context"
 
@@ -43,7 +50,20 @@ func (d simpleDialer) DialContext(ctx context.Context, network, address string) 
 	return net.Dial(d.network, d.address)
 }
 
+var exitCode = 0
+
 func main() {
+	defer func() {
+		for pid := range pids {
+			if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
+				slog.WarnContext(context.Background(), "failed to kill process", "pid", pid, "error", err)
+			} else {
+				slog.InfoContext(context.Background(), "killed process", "pid", pid)
+			}
+		}
+		time.Sleep(1 * time.Second)
+		os.Exit(exitCode)
+	}()
 
 	background := false
 	debug := true
@@ -88,15 +108,20 @@ func main() {
 
 	ctx = slogctx.Append(ctx, slog.String("process", "containerd"), slog.String("pid", strconv.Itoa(os.Getpid())))
 
+	// Start pprof server
+	pprofPort := startPprofServer(ctx)
+
 	slog.InfoContext(ctx, "Starting development containerd instance",
 		"background", background,
 		"debug", debug,
-		"ctr-commands", ctrCommands.Get())
+		"ctr-commands", ctrCommands.Get(),
+		"pprof-port", pprofPort)
 
 	server, err := env.NewDevContainerdServer(ctx, command.App(), debug)
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to create containerd server", "error", err)
-		os.Exit(1)
+		exitCode = 1
+		return
 	}
 
 	if len(ctrCommands.values) > 0 {
@@ -104,28 +129,41 @@ func main() {
 		if err := server.StartBackground(ctx); err != nil {
 			slog.ErrorContext(ctx, "Failed to start containerd in background", "error", err)
 			server.Stop(ctx)
-			os.Exit(1)
+			exitCode = 1
+			return
 		}
 
 		for _, command := range ctrCommands.values {
 			if err := env.RunCtrCommand(ctx, strings.Split(command, " ")...); err != nil {
 				slog.ErrorContext(ctx, "Failed to run ctr command", "error", err)
 				server.Stop(ctx)
-				os.Exit(1)
+				exitCode = 1
+				return
 			}
 		}
 
 		server.Stop(ctx)
-		os.Exit(0)
+		exitCode = 0
+		return
 	}
 
 	defer env.EnableDebugging()()
 
-	if background {
+	if len(flag.Args()) > 0 {
+		err := server.RunWithArgs(ctx, flag.Args())
+		if err != nil {
+			slog.ErrorContext(ctx, "Failed to run containerd with args", "error", err)
+			exitCode = 1
+			return
+		}
+		exitCode = 0
+		return
+	} else if background {
 		slog.InfoContext(ctx, "Starting containerd in background mode")
 		if err := server.StartBackground(ctx); err != nil {
 			slog.ErrorContext(ctx, "Failed to start containerd in background", "error", err)
-			os.Exit(1)
+			exitCode = 1
+			return
 		}
 
 		// Print connection info and exit
@@ -147,6 +185,11 @@ func main() {
 			errChan <- server.Start(ctx)
 		}()
 
+		if err := runBuildkitInBackground(ctx); err != nil {
+			slog.ErrorContext(ctx, "Failed to start buildkitd in background", "error", err)
+			return
+		}
+
 		// Wait for either signal or error
 		select {
 		case sig := <-sigChan:
@@ -154,8 +197,10 @@ func main() {
 			server.Stop(ctx)
 		case err := <-errChan:
 			if err != nil {
-				slog.ErrorContext(ctx, "Containerd failed", "error", err)
-				os.Exit(1)
+				slog.ErrorContext(ctx, "Containerd failed - sleeping for 2 seconds for graceful shutdown", "error", err)
+				time.Sleep(2 * time.Second)
+				exitCode = 1
+				return
 			}
 		}
 	}
@@ -191,4 +236,61 @@ func (f *FlagArray[T]) Set(value string) error {
 
 func (f *FlagArray[T]) Get() []T {
 	return f.values
+}
+
+var pids = make(map[int]bool)
+
+func runBuildkitInBackground(ctx context.Context) error {
+	// look for a binary called buildkitd-test next to our own binary
+	buildkitdTestPath, err := os.Executable()
+	if err != nil {
+		return errors.Errorf("failed to get executable path: %w", err)
+	}
+	buildkitdTestPath = filepath.Dir(buildkitdTestPath) + "/buildkitd-test"
+
+	// run it in background
+	cmd := exec.CommandContext(ctx, buildkitdTestPath)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Env = append(os.Environ(), "UNDER_CONTAINERD_TEST=1")
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		// Setpgid: true,
+		// Pgid: os.Getpid(),
+	}
+	if err := cmd.Start(); err != nil {
+		return errors.Errorf("failed to start buildkitd-test: %w", err)
+	}
+
+	go func() {
+		slog.InfoContext(ctx, "buildkitd-test started", "pid", cmd.Process.Pid)
+		if err := cmd.Wait(); err != nil {
+			slog.WarnContext(ctx, "failed to wait for buildkitd-test, storing pid "+strconv.Itoa(cmd.Process.Pid)+" for cleanup later", "error", err)
+			pids[cmd.Process.Pid] = true
+		}
+	}()
+
+	return nil
+}
+
+func startPprofServer(ctx context.Context) int {
+	// Find an available port
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to find available port for pprof server", "error", err)
+		return 0
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	if err := listener.Close(); err != nil {
+		slog.WarnContext(ctx, "Failed to close listener", "error", err)
+	}
+
+	// Start the pprof server in a goroutine
+	go func() {
+		slog.InfoContext(ctx, "Starting pprof server", "port", port)
+		if err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil); err != nil {
+			slog.ErrorContext(ctx, "pprof server failed", "error", err)
+		}
+	}()
+
+	return port
 }

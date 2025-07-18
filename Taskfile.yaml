@@ -60,11 +60,11 @@ env:
     GOPRIVATE: github.com/walteh
     DOCKER_BUILDKIT: 1
     PAGER: less
-    # DEBUG_CONTAINERD_TEST: 1
-    # DEBUG_BUILDKITD_TEST: 1
-    # DEBUG_NERDCTL_TEST: 1
+    DEBUG_CONTAINERD_TEST: 0
+    DEBUG_BUILDKITD_TEST: 0
+    DEBUG_NERDCTL_TEST: 0
     DEBUG_CONTAINERD_SHIM_RUNM_V2_TEST:
-        sh: mkdir -p /tmp/tcontainerd-fs-env && echo '1' | tee /tmp/tcontainerd-fs-env/DEBUG_CONTAINERD_SHIM_RUNM_V2_TEST
+        sh: mkdir -p /tmp/tcontainerd-fs-env && echo '0' | tee /tmp/tcontainerd-fs-env/DEBUG_CONTAINERD_SHIM_RUNM_V2_TEST
 
 tasks:
     #=================================================================================
@@ -324,6 +324,21 @@ tasks:
           - cmd: if [ "{{.SYMLINK}}" != "" ]; then ln -laf {{.OUT_DIR}}/{{.NAME}} {{.OUT_DIR}}/{{.SYMLINK}}; fi
             silent: true
 
+    build:buildctl-test:
+        desc: builds the buildctl test
+        run: once
+        sources:
+          - test/integration/**
+          - ../buildkit/**
+          - pkg/**
+        generates:
+          - '{{.TEST_BIN_DIR}}/buildctl-test'
+        cmds:
+          - task: build:go:buildctl-test:darwin:arm64
+            vars:
+                DEBUG: '1'
+                BIN_DIR: '{{.TEST_BIN_DIR}}'
+
     build:nerdctl-test:
         desc: builds the nerdctl test
         run: once
@@ -497,6 +512,7 @@ tasks:
           - build:runm-linux-mounter
           - build:busybox
           - build:buildkitd-test
+          - build:buildctl-test
         desc: builds all test binaries
 
     #endregion
@@ -521,6 +537,7 @@ tasks:
                 sh: echo $(pwd)/{{.LINUX_RUNTIME_DIR}}
         cmds:
           - task: dev:cleanup-running-shims
+          - task: dev:cleanup-containerd-processes
           - cmd: |-
                 {{.TEST_BIN_DIR}}/containerd-test
 
@@ -817,6 +834,15 @@ tasks:
           - task: dev:kill-process:containerd-shim-runc-v2
           - task: dev:kill-process:nerdctl-test
 
+    dev:cleanup-containerd-processes:
+        desc: kills all running containers
+        run: once
+        cmds:
+          - task: dev:kill-process:containerd-test
+          - task: dev:kill-process:buildkitd-test
+          - task: dev:kill-process:dlv
+          - cmd: rm /tmp/tcontainerd-persistent/lock.pid || true
+
     dev:2025-06-18:01:
         desc: runs the shim for 2025-06-18 - bun version from entrypoint
         deps: ['linux:runtime:all']
@@ -1014,6 +1040,33 @@ tasks:
                     sh: cat {{.TMP_DIR}}/stdout.txt
 
           - task: run:nerdctl-test:ps
+
+    dev:2025-07-17:01:
+        desc: runs the shim for 2025-07-17 - runm-linux-mounter
+        deps: ['linux:runtime:all', 'build:all-test-binaries']
+        vars:
+            TEST_SCENARIO_DIR:
+                sh: realpath ./test/integration/scenarios/2025-07-17
+            TMP_DIR:
+                sh: mktemp -d
+        cmds:
+          - defer: rm -rf {{.TMP_DIR}}
+          - cmd: mkdir -p {{.TMP_DIR}}
+          - cmd: mkdir -p {{.TMP_DIR}}/forks
+          - for: {var: FORKS}
+            cmd: rsync -a --exclude='vendor/' --exclude='tmp/' --exclude='.git/' {{.ITEM.path}} {{.TMP_DIR}}/forks/
+          - task: run:nerdctl-test:rm-all-running-containers
+          - cmd: |-
+                {{.NERDCTL_CMD}} build \
+                    --platform=linux/arm64 \
+                    --progress=plain \
+                    --build-context=runm=. \
+                    --build-context=go-path=$(go env GOPATH) \
+                    --build-context=forks={{.TMP_DIR}}/forks \
+                    --target=runm-linux-mounter-builder \
+                    --output=type=local,dest={{.TEST_BIN_DIR}} \
+                    {{.TEST_SCENARIO_DIR}}
+
     #endregion dev
 
     end-of-file:

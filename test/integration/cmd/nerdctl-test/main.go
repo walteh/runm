@@ -64,11 +64,23 @@ import (
 func init() {
 
 	os.Setenv("NERDCTL_TOML", env.NerdctlConfigTomlPath())
+	os.Setenv("BUILDKIT_HOST", "unix://"+env.BuildkitdAddress())
 
-	container.AddHackedClientOpts(client.WithExtraDialOpts([]grpc.DialOption{
+	// set buildctl binary to the test binary
+	buildctlBinary, err := os.Executable()
+	if err != nil {
+		panic(err)
+	}
+	os.Setenv("BUILDKIT_BUILDCTL_BINARY", strings.Replace(buildctlBinary, "nerdctl", "buildctl", 1))
+
+	clientopts := []grpc.DialOption{
 		grpc.WithChainUnaryInterceptor(grpcerr.NewUnaryClientInterceptor(context.Background())),
 		grpc.WithChainStreamInterceptor(grpcerr.NewStreamClientInterceptor(context.Background())),
-	}))
+	}
+
+	container.AddHackedClientOpts(client.WithExtraDialOpts(clientopts))
+
+	client.AddHackedClientOpts(clientopts...)
 
 }
 
@@ -185,6 +197,7 @@ func xmain() error {
 		}
 
 		goodStdLogger = logrus.StandardLogger()
+		goodStdLogger.SetLevel(logrus.DebugLevel)
 
 		log.L = &logrus.Entry{
 			Logger: goodStdLogger,
@@ -205,7 +218,11 @@ func xmain() error {
 		return nil
 	}
 
-	return app.ExecuteContext(context.Background())
+	if err := app.ExecuteContext(context.Background()); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func initRootCmdFlags(rootCmd *cobra.Command, tomlPath string) (*pflag.FlagSet, error) {

@@ -1,16 +1,10 @@
 package main
 
 import (
-	_ "net/http/pprof"
-
 	"context"
-	"fmt"
 	"log/slog"
-	"net"
-	"net/http"
 	"os"
 
-	"github.com/containerd/containerd/v2/pkg/cap"
 	"github.com/containerd/log"
 	"github.com/moby/buildkit/client"
 	"github.com/moby/buildkit/frontend/gateway/grpcclient"
@@ -22,16 +16,12 @@ import (
 	"google.golang.org/grpc"
 
 	containerdclient "github.com/containerd/containerd/v2/client"
-	buildkitd_main "github.com/moby/buildkit/cmd/buildkitd"
+	buildctl_main "github.com/moby/buildkit/cmd/buildctl"
 	slogctx "github.com/veqryn/slog-context"
 
 	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/test/integration/env"
 )
-
-func init() {
-	cap.SetMissingProcOverrides(env.GetCurrentRunmProcs())
-}
 
 func main() {
 
@@ -39,18 +29,12 @@ func main() {
 
 	var logger *slog.Logger
 
-	// if os.Getenv("UNDER_CONTAINERD_TEST") == "1" {
-	// 	os.Setenv("BUILDKIT_HOST", env.BuildkitdAddress())
-	// 	logger = logging.NewDefaultDevLogger("buildkitd", os.Stdout)
-	// 	ctx = slogctx.NewCtx(context.Background(), logger)
-	// } else {
-	l, df, err := env.SetupLogForwardingToContainerd(ctx, "buildkitd", true)
+	l, df, err := env.SetupLogForwardingToContainerd(ctx, "buildctl", false)
 	if err != nil {
 		panic(err)
 	}
 	defer df()
 	logger = l
-	// }
 
 	goodStdLogger := logrus.StandardLogger()
 
@@ -65,10 +49,6 @@ func main() {
 
 	ctx = slogctx.NewCtx(ctx, logger)
 
-	// Start pprof server
-	pprofPort := startPprofServer(ctx)
-	logger.Info("buildkitd pprof server started", "port", pprofPort)
-
 	clientopts := []grpc.DialOption{
 		grpc.WithChainUnaryInterceptor(grpcerr.NewUnaryClientInterceptor(ctx)),
 		grpc.WithChainStreamInterceptor(grpcerr.NewStreamClientInterceptor(ctx)),
@@ -79,9 +59,10 @@ func main() {
 	client.AddHackedClientOpts(clientopts...)
 	containerdclient.AddHackedClientOpts(clientopts...)
 
-	app := buildkitd_main.App(
-		grpc.ChainUnaryInterceptor(grpcerr.NewUnaryServerInterceptor(ctx)),
-		grpc.ChainStreamInterceptor(grpcerr.NewStreamServerInterceptor(ctx)))
+	app, err := buildctl_main.BuildctlApp()
+	if err != nil {
+		panic(err)
+	}
 
 	var debugDeferred func()
 
@@ -138,27 +119,4 @@ func main() {
 		}
 		os.Exit(1)
 	}
-}
-
-func startPprofServer(ctx context.Context) int {
-	// Find an available port
-	listener, err := net.Listen("tcp", ":0")
-	if err != nil {
-		slog.ErrorContext(ctx, "Failed to find available port for pprof server", "error", err)
-		return 0
-	}
-	port := listener.Addr().(*net.TCPAddr).Port
-	if err := listener.Close(); err != nil {
-		slog.WarnContext(ctx, "Failed to close listener", "error", err)
-	}
-
-	// Start the pprof server in a goroutine
-	go func() {
-		slog.InfoContext(ctx, "Starting pprof server", "port", port)
-		if err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil); err != nil {
-			slog.ErrorContext(ctx, "pprof server failed", "error", err)
-		}
-	}()
-
-	return port
 }
