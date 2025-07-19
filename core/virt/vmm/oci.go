@@ -192,6 +192,7 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 			"-mfs-binds=" + mfsBindString,
 			"-msock-binds=" + msockBindString,
 			"-timezone=" + loc.String(),
+			"-time=" + strconv.FormatInt(time.Now().UnixNano(), 10),
 		}
 
 		bootloader = &virtio.LinuxBootloader{

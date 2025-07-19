@@ -63,6 +63,7 @@ var (
 	msockBindsString string
 	enableOtel       bool
 	timezone         string
+	time             string // unix timestamp in nanoseconds, not meant to be exact (that is what the timesync does)
 
 	mfsBinds   map[string]string
 	msockBinds map[string]string
@@ -84,6 +85,7 @@ func init() {
 	flag.StringVar(&mfsBindsString, "mfs-binds", "", "the mfs binds")
 	flag.StringVar(&msockBindsString, "msock-binds", "", "the msock binds")
 	flag.StringVar(&timezone, "timezone", "", "the timezone")
+	flag.StringVar(&time, "time", "0", "the time in nanoseconds")
 	flag.Parse()
 
 	mfsBinds = make(map[string]string)
@@ -153,6 +155,18 @@ func main() {
 
 func (r *runmLinuxInit) run(ctx context.Context) error {
 
+	requestedNano, err := strconv.ParseInt(time, 10, 64)
+	if err != nil {
+		return errors.Errorf("problem parsing time: %w", err)
+	}
+
+	// update the time so certificates are valid
+	tv := unix.NsecToTimeval(requestedNano)
+
+	if err := unix.Settimeofday(&tv); err != nil {
+		return errors.Errorf("unix.Settimeofday failed: %v", err)
+	}
+
 	if containerId == "" {
 		return errors.Errorf("container-id flag is required")
 	}
@@ -221,6 +235,19 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 	if err := configureNetwork(ctx); err != nil {
 		slog.ErrorContext(ctx, "failed to configure network", "error", err)
 		return errors.Errorf("failed to configure network: %w", err)
+	}
+
+	// Check network interface status before diagnostic
+	if err := ExecCmdForwardingStdio(ctx, "ip", "link", "show"); err != nil {
+		slog.WarnContext(ctx, "failed to show network links", "error", err)
+	}
+
+	if err := ExecCmdForwardingStdio(ctx, "ip", "addr", "show"); err != nil {
+		slog.WarnContext(ctx, "failed to show network addresses", "error", err)
+	}
+
+	if err := ExecCmdForwardingStdio(ctx, "ip", "route", "show"); err != nil {
+		slog.WarnContext(ctx, "failed to show network routes", "error", err)
 	}
 
 	// try to hit google.com with busybox verbose if not throw an error

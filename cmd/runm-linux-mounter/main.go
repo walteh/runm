@@ -39,6 +39,7 @@ var (
 	mfsBindsString   string
 	msockBindsString string
 	timezone         string
+	time             string // unix timestamp in nanoseconds, not meant to be exact (that is what the timesync does)
 
 	mfsBinds   map[string]string
 	msockBinds map[string]string
@@ -104,6 +105,7 @@ func init() {
 	flag.StringVar(&msockBindsString, "msock-binds", "", "the msock binds")
 	flag.BoolVar(&enableOtel, "enable-otlp", false, "enable otel")
 	flag.StringVar(&timezone, "timezone", "UTC", "the timezone")
+	flag.StringVar(&time, "time", "0", "the time in nanoseconds")
 	flag.Parse()
 
 	mfsBinds = make(map[string]string)
