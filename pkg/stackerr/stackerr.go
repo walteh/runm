@@ -77,5 +77,9 @@ func Hyperlink(link, renderedText string) string {
 	start := "\x1b]8;;" + link + "\x07"
 	end := "\x1b]8;;\x07"
 
-	return start + renderedText + end
+	preLen := len(renderedText)
+	trimmed := strings.TrimRight(renderedText, " ")
+	postLen := len(trimmed)
+
+	return start + trimmed + end + strings.Repeat(" ", preLen-postLen)
 }

@@ -492,7 +492,7 @@ func (l *TermLogger) Handle(ctx context.Context, r slog.Record) error {
 		// 	Key:   "source.enhanced_pkg",
 		// 	Value: slog.StringValue(source.EnhancedPkg),
 		// })
-		b.WriteString(RenderEnhancedSource(source, l.styles, l.renderFunc, l.hyperlinkFunc))
+		b.WriteString(RenderEnhancedSourceWIthTrim(source, l.styles, l.renderFunc, l.hyperlinkFunc, true))
 		b.WriteByte(' ')
 	}
 

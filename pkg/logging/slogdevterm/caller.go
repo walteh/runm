@@ -3,9 +3,11 @@ package slogdevterm
 import (
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"runtime/debug"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/walteh/runm/pkg/stackerr"
 )
 
@@ -44,6 +46,9 @@ const (
 )
 
 func RenderEnhancedSource(e *stackerr.EnhancedSource, styles *Styles, render renderFunc, hyperlink HyperlinkFunc) string {
+	return RenderEnhancedSourceWIthTrim(e, styles, render, hyperlink, false)
+}
+func RenderEnhancedSourceWIthTrim(e *stackerr.EnhancedSource, styles *Styles, render renderFunc, hyperlink HyperlinkFunc, withTrim bool) string {
 
 	pkgNoProject := strings.TrimPrefix(e.EnhancedFullPkg, e.EnhancedProject+"/")
 	if e.EnhancedProject == e.EnhancedFullPkg {
@@ -59,7 +64,7 @@ func RenderEnhancedSource(e *stackerr.EnhancedSource, styles *Styles, render ren
 	var projIcon string
 
 	// pkg = filepath.Base(pkg)
-	filePath := render(styles.Caller.File, stackerr.FileNameOfPath(e.RawFilePath))
+	filename := render(styles.Caller.File, stackerr.FileNameOfPath(e.RawFilePath))
 	num := render(styles.Caller.Line, fmt.Sprintf("%d", e.RawFileLine))
 	sep := render(styles.Caller.Sep, ":")
 
@@ -94,18 +99,8 @@ func RenderEnhancedSource(e *stackerr.EnhancedSource, styles *Styles, render ren
 		pkg = ""
 	} else {
 		// For main executables, don't show the package name at all (it's shown in eproj)
-		pkg = render(styles.Caller.Pkg, strings.Join(pkgsplt, "/")) + sep
+		pkg = render(styles.Caller.Pkg, strings.Join(pkgsplt, "/"))
 	}
-
-	// var pkg string
-	// if len(pkgsplt) > 1 {
-	// 	pkg = styles.Caller.Pkg.Render(strings.Join(pkgsplt[:len(pkgsplt)-2], "/") + "/")
-	// 	pkg += styles.Caller.Pkg.Bold(true).Render(last)
-	// } else {
-	// 	pkg = styles.Caller.Pkg.Render(last)
-	// }
-
-	// [icon] [package]
 
 	var eproj string
 	if filepath.Base(e.EnhancedProject) == "main" {
@@ -116,5 +111,39 @@ func RenderEnhancedSource(e *stackerr.EnhancedSource, styles *Styles, render ren
 		eproj = " " + render(styles.Caller.Project, filepath.Base(e.EnhancedProject)) + " "
 	}
 
-	return hyperlink("cursor://file/"+e.RawFilePath+":"+fmt.Sprintf("%d", e.RawFileLine), fmt.Sprintf("%s%s%s%s%s%s", projIcon, eproj, pkg, filePath, sep, num))
+	pkgsep := ""
+	if pkg != "" {
+		pkgsep = sep
+	}
+
+	str := fmt.Sprintf("%s%s%s%s%s%s%s", projIcon, eproj, pkg, pkgsep, filename, sep, num)
+
+	if withTrim {
+		noColorString := Strip(str)
+
+		if len(noColorString) > 55 && withTrim && pkg != "" {
+			pkgNoAnsi := Strip(pkg)
+			diff := len(noColorString) - 55 + 3 // +3 for the "..." we'll add
+			if diff >= len(pkgNoAnsi) {
+				// If we need to trim more than the entire pkg, just remove pkg entirely
+				str = fmt.Sprintf("%s%s%s%s%s", projIcon, eproj, filename, sep, num)
+			} else {
+				// Trim from the beginning of pkg and add "..."
+				trimmedPkg := render(styles.Caller.Pkg, "..."+pkgNoAnsi[diff:])
+				str = fmt.Sprintf("%s%s%s%s%s%s%s", projIcon, eproj, trimmedPkg, sep, filename,
+					sep, num)
+			}
+		}
+		str = render(lipgloss.NewStyle().Width(55), str)
+	}
+
+	return hyperlink("cursor://file/"+e.RawFilePath+":"+fmt.Sprintf("%d", e.RawFileLine), str)
+}
+
+const ansi = "[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))"
+
+var re = regexp.MustCompile(ansi)
+
+func Strip(str string) string {
+	return re.ReplaceAllString(str, "")
 }
