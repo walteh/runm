@@ -40,14 +40,18 @@ func Domain() string {
 }
 
 type EnhancedSource struct {
-	ptr             *uintptr
-	RawFunc         string `json:"raw_func"`
-	RawFilePath     string `json:"raw_file_path"`
-	RawFileLine     int    `json:"raw_file_line"`
-	EnhancedFunc    string `json:"enhanced_func"`
-	EnhancedPkg     string `json:"enhanced_pkg"`
-	EnhancedProject string `json:"enhanced_project"`
-	EnhancedFullPkg string `json:"enhanced_full_pkg"`
+	ptr                      *uintptr
+	RawGoFunc                string `json:"raw_func"`
+	RawFilePath              string `json:"raw_file_path"`
+	RawFileLine              int    `json:"raw_file_line"`
+	FunctionName             string `json:"enhanced_func"`
+	ProjectName              string `json:"enhanced_project"`
+	FullPackageModulePath    string `json:"enhanced_full_pkg"`
+	TrimmedPackageModulePath string `json:"trimmed_package_path"`
+}
+
+func (e *EnhancedSource) IsLocalProjectFile() bool {
+	return e.ProjectName == currentMainGoPackage
 }
 
 func (e *EnhancedSource) UnsafePtr() (uintptr, error) {
@@ -60,17 +64,21 @@ func (e *EnhancedSource) UnsafePtr() (uintptr, error) {
 func NewEnhancedSource(pc uintptr) *EnhancedSource {
 	frame, _ := runtime.CallersFrames([]uintptr{pc}).Next()
 
-	fullpkg, pkg, function := GetPackageAndFuncFromFuncName(frame.Function)
+	fullpkg, function := GetPackageAndFuncFromFuncName(frame.Function)
+
+	projectName := GetProjectFromPackage(fullpkg)
+
+	pkgNoProject := strings.TrimPrefix(fullpkg, projectName+"/")
 
 	return &EnhancedSource{
-		ptr:             &pc,
-		RawFunc:         frame.Function,
-		RawFilePath:     frame.File,
-		RawFileLine:     frame.Line,
-		EnhancedFunc:    function,
-		EnhancedPkg:     pkg,
-		EnhancedProject: GetProjectFromPackage(fullpkg),
-		EnhancedFullPkg: fullpkg,
+		ptr:                      &pc,
+		RawGoFunc:                frame.Function,
+		RawFilePath:              frame.File,
+		RawFileLine:              frame.Line,
+		FunctionName:             function,
+		ProjectName:              GetProjectFromPackage(fullpkg),
+		FullPackageModulePath:    fullpkg,
+		TrimmedPackageModulePath: pkgNoProject,
 	}
 }
 
@@ -92,7 +100,7 @@ func GetProjectFromPackage(pkg string) string {
 	return pkg
 }
 
-func GetPackageAndFuncFromFuncName(pc string) (fullpkg, pkg, function string) {
+func GetPackageAndFuncFromFuncName(pc string) (string, string) {
 	funcName := pc
 	lastSlash := strings.LastIndexByte(funcName, '/')
 	if lastSlash < 0 {
@@ -101,7 +109,7 @@ func GetPackageAndFuncFromFuncName(pc string) (fullpkg, pkg, function string) {
 
 	firstDot := strings.IndexByte(funcName[lastSlash:], '.') + lastSlash
 
-	pkg = funcName[:firstDot]
+	pkg := funcName[:firstDot]
 	fname := funcName[firstDot+1:]
 
 	if strings.Contains(pkg, ".(") {
@@ -110,24 +118,7 @@ func GetPackageAndFuncFromFuncName(pc string) (fullpkg, pkg, function string) {
 		fname = "(" + splt[1] + "." + fname
 	}
 
-	fullpkg = pkg
-	pkg = strings.TrimPrefix(pkg, currentMainGoPackage+"/")
-
-	// Replace "main" with executable name for better display
-	if pkg == "main" {
-		pkg = executableName
-	}
-
-	return fullpkg, pkg, fname
-}
-
-func FileNameOfPath(path string) string {
-	tot := strings.Split(path, "/")
-	if len(tot) > 1 {
-		return tot[len(tot)-1]
-	}
-
-	return path
+	return pkg, fname
 }
 
 func GetEnhancedSourcesFromError(err error) []*EnhancedSource {

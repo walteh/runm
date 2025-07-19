@@ -11,6 +11,32 @@ import (
 	"gitlab.com/tozd/go/errors"
 )
 
+func initializeFsEnv() {
+	// list all the files in the fs env dir
+	files, err := os.ReadDir(FsEnvDir())
+	if err != nil {
+		return
+	}
+
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+
+		dat, err := os.ReadFile(filepath.Join(FsEnvDir(), file.Name()))
+		if err != nil {
+			continue
+		}
+
+		os.Setenv(file.Name(), string(dat))
+	}
+
+}
+
+func init() {
+	initializeFsEnv()
+}
+
 var (
 	globalWorkDir           = "/tmp/tcontainerd"
 	globalPersistentWorkDir = "/tmp/tcontainerd-persistent"
@@ -114,6 +140,14 @@ func getFsEnvVar(exe string) string {
 		return string(dat)
 	}
 	return ""
+}
+
+func getEnvVar(name string) string {
+	val := os.Getenv(name)
+	if val == "" {
+		val = getFsEnvVar(name)
+	}
+	return val
 }
 
 func resolveDebugEnvVar() string {

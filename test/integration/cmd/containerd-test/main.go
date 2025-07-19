@@ -25,18 +25,17 @@ import (
 	"github.com/containerd/log"
 	"github.com/sirupsen/logrus"
 	"gitlab.com/tozd/go/errors"
-	"google.golang.org/grpc"
 
 	slogctx "github.com/veqryn/slog-context"
 
 	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/pkg/logging"
+	"github.com/walteh/runm/pkg/logging/otel"
 	"github.com/walteh/runm/test/integration/env"
 )
 
 func init() {
-	server.AddHackedServerOption(grpc.ChainUnaryInterceptor(grpcerr.UnaryServerInterceptor))
-	server.AddHackedServerOption(grpc.ChainStreamInterceptor(grpcerr.NewStreamServerInterceptor(context.Background())))
+	server.AddHackedServerOption(grpcerr.GetGrpcServerOptsCtx(context.Background()))
 }
 
 var ctrCommands = FlagArray[string]{}
@@ -76,20 +75,12 @@ func main() {
 
 	var ctx context.Context
 
-	// // dial otel grpc
-	// conn, err := net.Dial("tcp", "localhost:4317")
-	// if err != nil {
-	// 	slog.ErrorContext(ctx, "Failed to dial otel grpc", "error", err)
-	// 	os.Exit(1)
-	// }
-	// defer conn.Close()
-
-	// otelInstances, err := logging.NewGRPCOtelInstances(ctx, simpleDialer{network: "tcp", address: "localhost:4317"}, "containerd")
-	// if err != nil {
-	// 	slog.ErrorContext(ctx, "Failed to create otel instances", "error", err)
-	// 	os.Exit(1)
-	// }
-	// otelInstances.EnableGlobally()
+	cleanup, err := otel.ConfigureOTelSDK(ctx, "containerd")
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to configure otel", "error", err)
+		os.Exit(1)
+	}
+	defer cleanup()
 
 	if json {
 		logger := logging.NewDefaultJSONLogger("containerd", os.Stdout)

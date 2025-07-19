@@ -61,12 +61,11 @@ func NewRunmVMRuntime[VM vmm.VirtualMachine](
 		RootfsMounts:   opts.Mounts,
 		StartingMemory: maxMemory.ToBytes(),
 		// VCPUs:          uint64(opts.OciSpec.Linux.Resources.CPU.Cpus),
-		VCPUs:        uint64(vcpus),
-		Platform:     units.PlatformLinuxARM64,
-		Bundle:       opts.Bundle,
-		HostOtlpPort: opts.HostOtlpPort,
-		RawWriter:    logging.GetDefaultRawWriter(),
-		DelimWriter:  logging.GetDefaultDelimWriter(),
+		VCPUs:       uint64(vcpus),
+		Platform:    units.PlatformLinuxARM64,
+		Bundle:      opts.Bundle,
+		RawWriter:   logging.GetDefaultRawWriter(),
+		DelimWriter: logging.GetDefaultDelimWriter(),
 	}
 
 	vm, err := vmm.NewOCIVirtualMachine(ctx, hpv, cfg)

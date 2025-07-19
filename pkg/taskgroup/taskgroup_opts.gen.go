@@ -21,8 +21,8 @@ func newTaskGroupOpts(
 	o.logLevel = slog.Level(-4)
 	o.logStart = true
 	o.logEnd = true
-	o.logTaskStart = false
-	o.logTaskEnd = false
+	o.logTaskStart = true
+	o.logTaskEnd = true
 	o.logTaskPanic = true
 	o.callerSkip = 1
 	o.enableTicker = false

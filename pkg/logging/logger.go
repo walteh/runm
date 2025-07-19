@@ -10,22 +10,14 @@ import (
 
 	"github.com/muesli/termenv"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
+	"go.opentelemetry.io/otel/trace"
 	"gopkg.in/natefinch/lumberjack.v2"
 
+	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/logging/slogdevterm"
 	"github.com/walteh/runm/pkg/logging/sloghclog"
 	"github.com/walteh/runm/pkg/logging/sloglogrus"
 )
-
-var globalOtelInstances *OTelInstances
-
-func SetGlobalOtelInstances(instances *OTelInstances) {
-	globalOtelInstances = instances
-}
-
-func GetGlobalOtelInstances() *OTelInstances {
-	return globalOtelInstances
-}
 
 //go:opts
 type LoggerOpts struct {
@@ -42,7 +34,7 @@ type LoggerOpts struct {
 	interceptHclog    bool
 	values            []slog.Attr
 	globalLogWriter   io.Writer
-	otlpInstances     *OTelInstances
+	// otlpInstances     *OTelInstances
 
 	delayedHandlerCreatorOpts []LoggerOpt `option:"-"`
 }
@@ -62,35 +54,15 @@ func NewDefaultDevLogger(name string, writer io.Writer, opts ...LoggerOpt) *slog
 			Level:     slog.LevelDebug,
 			AddSource: true,
 		}),
-	}
-	opts = append(defaults, opts...)
-	return NewLogger(opts...)
-}
-
-func NewDefaultDevLoggerWithDelimiter(name string, writer io.Writer, delimiter rune, opts ...LoggerOpt) *slog.Logger {
-	opts = append(opts, WithDelimiter(delimiter), WithEnableDelimiter(true))
-	return NewDefaultDevLogger(name, writer, opts...)
-}
-
-func NewDefaultDevLoggerWithOtel(ctx context.Context, name string, rawLogWriter io.Writer, instances *OTelInstances, opts ...LoggerOpt) *slog.Logger {
-	defaults := []LoggerOpt{
-		WithDevTermHanlder(rawLogWriter),
-		WithProcessName(name),
-		WithGlobalRedactor(),
-		WithErrorStackTracer(),
-		WithInterceptLogrus(true),
-		WithInterceptHclog(true),
-		WithMakeDefaultLogger(true),
-		WithGlobalLogWriter(rawLogWriter),
-		WithOtlpInstances(instances),
 		WithOtelHandler(),
-		WithHandlerOptions(&slog.HandlerOptions{
-			Level:     slog.LevelDebug,
-			AddSource: true,
-		}),
 	}
 	opts = append(defaults, opts...)
 	return NewLogger(opts...)
+}
+
+func NewDefaultDevLoggerWithDelimiter(name string, writer io.Writer, opts ...LoggerOpt) *slog.Logger {
+	opts = append(opts, WithDelimiter(constants.VsockDelimitedLogProxyDelimiter), WithEnableDelimiter(true))
+	return NewDefaultDevLogger(name, writer, opts...)
 }
 
 func NewDefaultJSONLogger(name string, writer io.Writer, opts ...LoggerOpt) *slog.Logger {
@@ -184,7 +156,9 @@ func NewLogger(opts ...LoggerOpt) *slog.Logger {
 
 	ctxHandler := newContextHandler(fan)
 
-	l := slog.New(ctxHandler)
+	otelHandler := NewOTelSlogTraceInjectionHandler(ctxHandler)
+
+	l := slog.New(otelHandler)
 
 	for _, v := range copts.values {
 		l = l.With(v)
@@ -201,10 +175,10 @@ func NewLogger(opts ...LoggerOpt) *slog.Logger {
 
 	if copts.makeDefaultLogger {
 		slog.SetDefault(l)
-		if copts.otlpInstances != nil {
-			copts.otlpInstances.EnableGlobally()
-			SetGlobalOtelInstances(copts.otlpInstances)
-		}
+		// if copts.otlpInstances != nil {
+		// 	copts.otlpInstances.EnableGlobally()
+		// 	SetGlobalOtelInstances(copts.otlpInstances)
+		// }
 	}
 
 	if copts.interceptLogrus {
@@ -250,13 +224,16 @@ func WithDevTermHanlder(writer io.Writer) LoggerOpt {
 func WithOtelHandler() LoggerOpt {
 	return func(o *LoggerOpts) {
 		o.delayedHandlerCreatorOpts = append(o.delayedHandlerCreatorOpts, func(o *LoggerOpts) {
-			if o.otlpInstances == nil {
-				panic("otlpInstances is nil, use WithOtelInstances to set it")
+			opts := []otelslog.Option{
+				otelslog.WithSource(true),
 			}
+
+			// if o.otlpInstances == nil {
+			// 	opts = append(opts, otelslog.WithLoggerProvider(o.otlpInstances.LoggerProvider))
+			// }
 			o.handlers = append(o.handlers, otelslog.NewHandler(
 				Domain(),
-				otelslog.WithSource(true),
-				otelslog.WithLoggerProvider(o.otlpInstances.LoggerProvider),
+				opts...,
 			))
 		})
 	}
@@ -312,4 +289,41 @@ type SlogReplacerFunc func(groups []string, a slog.Attr) slog.Attr
 
 func (f SlogReplacerFunc) Replace(groups []string, a slog.Attr) slog.Attr {
 	return f(groups, a)
+}
+
+var _ slog.Handler = &OTelSlogTraceInjectionHandler{}
+
+type OTelSlogTraceInjectionHandler struct {
+	Next slog.Handler
+}
+
+// Enabled implements slog.Handler.
+func (h *OTelSlogTraceInjectionHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	return h.Next.Enabled(ctx, level)
+}
+
+// WithAttrs implements slog.Handler.
+func (h *OTelSlogTraceInjectionHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &OTelSlogTraceInjectionHandler{Next: h.Next.WithAttrs(attrs)}
+}
+
+// WithGroup implements slog.Handler.
+func (h *OTelSlogTraceInjectionHandler) WithGroup(name string) slog.Handler {
+	return &OTelSlogTraceInjectionHandler{Next: h.Next.WithGroup(name)}
+}
+
+func NewOTelSlogTraceInjectionHandler(h slog.Handler) *OTelSlogTraceInjectionHandler {
+	return &OTelSlogTraceInjectionHandler{Next: h}
+}
+
+// Handle extracts trace and span IDs and adds them to the log record.
+func (h *OTelSlogTraceInjectionHandler) Handle(ctx context.Context, r slog.Record) error {
+	spanCtx := trace.SpanContextFromContext(ctx)
+	if spanCtx.IsValid() {
+		r.AddAttrs(
+			slog.String("trace_id", spanCtx.TraceID().String()),
+			slog.String("span_id", spanCtx.SpanID().String()),
+		)
+	}
+	return h.Next.Handle(ctx, r)
 }

@@ -26,6 +26,7 @@ import (
 	slogctx "github.com/veqryn/slog-context"
 
 	"github.com/walteh/runm/pkg/grpcerr"
+	"github.com/walteh/runm/pkg/logging/otel"
 	"github.com/walteh/runm/test/integration/env"
 )
 
@@ -34,23 +35,22 @@ func init() {
 }
 
 func main() {
+	var exitCode = 0
+	defer func() {
+		os.Exit(exitCode)
+	}()
 
 	ctx := context.Background()
 
 	var logger *slog.Logger
 
-	// if os.Getenv("UNDER_CONTAINERD_TEST") == "1" {
-	// 	os.Setenv("BUILDKIT_HOST", env.BuildkitdAddress())
-	// 	logger = logging.NewDefaultDevLogger("buildkitd", os.Stdout)
-	// 	ctx = slogctx.NewCtx(context.Background(), logger)
-	// } else {
-	l, df, err := env.SetupLogForwardingToContainerd(ctx, "buildkitd", true)
+	logger, df, err := env.SetupLogForwardingToContainerd(ctx, "buildkitd", true)
 	if err != nil {
-		panic(err)
+		logger.Error("failed to setup logging", "error", err)
+		exitCode = 1
+		return
 	}
 	defer df()
-	logger = l
-	// }
 
 	goodStdLogger := logrus.StandardLogger()
 
@@ -70,8 +70,8 @@ func main() {
 	logger.Info("buildkitd pprof server started", "port", pprofPort)
 
 	clientopts := []grpc.DialOption{
-		grpc.WithChainUnaryInterceptor(grpcerr.NewUnaryClientInterceptor(ctx)),
-		grpc.WithChainStreamInterceptor(grpcerr.NewStreamClientInterceptor(ctx)),
+		otel.GetGrpcClientOpts(),
+		grpcerr.GetGrpcClientOptsCtx(ctx),
 	}
 
 	grpcclient.AddHackedClientOpts(clientopts...)
@@ -80,8 +80,9 @@ func main() {
 	containerdclient.AddHackedClientOpts(clientopts...)
 
 	app := buildkitd_main.App(
-		grpc.ChainUnaryInterceptor(grpcerr.NewUnaryServerInterceptor(ctx)),
-		grpc.ChainStreamInterceptor(grpcerr.NewStreamServerInterceptor(ctx)))
+		otel.GetGrpcServerOpts(),
+		grpcerr.GetGrpcServerOptsCtx(ctx),
+	)
 
 	var debugDeferred func()
 
@@ -98,7 +99,8 @@ func main() {
 		if debugDeferred != nil {
 			debugDeferred()
 		}
-		os.Exit(1)
+		exitCode = 1
+		return
 	}
 
 	app.ExitErrHandler = exitErrHandler
@@ -136,7 +138,8 @@ func main() {
 		if debugDeferred != nil {
 			debugDeferred()
 		}
-		os.Exit(1)
+		exitCode = 1
+		return
 	}
 }
 

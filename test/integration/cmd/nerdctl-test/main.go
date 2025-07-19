@@ -57,6 +57,7 @@ import (
 	slogctx "github.com/veqryn/slog-context"
 
 	"github.com/walteh/runm/pkg/grpcerr"
+	"github.com/walteh/runm/pkg/logging/otel"
 	"github.com/walteh/runm/test/integration/cmd/nerdctl-test/internal"
 	"github.com/walteh/runm/test/integration/env"
 )
@@ -72,15 +73,6 @@ func init() {
 		panic(err)
 	}
 	os.Setenv("BUILDKIT_BUILDCTL_BINARY", strings.Replace(buildctlBinary, "nerdctl", "buildctl", 1))
-
-	clientopts := []grpc.DialOption{
-		grpc.WithChainUnaryInterceptor(grpcerr.NewUnaryClientInterceptor(context.Background())),
-		grpc.WithChainStreamInterceptor(grpcerr.NewStreamClientInterceptor(context.Background())),
-	}
-
-	container.AddHackedClientOpts(client.WithExtraDialOpts(clientopts))
-
-	client.AddHackedClientOpts(clientopts...)
 
 }
 
@@ -172,6 +164,16 @@ func xmain() error {
 		// "binary://BIN?KEY=VALUE" URI is parsed into Args {BIN, KEY, VALUE}.
 		return logging.Main(os.Args[2])
 	}
+
+	clientopts := []grpc.DialOption{
+		otel.GetGrpcClientOpts(),
+		grpcerr.GetGrpcClientOptsCtx(context.Background()),
+	}
+
+	container.AddHackedClientOpts(client.WithExtraDialOpts(clientopts))
+
+	client.AddHackedClientOpts(clientopts...)
+
 	// nerdctl CLI mode
 	app, err := newApp()
 	if err != nil {
@@ -188,13 +190,24 @@ func xmain() error {
 		}
 	}()
 
+	clanups := make([]func() error, 0)
+
+	defer func() {
+		for _, cleanup := range clanups {
+			if err := cleanup(); err != nil {
+				slog.Error("failed to cleanup", "error", err)
+			}
+		}
+	}()
+
 	app.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
-		l, _, err := env.SetupOtelForNerdctl(ctx, cmd.Name())
+		l, cleanup, err := env.SetupLoggingForNerdctl(ctx, cmd.Name())
 		if err != nil {
 			return err
 		}
+		clanups = append(clanups, cleanup)
 
 		goodStdLogger = logrus.StandardLogger()
 		goodStdLogger.SetLevel(logrus.DebugLevel)

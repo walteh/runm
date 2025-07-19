@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -23,6 +24,7 @@ import (
 
 	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/logging"
+	"github.com/walteh/runm/pkg/logging/otel"
 )
 
 // var binariesToCopy = []string{
@@ -51,52 +53,43 @@ type runmLinuxMounter struct {
 }
 
 // DO NOT USE SLOG IN THIS FUNCTION - LOG TO STDOUT
-func (r *runmLinuxMounter) setupLogger(ctx context.Context) (context.Context, error) {
+func (r *runmLinuxMounter) setupLogger(ctx context.Context) (context.Context, func(), error) {
 	var err error
 
 	fmt.Println("linux-runm-mounter: setting up logging - all future logs will be sent to vsock (pid: ", os.Getpid(), ")")
 
 	rawWriterConn, err := vsock.Dial(2, uint32(constants.VsockRawWriterProxyPort), nil)
 	if err != nil {
-		return nil, errors.Errorf("problem dialing vsock for raw writer: %w", err)
+		return nil, nil, errors.Errorf("problem dialing vsock for raw writer: %w", err)
 	}
 
 	delimitedLogProxyConn, err := vsock.Dial(2, uint32(constants.VsockDelimitedWriterProxyPort), nil)
 	if err != nil {
-		return nil, errors.Errorf("problem dialing vsock for log proxy: %w", err)
+		return nil, nil, errors.Errorf("problem dialing vsock for log proxy: %w", err)
+	}
+
+	dialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		return vsock.Dial(2, uint32(constants.VsockOtelPort), nil)
+	}
+
+	cleanup, err := otel.ConfigureOTelSDKWithDialer(ctx, serviceName, enableOtel, dialer)
+	if err != nil {
+		return nil, nil, errors.Errorf("failed to setup OTel SDK: %w", err)
 	}
 
 	opts := []logging.LoggerOpt{
-		logging.WithDelimiter(constants.VsockDelimitedLogProxyDelimiter),
-		logging.WithEnableDelimiter(true),
 		logging.WithRawWriter(rawWriterConn),
 	}
 
-	var logger *slog.Logger
-	if enableOtel {
-		otelConn, err := vsock.Dial(2, uint32(constants.VsockOtelPort), nil)
-		if err != nil {
-			return nil, errors.Errorf("problem dialing vsock for otel: %w", err)
-		}
-
-		otelInstancez, err := logging.NewGRPCOtelInstances(ctx, otelConn, serviceName)
-		if err != nil {
-			return nil, errors.Errorf("failed to setup OTel SDK: %w", err)
-		}
-
-		logger = logging.NewDefaultDevLoggerWithOtel(ctx, serviceName, delimitedLogProxyConn, otelInstancez, opts...)
-
-		r.otelWriter = otelConn
-
-	} else {
-		logger = logging.NewDefaultDevLogger(serviceName, delimitedLogProxyConn, opts...)
-	}
+	logger := logging.NewDefaultDevLoggerWithDelimiter(serviceName, delimitedLogProxyConn, opts...)
 
 	r.rawWriter = rawWriterConn
 	r.logWriter = delimitedLogProxyConn
 	r.logger = logger
 
-	return slogctx.NewCtx(ctx, logger), nil
+	return slogctx.NewCtx(ctx, logger), func() {
+		cleanup()
+	}, nil
 }
 
 const (
@@ -128,22 +121,31 @@ func init() {
 }
 
 func main() {
+	var exitCode = 0
+
+	defer func() {
+		os.Exit(exitCode)
+	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	runmLinuxMounter := &runmLinuxMounter{}
 
-	ctx, err := runmLinuxMounter.setupLogger(ctx)
+	ctx, cleanup, err := runmLinuxMounter.setupLogger(ctx)
 	if err != nil {
 		fmt.Printf("failed to setup logger: %v\n", err)
-		os.Exit(1)
+		exitCode = 1
+		return
 	}
+
+	defer cleanup()
 
 	err = recoveryMain(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "error in main", "error", err)
-		os.Exit(1)
+		exitCode = 1
+		return
 	}
 }
 

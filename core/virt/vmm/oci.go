@@ -37,7 +37,6 @@ type OCIVMConfig struct {
 	StartingMemory strongunits.B
 	VCPUs          uint64
 	Platform       units.Platform
-	HostOtlpPort   uint32
 	RawWriter      io.Writer
 	DelimWriter    io.Writer
 }
@@ -158,7 +157,7 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 
 	var otelString string = ""
 
-	if ctrconfig.HostOtlpPort != 0 {
+	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" {
 		otelString = "-enable-otlp"
 	}
 
@@ -244,7 +243,6 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 
 	runner := &RunningVM[VM]{
 		bootloader:   bootloader,
-		hostOtlpPort: ctrconfig.HostOtlpPort,
 		start:        startTime,
 		vm:           vm,
 		portOnHostIP: hostIPPort,

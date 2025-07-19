@@ -38,29 +38,29 @@ func mergeContext(ctx context.Context, grpcctx context.Context) context.Context 
 	return slogctx.Append(grpcctx, anyattrs...)
 }
 
-func NewUnaryServerInterceptor(ctx context.Context) grpc.UnaryServerInterceptor {
-	return func(grpcctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-		return UnaryServerInterceptor(mergeContext(ctx, grpcctx), req, info, handler)
-	}
-}
+// func NewUnaryServerInterceptor(ctx context.Context) grpc.UnaryServerInterceptor {
+// 	return func(grpcctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+// 		return UnaryServerInterceptor(mergeContext(ctx, grpcctx), req, info, handler)
+// 	}
+// }
 
-func NewStreamServerInterceptor(ctx context.Context) grpc.StreamServerInterceptor {
-	return func(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-		return handler(srv, stream)
-	}
-}
+// func NewStreamServerInterceptor(ctx context.Context) grpc.StreamServerInterceptor {
+// 	return func(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+// 		return handler(srv, stream)
+// 	}
+// }
 
-func NewUnaryClientInterceptor(ctx context.Context) grpc.UnaryClientInterceptor {
-	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
-		return UnaryClientInterceptor(mergeContext(ctx, ctx), method, req, reply, cc, invoker, opts...)
-	}
-}
+// func NewUnaryClientInterceptor(ctx context.Context) grpc.UnaryClientInterceptor {
+// 	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+// 		return UnaryClientInterceptor(mergeContext(ctx, ctx), method, req, reply, cc, invoker, opts...)
+// 	}
+// }
 
-func NewStreamClientInterceptor(ctx context.Context) grpc.StreamClientInterceptor {
-	return func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
-		return streamer(mergeContext(ctx, ctx), desc, cc, method, opts...)
-	}
-}
+// func NewStreamClientInterceptor(ctx context.Context) grpc.StreamClientInterceptor {
+// 	return func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+// 		return streamer(mergeContext(ctx, ctx), desc, cc, method, opts...)
+// 	}
+// }
 
 var ignoredMethods = map[string]bool{
 	"/containerd.services.content.v1.Content/Status": true,
@@ -240,7 +240,7 @@ func UnaryClientInterceptor(
 
 	codePointer := lastNonGrpcCaller(ctx)
 
-	logging.LogCaller(ctx, slog.LevelDebug, codePointer, event, "service", service)
+	logging.LogCaller(ctx, slog.LevelDebug, codePointer, event)
 	// if event == "GRPC:CLIENT:runm.v1.SocketAllocatorService:CloseIO[START]" {
 	// 	slog.InfoContext(ctx, string(debug.Stack()))
 	// }
@@ -255,7 +255,7 @@ func UnaryClientInterceptor(
 	).RunAsDefer()()
 
 	errd := invoker(ctx, method, req, reply, cc, opts...)
-	logging.LogCaller(ctx, slog.LevelDebug, codePointer, fmt.Sprintf("%s[END]", id), "service", service, "error", errd, "duration", time.Since(start))
+	logging.LogCaller(ctx, slog.LevelDebug, codePointer, fmt.Sprintf("%s[END]", id), "error", errd, "duration", time.Since(start))
 	return errd
 }
 

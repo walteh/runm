@@ -61,8 +61,8 @@ func (p *SlogProducer) Produce(ctx context.Context, data interface{}) (*devlog.E
 		structured.Source = (&devlogv1.SourceInfo_builder{
 			FilePath:       source.RawFilePath,
 			LineNumber:     int32(source.RawFileLine),
-			FunctionName:   source.RawFunc,
-			PackageName:    source.EnhancedPkg,
+			FunctionName:   source.RawGoFunc,
+			PackageName:    source.FullPackageModulePath,
 			ModuleName:     getModuleName(source.RawFilePath),
 			ProgramCounter: uint64(record.PC),
 		}).Build()

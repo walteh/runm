@@ -21,7 +21,7 @@ import (
 	cruntime "github.com/containerd/containerd/v2/core/runtime/v2"
 	slogctx "github.com/veqryn/slog-context"
 
-	"github.com/walteh/runm/pkg/logging"
+	"github.com/walteh/runm/pkg/logging/otel"
 	"github.com/walteh/runm/pkg/ticker"
 )
 
@@ -45,14 +45,11 @@ func (e *errTaskService) RegisterTTRPC(s *ttrpc.Server) error {
 }
 
 func (e *errTaskService) UnaryServerInterceptor() ttrpc.UnaryServerInterceptor {
-	otelInstances := logging.GetGlobalOtelInstances()
-	if otelInstances == nil {
-		return otelttrpc.UnaryServerInterceptor()
-	}
+
 	return otelttrpc.UnaryServerInterceptor(
-		otelttrpc.WithTracerProvider(otelInstances.TracerProvider),
-		otelttrpc.WithPropagators(otelInstances.Propagator),
-		otelttrpc.WithMeterProvider(otelInstances.MeterProvider),
+		otelttrpc.WithTracerProvider(otel.GetTracerProvider()),
+		otelttrpc.WithPropagators(otel.GetPropagators()),
+		otelttrpc.WithMeterProvider(otel.GetMeterProvider()),
 	)
 }
 

@@ -16,7 +16,6 @@ import (
 
 	"github.com/nxadm/tail"
 	"gitlab.com/tozd/go/errors"
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -26,6 +25,7 @@ import (
 	"github.com/walteh/runm/pkg/conn"
 	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/pkg/logging"
+	"github.com/walteh/runm/pkg/logging/otel"
 	"github.com/walteh/runm/pkg/taskgroup"
 
 	runmv1 "github.com/walteh/runm/proto/v1"
@@ -34,7 +34,6 @@ import (
 type RunningVM[VM VirtualMachine] struct {
 	cachedGuestGrpcConn *grpc.ClientConn
 	// hostGrpcListener net.Listener
-	hostOtlpPort uint32
 	bootloader   virtio.Bootloader
 	closeCancel  context.CancelFunc
 	portOnHostIP uint16
@@ -160,13 +159,11 @@ func (r *RunningVM[VM]) buildGuestGrpcConn(ctx context.Context) (*grpc.ClientCon
 			}
 			return conn, nil
 		}),
-		grpc.WithUnaryInterceptor(grpcerr.NewUnaryClientInterceptor(ctx)),
-		grpc.WithStreamInterceptor(grpcerr.NewStreamClientInterceptor(ctx)),
+		grpcerr.GetGrpcClientOptsCtx(ctx),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*10), grpc.WaitForReady(true)),
+		otel.GetGrpcClientOpts(),
 	}
-	if logging.GetGlobalOtelInstances() != nil {
-		opts = append(opts, logging.GetGlobalOtelInstances().GetGrpcClientOpts())
-	}
+
 	grpcConn, err := grpc.NewClient("passthrough:target", opts...)
 	if err != nil {
 		return nil, errors.Errorf("building guest grpc conn: %w", err)
@@ -408,7 +405,7 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 		return nil
 	})
 
-	if rvm.hostOtlpPort != 0 {
+	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" {
 		rvm.taskGroup.GoWithName("otel-forwarder", func(ctx context.Context) error {
 			err = rvm.SetupOtelForwarder(ctx)
 			if err != nil {
@@ -529,10 +526,8 @@ func (rvm *RunningVM[VM]) SetupHostService(ctx context.Context) error {
 	defer vsockListener.Close()
 
 	grpcServer := grpc.NewServer(
-
-		grpc.StatsHandler(otelgrpc.NewServerHandler()),
-		grpc.ChainUnaryInterceptor(grpcerr.NewUnaryServerInterceptor(ctx)),
-		grpc.ChainStreamInterceptor(grpcerr.NewStreamServerInterceptor(ctx)),
+		otel.GetGrpcServerOpts(),
+		grpcerr.GetGrpcServerOpts(),
 	)
 
 	runmv1.RegisterHostServiceServer(grpcServer, rvm)
@@ -558,7 +553,7 @@ func (rvm *RunningVM[VM]) SetupOtelForwarder(ctx context.Context) error {
 	slog.InfoContext(ctx, "vsock listener started", "port", constants.VsockOtelPort)
 
 	// dial tcp localhost:5909
-	conn, err := net.Dial("tcp", fmt.Sprintf(":%d", rvm.hostOtlpPort))
+	conn, err := net.Dial("tcp", os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"))
 	if err != nil {
 		slog.ErrorContext(ctx, "unix dial failed", "err", err)
 		return errors.Errorf("dialing unix socket: %w", err)

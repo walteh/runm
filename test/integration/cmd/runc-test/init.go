@@ -3,6 +3,9 @@
 package main
 
 import (
+	"context"
+	"net"
+
 	_ "github.com/opencontainers/runc/libcontainer/nsenter"
 
 	"fmt"
@@ -15,6 +18,7 @@ import (
 
 	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/logging"
+	"github.com/walteh/runm/pkg/logging/otel"
 	"github.com/walteh/runm/pkg/ticker"
 )
 
@@ -49,6 +53,20 @@ func init() {
 
 func setupLogging() func() {
 	closers := []func(){}
+
+	enableOtel := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != ""
+
+	cleanup, err := otel.ConfigureOTelSDKWithDialer(context.Background(), "runc[init]", enableOtel, func(ctx context.Context, network, addr string) (net.Conn, error) {
+		return vsock.Dial(2, uint32(constants.VsockOtelPort), nil)
+	})
+
+	if err != nil {
+		fmt.Printf("problem configuring otel: %v\n", err)
+	}
+
+	closers = append(closers, func() {
+		cleanup()
+	})
 
 	opts := []logging.LoggerOpt{
 		logging.WithInterceptLogrus(true),

@@ -18,8 +18,8 @@ replace (
 	github.com/containers/gvisor-tap-vsock => ../gvisor-tap-vsock
 	github.com/moby/buildkit => ../buildkit
 	github.com/opencontainers/runc => ../runc
-	gitlab.com/tozd/go/errors => ../go-errors
 	github.com/tonistiigi/fsutil => ../fsutil
+	gitlab.com/tozd/go/errors => ../go-errors
 )
 
 replace gvisor.dev/gvisor => gvisor.dev/gvisor v0.0.0-20250611222258-0fe9a4bf489c
@@ -362,9 +362,9 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.37.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.37.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.36.0 // indirect
-	go.opentelemetry.io/otel/metric v1.37.0 // indirect
+	go.opentelemetry.io/otel/metric v1.37.0
 	go.opentelemetry.io/otel/sdk v1.37.0
-	go.opentelemetry.io/otel/trace v1.37.0 // indirect
+	go.opentelemetry.io/otel/trace v1.37.0
 	go.opentelemetry.io/proto/otlp v1.7.0 // indirect
 	golang.org/x/exp v0.0.0-20250506013437-ce4c2cf36ca6 // indirect
 	golang.org/x/net v0.42.0

@@ -318,7 +318,6 @@ func (w *runcExecutor) Run(ctx context.Context, id string, root executor.Mount, 
 		},
 		Namespace:    "default",
 		Bundle:       bundle,
-		HostOtlpPort: 0,
 		PdeathSignal: unix.SIGKILL,
 	}
 

@@ -4,6 +4,7 @@ package main
 
 import (
 	_ "embed"
+
 	_ "github.com/opencontainers/cgroups/devices"
 
 	"errors"
@@ -18,6 +19,8 @@ import (
 	"strings"
 	"time"
 
+	gocontext "context"
+
 	"github.com/mdlayher/vsock"
 	"github.com/opencontainers/runc/libcontainer/seccomp"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -26,6 +29,7 @@ import (
 
 	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/logging"
+	"github.com/walteh/runm/pkg/logging/otel"
 )
 
 // version is set from the contents of VERSION file.
@@ -153,6 +157,8 @@ func main() {
 	}
 
 	var logProxyConn, rawProxyConn net.Conn
+	var otelCleanup func()
+
 	app.Before = func(context *cli.Context) error {
 		if !context.IsSet("root") && xdgDirUsed {
 			// According to the XDG specification, we need to set anything in
@@ -171,13 +177,23 @@ func main() {
 			return err
 		}
 
+		enableOtel := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != ""
+
+		loggerName := fmt.Sprintf("runc[%s]", context.Args().First())
+
+		cleanup, err := otel.ConfigureOTelSDKWithDialer(gocontext.Background(), loggerName, enableOtel, func(ctx gocontext.Context, network, addr string) (net.Conn, error) {
+			return vsock.Dial(2, uint32(constants.VsockOtelPort), nil)
+		})
+		if err != nil {
+			fmt.Printf("problem configuring otel: %v\n", err)
+		}
+		otelCleanup = cleanup
+
 		opts := []logging.LoggerOpt{
 			logging.WithDelimiter(constants.VsockDelimitedLogProxyDelimiter),
 			logging.WithEnableDelimiter(true),
 			logging.WithInterceptLogrus(false),
 		}
-
-		loggerName := fmt.Sprintf("runc[%s]", context.Args().First())
 
 		opts = append(opts, logging.WithValues(
 			slog.String("run_id", fmt.Sprintf("%d", runId)),
@@ -213,6 +229,9 @@ func main() {
 		}
 		if rawProxyConn != nil {
 			rawProxyConn.Close()
+		}
+		if otelCleanup != nil {
+			otelCleanup()
 		}
 	}()
 

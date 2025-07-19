@@ -1,6 +1,10 @@
 package slogdevterm
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"hash/fnv"
+
+	"github.com/charmbracelet/lipgloss"
+)
 
 // Adaptive colors used by the termlog styles. Using AdaptiveColor ensures
 // sensible theming in both light and dark terminals while still honouring the
@@ -25,8 +29,12 @@ var (
 		Dark:  lipgloss.CompleteColor{TrueColor: "#00ffff", ANSI256: "51", ANSI: "14"},
 	}
 	CallerMainPkgColor = lipgloss.CompleteAdaptiveColor{
-		Light: lipgloss.CompleteColor{TrueColor: "#FF8C00", ANSI256: "208", ANSI: "11"}, // Dark orange for main packages
-		Dark:  lipgloss.CompleteColor{TrueColor: "#FFA500", ANSI256: "214", ANSI: "3"},  // Orange for main packages
+		Light: lipgloss.CompleteColor{TrueColor: "#d7ff87", ANSI256: "192", ANSI: "10"},
+		Dark:  lipgloss.CompleteColor{TrueColor: "#d7ff87", ANSI256: "192", ANSI: "10"},
+	}
+	CallerCurrentProjectPkgColor = lipgloss.CompleteAdaptiveColor{
+		Light: lipgloss.CompleteColor{TrueColor: "#0080FF", ANSI256: "33", ANSI: "4"},  // Electric blue
+		Dark:  lipgloss.CompleteColor{TrueColor: "#00BFFF", ANSI256: "39", ANSI: "12"}, // Deep sky blue
 	}
 
 	// Duration colours - spectrum based on time magnitude.
@@ -151,3 +159,63 @@ var (
 		Dark:  lipgloss.CompleteColor{TrueColor: "#FF1493", ANSI256: "198", ANSI: "9"}, // Deep pink
 	}
 )
+
+func generateDeterministicNeonColor(s string) lipgloss.Color {
+	// Use FNV hash for a deterministic but distributed value
+	h := fnv.New32a()
+	h.Write([]byte(s))
+	hash := h.Sum32()
+
+	// hash := sha256.Sum256([]byte(s))
+
+	neonColors := []string{
+		// Reds & Oranges
+		"#FF9D00", // yellowgreen
+		"#FF4500", // OrangeRed
+		"#FF6347", // Tomato
+		"#FF7F50", // Coral
+		"#FFD700", // Gold
+
+		// Pinks & Purples
+		"#FF1493", // DeepPink
+		"#FF69B4", // HotPink
+		"#BA55D3", // MediumOrchid
+		"#9370DB", // MediumPurple
+		"#DA70D6", // Orchid
+
+		// Yellows & Greens
+		"#ADFF2F", // GreenYellow
+		"#7FFF00", // Chartreuse
+		"#00FF00", // Lime
+		"#32CD32", // LimeGreen
+		"#00FA9A", // MediumSpringGreen
+
+		// Cyans & Blues
+		"#009AD6", // Aqua
+		"#00CED1", // DarkTurquoise
+		"#1E90FF", // DodgerBlue
+		"#4169E1", // RoyalBlue
+		"#6495ED", // CornflowerBlue
+
+		// Teals & Aquas
+		"#20B2AA", // LightSeaGreen
+		"#40E0D0", // Turquoise
+		"#48D1CC", // MediumTurquoise
+		"#5F9EA0", // CadetBlue
+		"#00BFFF", // DeepSkyBlue
+
+		// Browns & Accents
+		"#D2691E", // Chocolate
+		"#FF8C00", // DarkOrange
+		"#DAA520", // GoldenRod
+		"#A66F09", // Red
+		// "#DC143C", // Crimson
+		// "#8B008B", // DarkMagenta
+	}
+
+	// Use the hash to select a color
+	// index := big.NewInt(0).Mod(big.NewInt(0).SetBytes(hash[:]), big.NewInt(int64(len(neonColors)))).Int64()
+	index := int(hash) % len(neonColors)
+
+	return lipgloss.Color(neonColors[index])
+}

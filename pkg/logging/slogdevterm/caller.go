@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+
 	"github.com/walteh/runm/pkg/stackerr"
 )
 
@@ -35,14 +36,14 @@ func init() {
 const (
 	githubIcon       = "\ue709 "
 	githubIconSquare = "\uf092 "
-	gitIcon          = "\ue725 "
+	localIcon        = "\ue725 "
 	gitFolderIcon    = "\ue702 "
 	goIcon           = "\ue65e "
 	goXIcon          = "\ue702 "
 	goStandardIcon   = "\uf07ef "
 	gitlabIcon       = "\ue7eb "
 	externalIcon     = "\uf14c "
-	executableIcon   = "\uf489 " // Terminal/executable icon for main packages
+	executableIcon   = "\ueba6 " // Terminal/executable icon for main packages
 )
 
 func RenderEnhancedSource(e *stackerr.EnhancedSource, styles *Styles, render renderFunc, hyperlink HyperlinkFunc) string {
@@ -50,94 +51,123 @@ func RenderEnhancedSource(e *stackerr.EnhancedSource, styles *Styles, render ren
 }
 func RenderEnhancedSourceWIthTrim(e *stackerr.EnhancedSource, styles *Styles, render renderFunc, hyperlink HyperlinkFunc, withTrim bool) string {
 
-	pkgNoProject := strings.TrimPrefix(e.EnhancedFullPkg, e.EnhancedProject+"/")
-	if e.EnhancedProject == e.EnhancedFullPkg {
-		pkgNoProject = ""
-	}
+	filename := filepath.Base(e.RawFilePath)
+	filenameStyle := styles.Caller.File
 
-	var isCurrentMainGoPackage bool
+	num := fmt.Sprintf("%d", e.RawFileLine)
+	numStyle := styles.Caller.Line
 
-	if e.EnhancedProject == currentMainGoPackage {
-		isCurrentMainGoPackage = true
-	}
+	sep := ":"
+	sepStyle := styles.Caller.Sep
 
-	var projIcon string
+	icon := getIcon(e)
+	iconStyle := styles.Caller.Icon
 
-	// pkg = filepath.Base(pkg)
-	filename := render(styles.Caller.File, stackerr.FileNameOfPath(e.RawFilePath))
-	num := render(styles.Caller.Line, fmt.Sprintf("%d", e.RawFileLine))
-	sep := render(styles.Caller.Sep, ":")
+	pkg := filepath.Base(e.FullPackageModulePath)
+	pkgStyle := styles.Caller.Pkg
 
-	if !isCurrentMainGoPackage {
-		splt := strings.Split(e.EnhancedProject, "/")
-		first := splt[0]
-		// var lasts []string
-		// if len(splt) > 1 {
-		// 	lasts = strings.Split(e.enhancedProject, "/")[1:]
-		// }
-
-		if first == "github.com" {
-			projIcon = githubIcon
-		} else if first == "gitlab.com" {
-			projIcon = gitlabIcon
-		} else if first == "main" {
-			projIcon = executableIcon
-		} else if !strings.Contains(first, ".") {
-			projIcon = goIcon
-		} else {
-			projIcon = externalIcon
-		}
-	} else {
-		projIcon = gitIcon
-	}
-
-	pkgsplt := strings.Split(pkgNoProject, "/")
-	// last := pkgsplt[len(pkgsplt)-1]
-
-	var pkg string
-	if pkgNoProject == "" || filepath.Base(e.EnhancedProject) == "main" {
-		pkg = ""
-	} else {
-		// For main executables, don't show the package name at all (it's shown in eproj)
-		pkg = render(styles.Caller.Pkg, strings.Join(pkgsplt, "/"))
-	}
-
+	var eprojStyle lipgloss.Style
 	var eproj string
-	if filepath.Base(e.EnhancedProject) == "main" {
-		eproj = " " + render(styles.Caller.MainPkg, stackerr.ExecutableName()) + " "
-	} else if e.EnhancedProject == currentMainGoPackage {
-		eproj = " "
+	if filepath.Base(e.ProjectName) == "main" {
+		eprojStyle = styles.Caller.CurrentProjectMainPkg
+		eproj = stackerr.ExecutableName()
+	} else if e.IsLocalProjectFile() {
+		eprojStyle = styles.Caller.CurrentProjectPkg
+		eproj = filepath.Base(e.ProjectName)
 	} else {
-		eproj = " " + render(styles.Caller.Project, filepath.Base(e.EnhancedProject)) + " "
+		eprojStyle = styles.Caller.ExternalProjectPackage
+		eproj = filepath.Base(e.ProjectName)
 	}
 
-	pkgsep := ""
-	if pkg != "" {
-		pkgsep = sep
-	}
+	tester := fmt.Sprintf("%s%s%s%s%s%s%s%s", icon, eproj, sep, pkg, sep, filename, sep, num)
 
-	str := fmt.Sprintf("%s%s%s%s%s%s%s", projIcon, eproj, pkg, pkgsep, filename, sep, num)
+	fullStyle := lipgloss.NewStyle()
 
 	if withTrim {
-		noColorString := Strip(str)
+		fullStyle = fullStyle.Width(trimWidth)
 
-		if len(noColorString) > 55 && withTrim && pkg != "" {
-			pkgNoAnsi := Strip(pkg)
-			diff := len(noColorString) - 55 + 3 // +3 for the "..." we'll add
-			if diff >= len(pkgNoAnsi) {
-				// If we need to trim more than the entire pkg, just remove pkg entirely
-				str = fmt.Sprintf("%s%s%s%s%s", projIcon, eproj, filename, sep, num)
-			} else {
-				// Trim from the beginning of pkg and add "..."
-				trimmedPkg := render(styles.Caller.Pkg, "..."+pkgNoAnsi[diff:])
-				str = fmt.Sprintf("%s%s%s%s%s%s%s", projIcon, eproj, trimmedPkg, sep, filename,
-					sep, num)
-			}
+		if len(tester) > trimWidth {
+			// Components to trim in order of priority (least to most important)
+			components := []*string{&pkg, &filename, &eproj, &num}
+			trimComponents(components, len(tester), trimWidth)
 		}
-		str = render(lipgloss.NewStyle().Width(55), str)
 	}
 
-	return hyperlink("cursor://file/"+e.RawFilePath+":"+fmt.Sprintf("%d", e.RawFileLine), str)
+	finalWithStyle := fmt.Sprintf("%s%s%s%s%s%s%s%s",
+		render(iconStyle, icon),
+		render(eprojStyle, eproj),
+		render(sepStyle, sep),
+		render(pkgStyle, pkg),
+		render(sepStyle, sep),
+		render(filenameStyle, filename),
+		render(sepStyle, sep),
+		render(numStyle, num))
+
+	return hyperlink("cursor://file/"+e.RawFilePath+":"+fmt.Sprintf("%d", e.RawFileLine), render(fullStyle, finalWithStyle))
+}
+
+func getIcon(e *stackerr.EnhancedSource) string {
+
+	if e.IsLocalProjectFile() {
+		return localIcon
+	}
+
+	splt := strings.Split(e.ProjectName, "/")
+	first := splt[0]
+
+	if first == "github.com" {
+		return githubIcon
+	} else if first == "gitlab.com" {
+		return gitlabIcon
+	} else if first == "main" {
+		return executableIcon
+	} else if !strings.Contains(first, ".") {
+		return goIcon
+	} else {
+		return externalIcon
+	}
+
+}
+
+const trimWidth = 40
+
+// trimComponents trims string components in priority order to fit within maxLen
+func trimComponents(components []*string, totalLen, maxLen int) {
+	excess := totalLen - maxLen
+
+	for _, component := range components {
+		if excess <= 0 {
+			break
+		}
+		if excess >= len(*component) {
+			excess -= len(*component)
+			*component = ""
+		} else {
+			// Keep the first (len - excess) characters and add "~"
+			keepChars := len(*component) - excess
+			*component = (*component)[:keepChars] + "~"
+			excess = 0
+		}
+	}
+}
+
+// trimMiddle trims a string to maxLen by removing characters from the middle
+// and replacing them with "...". Returns original string if no trimming needed.
+func trimMiddle(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+
+	if maxLen <= 3 {
+		return "..."[:maxLen]
+	}
+
+	// Calculate how many chars to keep (excluding the 3 dots)
+	keepChars := maxLen - 3
+	leftChars := keepChars / 2
+	rightChars := keepChars - leftChars
+
+	return s[:leftChars] + "..." + s[len(s)-rightChars:]
 }
 
 const ansi = "[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))"

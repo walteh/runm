@@ -20,7 +20,6 @@ import (
 	slogctx "github.com/veqryn/slog-context"
 
 	"github.com/walteh/runm/cmd/containerd-shim-runm-v2/manager"
-	"github.com/walteh/runm/pkg/logging"
 	"github.com/walteh/runm/pkg/logging/sloglogrus"
 	"github.com/walteh/runm/pkg/ticker"
 	"github.com/walteh/runm/test/integration/env"
@@ -159,13 +158,7 @@ func RunShim(ctx context.Context) error {
 	taskplugin.Reregister()
 	vfruntimeplugin.Reregister()
 
-	if logging.GetGlobalOtelInstances() != nil {
-		os.Setenv("RUNM_SHIM_HOST_OTLP_PORT", strconv.Itoa(int(env.MagicHostOtlpGRPCPort())))
-	}
-
 	os.Setenv("LINUX_RUNTIME_BUILD_DIR", env.LinuxRuntimeBuildDir())
-
-	slog.InfoContext(ctx, "PRIMARY_SHIM_ABOUT_TO_RUN_SHIM", "mode", mode)
 
 	shim.Run(ctx, manager.NewDebugManager(manager.NewShimManager("io.containerd.runc.v2")), func(c *shim.Config) {
 		c.NoReaper = true
@@ -173,6 +166,5 @@ func RunShim(ctx context.Context) error {
 		c.NoSetupLogger = true
 	})
 
-	slog.InfoContext(ctx, "PRIMARY_SHIM_RUN_COMPLETED", "mode", mode)
 	return nil
 }

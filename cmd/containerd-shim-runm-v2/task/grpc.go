@@ -13,12 +13,12 @@ import (
 	"github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/log"
 	"gitlab.com/tozd/go/errors"
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 
 	gorunc "github.com/containerd/go-runc"
 
 	"github.com/walteh/runm/pkg/grpcerr"
+	"github.com/walteh/runm/pkg/logging/otel"
 
 	runmv1 "github.com/walteh/runm/proto/v1"
 )
@@ -30,9 +30,8 @@ var (
 func (s *service) serveGrpc(ctx context.Context, cid string) (func() error, func() error, error) {
 
 	grpcServer := grpc.NewServer(
-		grpc.StatsHandler(otelgrpc.NewServerHandler()),
-		grpc.ChainUnaryInterceptor(grpcerr.NewUnaryServerInterceptor(ctx)),
-		grpc.ChainStreamInterceptor(grpcerr.NewStreamServerInterceptor(ctx)),
+		otel.GetGrpcServerOpts(),
+		grpcerr.GetGrpcServerOptsCtx(ctx),
 	)
 
 	runmv1.RegisterShimServiceServer(grpcServer, s)

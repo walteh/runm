@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"hash/fnv"
 	"io"
 	"log/slog"
 	"os"
@@ -175,64 +174,6 @@ type TermLogger struct {
 }
 
 // Generate a deterministic neon color from a string
-func generateDeterministicNeonColor(s string) lipgloss.Color {
-	// Use FNV hash for a deterministic but distributed value
-	h := fnv.New32a()
-	h.Write([]byte(s))
-	hash := h.Sum32()
-
-	// hash := sha256.Sum256([]byte(s))
-
-	neonColors := []string{
-		// Reds & Oranges
-		"#FF0000", // Red
-		"#FF4500", // OrangeRed
-		"#FF6347", // Tomato
-		"#FF7F50", // Coral
-		"#FFD700", // Gold
-
-		// Pinks & Purples
-		"#FF1493", // DeepPink
-		"#FF69B4", // HotPink
-		"#BA55D3", // MediumOrchid
-		"#9370DB", // MediumPurple
-		"#DA70D6", // Orchid
-
-		// Yellows & Greens
-		"#ADFF2F", // GreenYellow
-		"#7FFF00", // Chartreuse
-		"#00FF00", // Lime
-		"#32CD32", // LimeGreen
-		"#00FA9A", // MediumSpringGreen
-
-		// Cyans & Blues
-		"#00FFFF", // Aqua
-		"#00CED1", // DarkTurquoise
-		"#1E90FF", // DodgerBlue
-		"#4169E1", // RoyalBlue
-		"#6495ED", // CornflowerBlue
-
-		// Teals & Aquas
-		"#20B2AA", // LightSeaGreen
-		"#40E0D0", // Turquoise
-		"#48D1CC", // MediumTurquoise
-		"#5F9EA0", // CadetBlue
-		"#00BFFF", // DeepSkyBlue
-
-		// Browns & Accents
-		"#D2691E", // Chocolate
-		"#FF8C00", // DarkOrange
-		"#DAA520", // GoldenRod
-		"#DC143C", // Crimson
-		// "#8B008B", // DarkMagenta
-	}
-
-	// Use the hash to select a color
-	// index := big.NewInt(0).Mod(big.NewInt(0).SetBytes(hash[:]), big.NewInt(int64(len(neonColors)))).Int64()
-	index := int(hash) % len(neonColors)
-
-	return lipgloss.Color(neonColors[index])
-}
 
 func NewTermLogger(writer io.Writer, sopts *slog.HandlerOptions, opts ...TermLoggerOption) *TermLogger {
 	l := TermLogger{

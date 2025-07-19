@@ -20,21 +20,28 @@ import (
 	slogctx "github.com/veqryn/slog-context"
 
 	"github.com/walteh/runm/pkg/grpcerr"
+	"github.com/walteh/runm/pkg/logging/otel"
 	"github.com/walteh/runm/test/integration/env"
 )
 
 func main() {
 
+	var exitCode = 0
+	defer func() {
+		os.Exit(exitCode)
+	}()
+
 	ctx := context.Background()
 
 	var logger *slog.Logger
 
-	l, df, err := env.SetupLogForwardingToContainerd(ctx, "buildctl", false)
+	logger, df, err := env.SetupLogForwardingToContainerd(ctx, "buildctl", false)
 	if err != nil {
-		panic(err)
+		logger.Error("failed to setup logging", "error", err)
+		exitCode = 1
+		return
 	}
 	defer df()
-	logger = l
 
 	goodStdLogger := logrus.StandardLogger()
 
@@ -50,8 +57,8 @@ func main() {
 	ctx = slogctx.NewCtx(ctx, logger)
 
 	clientopts := []grpc.DialOption{
-		grpc.WithChainUnaryInterceptor(grpcerr.NewUnaryClientInterceptor(ctx)),
-		grpc.WithChainStreamInterceptor(grpcerr.NewStreamClientInterceptor(ctx)),
+		otel.GetGrpcClientOpts(),
+		grpcerr.GetGrpcClientOptsCtx(ctx),
 	}
 
 	grpcclient.AddHackedClientOpts(clientopts...)
@@ -112,11 +119,15 @@ func main() {
 		return nil
 	}
 
-	if err := app.Run(os.Args); err != nil {
-		logger.Error("buildkitd failed", "error", err)
+	defer func() {
 		if debugDeferred != nil {
 			debugDeferred()
 		}
-		os.Exit(1)
+	}()
+
+	if err := app.Run(os.Args); err != nil {
+		logger.Error("buildkitd failed", "error", err)
+		exitCode = 1
+		return
 	}
 }

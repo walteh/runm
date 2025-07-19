@@ -13,9 +13,10 @@ import (
 
 	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/logging"
+	"github.com/walteh/runm/pkg/logging/otel"
 )
 
-func SetupOtelForNerdctl(ctx context.Context, name string) (*slog.Logger, func() error, error) {
+func SetupLoggingForNerdctl(ctx context.Context, name string) (*slog.Logger, func() error, error) {
 	return SetupLogForwardingToContainerd(ctx, fmt.Sprintf("nerdctl[%s]", name), false)
 }
 
@@ -70,33 +71,22 @@ func SetupLogForwardingToContainerd(ctx context.Context, shimName string, redire
 		dynamicCleanup.AddCloserFunc(redirStdoutCloser)
 	}
 
-	// attempt to listen on the port 5909
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", MagicHostOtlpGRPCPort()))
-	if err == nil {
-		listener.Close()
-		l := logging.NewDefaultDevLogger(shimName, logProxySockDelim, opts...)
-		l.Debug("logger created without otel, the host otel grpc port is free", "port", MagicHostOtlpGRPCPort())
-		return l, dynamicCleanup.DetachDeferAsCloser(), nil
-	}
-
-	otlpConn, err := net.Dial("tcp", fmt.Sprintf("localhost:%d", MagicHostOtlpGRPCPort()))
+	cleanup, err := otel.ConfigureOTelSDK(ctx, shimName)
 	if err != nil {
-		return nil, nil, errors.Errorf("dialing otlp grpc: %w", err)
+		return nil, nil, errors.Errorf("configuring otel: %w", err)
 	}
 
-	otelInstances, err := logging.NewGRPCOtelInstances(ctx, otlpConn, shimName)
-	if err != nil {
-		return nil, nil, errors.Errorf("creating otel instances: %w", err)
-	}
-
-	dynamicCleanup.AddCloserFuncCtx(otelInstances.Shutdown)
+	dynamicCleanup.AddCloserFunc(func() error {
+		cleanup()
+		return nil
+	})
 
 	log.L = &logrus.Entry{
 		Logger: logrus.StandardLogger(),
 		Data:   make(log.Fields, 6),
 	}
 
-	loggerz := logging.NewDefaultDevLoggerWithOtel(ctx, shimName, logProxySockDelim, otelInstances, opts...)
+	loggerz := logging.NewDefaultDevLogger(shimName, logProxySockDelim, opts...)
 
 	return loggerz, dynamicCleanup.DetachDeferAsCloser(), nil
 }

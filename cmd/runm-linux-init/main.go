@@ -44,6 +44,7 @@ import (
 	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/pkg/logging"
+	"github.com/walteh/runm/pkg/logging/otel"
 	"github.com/walteh/runm/pkg/taskgroup"
 	"github.com/walteh/runm/pkg/ticker"
 
@@ -126,30 +127,21 @@ func (r *runmLinuxInit) setupLogger(ctx context.Context) (context.Context, error
 	}
 
 	opts := []logging.LoggerOpt{
-		logging.WithDelimiter(constants.VsockDelimitedLogProxyDelimiter),
-		logging.WithEnableDelimiter(true),
 		logging.WithRawWriter(rawWriterConn),
 	}
 
-	var logger *slog.Logger
-	if enableOtel {
-		otelConn, err := vsock.Dial(2, uint32(constants.VsockOtelPort), nil)
-		if err != nil {
-			return nil, errors.Errorf("problem dialing vsock for otel: %w", err)
-		}
-
-		otelInstancez, err := logging.NewGRPCOtelInstances(ctx, otelConn, serviceName)
-		if err != nil {
-			return nil, errors.Errorf("failed to setup OTel SDK: %w", err)
-		}
-
-		logger = logging.NewDefaultDevLoggerWithOtel(ctx, serviceName, delimitedLogProxyConn, otelInstancez, opts...)
-
-		r.otelWriter = otelConn
-
-	} else {
-		logger = logging.NewDefaultDevLogger(serviceName, delimitedLogProxyConn, opts...)
+	dialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		return vsock.Dial(2, uint32(constants.VsockOtelPort), nil)
 	}
+
+	cleanup, err := otel.ConfigureOTelSDKWithDialer(ctx, serviceName, enableOtel, dialer)
+	if err != nil {
+		return nil, errors.Errorf("failed to setup OTel SDK: %w", err)
+	}
+
+	defer cleanup()
+
+	logger := logging.NewDefaultDevLoggerWithDelimiter(serviceName, delimitedLogProxyConn, opts...)
 
 	r.rawWriter = rawWriterConn
 	r.logWriter = delimitedLogProxyConn
@@ -159,6 +151,10 @@ func (r *runmLinuxInit) setupLogger(ctx context.Context) (context.Context, error
 }
 
 func main() {
+	var exitCode = 0
+	defer func() {
+		os.Exit(exitCode)
+	}()
 
 	pid := os.Getpid()
 
@@ -172,7 +168,8 @@ func main() {
 	ctx, err := runmLinuxInit.setupLogger(ctx)
 	if err != nil {
 		fmt.Printf("failed to setup logger: %v\n", err)
-		os.Exit(1)
+		exitCode = 1
+		return
 	}
 
 	ctx = slogctx.Append(ctx, slog.Int("pid", pid))
@@ -180,7 +177,8 @@ func main() {
 	err = recoveryMain(ctx, runmLinuxInit)
 	if err != nil {
 		slog.ErrorContext(ctx, "error in main", "error", err)
-		os.Exit(1)
+		exitCode = 1
+		return
 	}
 }
 
@@ -218,17 +216,8 @@ func (r *runmLinuxInit) configureRuntimeServer(ctx context.Context) (*grpc.Serve
 	})
 
 	serveropts := []grpc.ServerOption{
-		grpc.ChainUnaryInterceptor(grpcerr.NewUnaryServerInterceptor(ctx)),
-		grpc.ChainStreamInterceptor(grpcerr.NewStreamServerInterceptor(ctx)),
-	}
-
-	if enableOtel {
-		if logging.GetGlobalOtelInstances() != nil {
-			serveropts = append(serveropts, logging.GetGlobalOtelInstances().GetGrpcServerOpts())
-			defer logging.GetGlobalOtelInstances().Shutdown(ctx)
-		} else {
-			slog.WarnContext(ctx, "no otel instances found, not enabling otel")
-		}
+		grpcerr.GetGrpcServerOptsCtx(ctx),
+		otel.GetGrpcServerOpts(),
 	}
 
 	grpcVsockServer := grpc.NewServer(serveropts...)

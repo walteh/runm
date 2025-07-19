@@ -57,13 +57,15 @@ type Styles struct {
 }
 
 type CallerStyle struct {
-	File    lipgloss.Style
-	Line    lipgloss.Style
-	Func    lipgloss.Style
-	Pkg     lipgloss.Style
-	MainPkg lipgloss.Style  // Special style for main package names (executables)
-	Sep     lipgloss.Style
-	Project lipgloss.Style
+	File                   lipgloss.Style
+	Line                   lipgloss.Style
+	Func                   lipgloss.Style
+	Icon                   lipgloss.Style
+	Pkg                    lipgloss.Style
+	CurrentProjectPkg      lipgloss.Style // Special style for main package names (executables)
+	CurrentProjectMainPkg  lipgloss.Style // Special style for main package names (executables)
+	Sep                    lipgloss.Style
+	ExternalProjectPackage lipgloss.Style
 }
 
 // TreeStyles defines beautiful styling for tree visualizations
@@ -126,13 +128,14 @@ func DefaultStyles() *Styles {
 	return &Styles{
 		Timestamp: lipgloss.NewStyle().Width(len(timeFormat)).Faint(true).Align(lipgloss.Center),
 		Caller: CallerStyle{
-			File:    lipgloss.NewStyle().Bold(true),
-			Line:    lipgloss.NewStyle().Foreground(CallerLineColor),
-			Func:    lipgloss.NewStyle().Foreground(CallerFuncColor),
-			Pkg:     lipgloss.NewStyle().Foreground(CallerPkgColor),
-			MainPkg: lipgloss.NewStyle().Foreground(CallerMainPkgColor).Bold(true),
-			Sep:     lipgloss.NewStyle().Faint(true),
-			Project: lipgloss.NewStyle().Foreground(CallerProjectColor).Bold(true),
+			File:                   lipgloss.NewStyle().Bold(true),
+			Line:                   lipgloss.NewStyle().Foreground(CallerLineColor),
+			Func:                   lipgloss.NewStyle().Foreground(CallerFuncColor),
+			Pkg:                    lipgloss.NewStyle().Foreground(CallerPkgColor),
+			CurrentProjectPkg:      lipgloss.NewStyle().Foreground(CallerCurrentProjectPkgColor).Bold(true),
+			CurrentProjectMainPkg:  lipgloss.NewStyle().Foreground(CallerMainPkgColor).Bold(true),
+			Sep:                    lipgloss.NewStyle().Faint(true),
+			ExternalProjectPackage: lipgloss.NewStyle().Foreground(CallerProjectColor).Bold(true),
 		},
 		Prefix: lipgloss.NewStyle().Bold(true).Faint(true).Width(10).Align(lipgloss.Left),
 		// gray with a little bit of green

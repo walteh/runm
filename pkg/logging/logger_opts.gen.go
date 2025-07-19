@@ -74,10 +74,6 @@ func WithGlobalLogWriter(opt io.Writer) LoggerOpt {
 	return func(o *LoggerOpts) { o.globalLogWriter = opt }
 }
 
-func WithOtlpInstances(opt *OTelInstances) LoggerOpt {
-	return func(o *LoggerOpts) { o.otlpInstances = opt }
-}
-
 func (o *LoggerOpts) Validate() error {
 	return nil
 }
@@ -109,5 +105,3 @@ func (o LoggerOpts) InterceptHclog() bool { return o.interceptHclog }
 func (o LoggerOpts) Values() []slog.Attr { return o.values }
 
 func (o LoggerOpts) GlobalLogWriter() io.Writer { return o.globalLogWriter }
-
-func (o LoggerOpts) OtlpInstances() *OTelInstances { return o.otlpInstances }

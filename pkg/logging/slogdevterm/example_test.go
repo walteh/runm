@@ -5,9 +5,9 @@ import (
 	"os"
 )
 
-// ExampleDottedNotation demonstrates how groups are flattened into dotted keys
+// ExampleTermLogger demonstrates how groups are flattened into dotted keys
 // instead of showing nested structures.
-func ExampleDottedNotation() {
+func ExampleTermLogger() {
 	// Create a logger with the terminal handler
 	handler := NewTermLogger(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,

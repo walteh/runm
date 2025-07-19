@@ -1,4 +1,4 @@
-package logging
+package otel
 
 import (
 	"context"
@@ -29,6 +29,12 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 )
+
+var filterFuncs = map[string]func(sdktrace.SpanExporter) sdktrace.SpanExporter{
+	"containerd": func(exporter sdktrace.SpanExporter) sdktrace.SpanExporter {
+		return &containerdTaskFilteringExporter{next: exporter}
+	},
+}
 
 type OTelInstances struct {
 	Propagator     propagation.TextMapPropagator
@@ -94,10 +100,18 @@ func (i *OTelInstances) Shutdown(ctx context.Context) error {
 
 // setupOTelSDK bootstraps the OpenTelemetry pipeline.
 // If it does not return an error, make sure to call shutdown for proper cleanup.
-func NewGRPCOtelInstances(ctx context.Context, conn net.Conn, serviceName string) (*OTelInstances, error) {
+func setupOTelSDK(ctx context.Context, serviceName string, dialer proxy.ContextDialer) (*OTelInstances, error) {
 
-	var err error
 	instances := &OTelInstances{}
+
+	if dialer != nil {
+		conn, err := initConnFromDialer(ctx, dialer)
+		if err != nil {
+			return nil, errors.Errorf("initializing gRPC connection: %w", err)
+		}
+		instances.Conn = conn
+	}
+
 	shouldShutdown := true
 	defer func() {
 		if shouldShutdown {
@@ -109,11 +123,6 @@ func NewGRPCOtelInstances(ctx context.Context, conn net.Conn, serviceName string
 	executable, err := filepath.EvalSymlinks(os.Args[0])
 	if err != nil {
 		return nil, errors.Errorf("resolving executable: %w", err)
-	}
-
-	instances.Conn, err = initConnFromConn(ctx, conn)
-	if err != nil {
-		return nil, errors.Errorf("initializing gRPC connection: %w", err)
 	}
 
 	arch := semconv.HostArchARM64
@@ -135,13 +144,9 @@ func NewGRPCOtelInstances(ctx context.Context, conn net.Conn, serviceName string
 		return nil, errors.Errorf("initializing resource: %w", err)
 	}
 
-	var filterFunc func(sdktrace.SpanExporter) sdktrace.SpanExporter
-	if serviceName == "containerd" {
-		filterFunc = func(exporter sdktrace.SpanExporter) sdktrace.SpanExporter {
-			return &containerdTaskFilteringExporter{next: exporter}
-		}
-	} else {
-		filterFunc = func(exporter sdktrace.SpanExporter) sdktrace.SpanExporter {
+	traceFilterFunc := filterFuncs[serviceName]
+	if traceFilterFunc == nil {
+		traceFilterFunc = func(exporter sdktrace.SpanExporter) sdktrace.SpanExporter {
 			return exporter
 		}
 	}
@@ -151,7 +156,7 @@ func NewGRPCOtelInstances(ctx context.Context, conn net.Conn, serviceName string
 	// otel.SetTextMapPropagator(prop)
 
 	// Set up trace provider.
-	instances.TracerProvider, err = initTracerProvider(ctx, instances.Resource, instances.Conn, filterFunc)
+	instances.TracerProvider, err = initTracerProvider(ctx, instances.Resource, instances.Conn, traceFilterFunc)
 	if err != nil {
 		return nil, errors.Errorf("initializing tracer provider: %w", err)
 	}
@@ -184,6 +189,21 @@ func newPropagator() propagation.TextMapPropagator {
 	)
 }
 
+type contextDialerFunc struct {
+	fn func(ctx context.Context, network, addr string) (net.Conn, error)
+}
+
+func NewContextDialerFunc(fn func(ctx context.Context, network, addr string) (net.Conn, error)) proxy.ContextDialer {
+	if fn == nil {
+		return nil
+	}
+	return &contextDialerFunc{fn: fn}
+}
+
+func (d *contextDialerFunc) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	return d.fn(ctx, network, addr)
+}
+
 // Initialize a gRPC connection to be used by both the tracer and meter
 // providers.
 func initConnFromDialer(ctx context.Context, dialer proxy.ContextDialer) (*grpc.ClientConn, error) {
@@ -204,7 +224,7 @@ func initConnFromDialer(ctx context.Context, dialer proxy.ContextDialer) (*grpc.
 
 // Initialize a gRPC connection to be used by both the tracer and meter
 // providers.
-func initConnFromConn(ctx context.Context, nconn net.Conn) (*grpc.ClientConn, error) {
+func NewOtelGRPCConnFromNetConn(ctx context.Context, nconn net.Conn) (*grpc.ClientConn, error) {
 
 	conn, err := grpc.NewClient(
 		"passthrough://",
@@ -222,20 +242,28 @@ func initConnFromConn(ctx context.Context, nconn net.Conn) (*grpc.ClientConn, er
 
 // Initializes an OTLP exporter, and configures the corresponding trace provider.
 func initTracerProvider(ctx context.Context, res *resource.Resource, conn *grpc.ClientConn, filterFunc func(sdktrace.SpanExporter) sdktrace.SpanExporter) (*sdktrace.TracerProvider, error) {
-	// Set up a trace exporter
-	traceExporter, err := otlptracegrpc.New(ctx, otlptracegrpc.WithGRPCConn(conn))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create trace exporter: %w", err)
+
+	opts := []sdktrace.TracerProviderOption{
+		sdktrace.WithResource(res),
+		sdktrace.WithSampler(sdktrace.AlwaysSample()),
+	}
+
+	if conn != nil {
+		// Set up a trace exporter
+		traceExporter, err := otlptracegrpc.New(ctx, otlptracegrpc.WithGRPCConn(conn))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create trace exporter: %w", err)
+		}
+		bsp := sdktrace.NewBatchSpanProcessor(filterFunc(traceExporter))
+
+		opts = append(opts, sdktrace.WithSpanProcessor(bsp))
 	}
 
 	// Register the trace exporter with a TracerProvider, using a batch
 	// span processor to aggregate spans before export.
-	bsp := sdktrace.NewBatchSpanProcessor(filterFunc(traceExporter))
 
 	tracerProvider := sdktrace.NewTracerProvider(
-		sdktrace.WithSampler(sdktrace.AlwaysSample()),
-		sdktrace.WithResource(res),
-		sdktrace.WithSpanProcessor(bsp),
+		opts...,
 	)
 
 	// otel.SetTracerProvider(tracerProvider)
@@ -249,30 +277,42 @@ func initTracerProvider(ctx context.Context, res *resource.Resource, conn *grpc.
 
 // Initializes an OTLP exporter, and configures the corresponding meter provider.
 func initMeterProvider(ctx context.Context, res *resource.Resource, conn *grpc.ClientConn) (*sdkmetric.MeterProvider, error) {
-	metricExporter, err := otlpmetricgrpc.New(ctx, otlpmetricgrpc.WithGRPCConn(conn))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create metrics exporter: %w", err)
+
+	opts := []sdkmetric.Option{
+		sdkmetric.WithResource(res),
+	}
+
+	if conn != nil {
+		metricExporter, err := otlpmetricgrpc.New(ctx, otlpmetricgrpc.WithGRPCConn(conn))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create metrics exporter: %w", err)
+		}
+		opts = append(opts, sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricExporter)))
 	}
 
 	meterProvider := sdkmetric.NewMeterProvider(
-		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricExporter)),
-		sdkmetric.WithResource(res),
+		opts...,
 	)
-	// otel.SetMeterProvider(meterProvider)
 
 	return meterProvider, nil
 }
 
 func newLoggerProvider(ctx context.Context, res *resource.Resource, conn *grpc.ClientConn) (*log.LoggerProvider, error) {
-	logExporter, err := otlploggrpc.New(ctx, otlploggrpc.WithGRPCConn(conn))
-	if err != nil {
-		return nil, err
+	opts := []log.LoggerProviderOption{
+		log.WithResource(res),
 	}
 
-	loggerProvider := log.NewLoggerProvider(
-		log.WithProcessor(log.NewBatchProcessor(logExporter)),
-		log.WithResource(res),
-	)
+	if conn != nil {
+		logExporter, err := otlploggrpc.New(ctx, otlploggrpc.WithGRPCConn(conn))
+		if err != nil {
+			return nil, err
+		}
+
+		opts = append(opts, log.WithProcessor(log.NewBatchProcessor(logExporter)))
+	}
+
+	loggerProvider := log.NewLoggerProvider(opts...)
+
 	return loggerProvider, nil
 }
 
