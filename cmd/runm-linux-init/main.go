@@ -111,6 +111,145 @@ type runmLinuxInit struct {
 }
 
 // DO NOT USE SLOG IN THIS FUNCTION - LOG TO STDOUT
+
+func main() {
+	var exitCode = 0
+	defer func() {
+		os.Exit(exitCode)
+	}()
+
+	pid := os.Getpid()
+
+	// reap.SetSubreaper(os.Getpid())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	runmLinuxInit := &runmLinuxInit{}
+
+	ctx, err := runmLinuxInit.setupLogger(ctx)
+	if err != nil {
+		fmt.Printf("failed to setup logger: %v\n", err)
+		exitCode = 1
+		return
+	}
+
+	ctx = slogctx.Append(ctx, slog.Int("pid", pid))
+
+	err = recoveryMain(ctx, runmLinuxInit)
+	if err != nil {
+		slog.ErrorContext(ctx, "error in main", "error", err)
+		exitCode = 1
+		return
+	}
+}
+
+func (r *runmLinuxInit) run(ctx context.Context) error {
+
+	if containerId == "" {
+		return errors.Errorf("container-id flag is required")
+	}
+
+	if err := mount(ctx); err != nil {
+		return errors.Errorf("problem mounting rootfs: %w", err)
+	}
+
+	// WARNING: after we call this it will trigger intermitent 'no child processes' errors
+	// see https://github.com/firecracker-microvm/firecracker-containerd/issues/285
+	// if we call 'mount' after this point, we run into this often because of all the processes that are running
+	signals, err := setupSignals()
+	if err != nil {
+		return errors.Errorf("problem setting up signals: %w", err)
+	}
+
+	defer ticker.NewTicker(
+		ticker.WithMessage("RUNM:INIT[RUNNING]"),
+		ticker.WithDoneMessage("RUNM:INIT[DONE]"),
+		ticker.WithSlogBaseContext(ctx),
+		ticker.WithLogLevel(slog.LevelDebug),
+		ticker.WithFrequency(15),
+		ticker.WithStartBurst(5),
+		ticker.WithAttrFunc(func() []slog.Attr {
+			return []slog.Attr{
+				slog.Int("pid", os.Getpid()),
+				slog.String("gomaxprocs", strconv.Itoa(goruntime.GOMAXPROCS(0))),
+			}
+		}),
+	).RunAsDefer()()
+
+	ctx, cancel := context.WithCancel(ctx)
+	go handleExitSignals(ctx, cancel)
+
+	r.cancel = cancel
+	// Create TaskGroup with pprof enabled and custom labels
+	taskgroupz := taskgroup.NewTaskGroup(ctx,
+		taskgroup.WithName("runm-linux-init"),
+		taskgroup.WithEnablePprof(true),
+		taskgroup.WithPprofLabels(map[string]string{
+			"service":      serviceName,
+			"container-id": containerId,
+			"runm-mode":    runmMode,
+		}),
+		taskgroup.WithLogStart(true),
+		taskgroup.WithLogEnd(true),
+		taskgroup.WithLogTaskStart(false),
+		taskgroup.WithLogTaskEnd(false),
+		taskgroup.WithSlogBaseContext(ctx),
+	)
+
+	r.exitChan = make(chan gorunc.Exit, 32*100)
+
+	taskgroupz.GoWithName("reaper", func(ctx context.Context) (err error) {
+		return reapOnSignals(ctx, signals)
+	})
+
+	// taskgroupz.GoWithName("psnotify", func(ctx context.Context) error {
+	// 	return r.runPsnotify(ctx, r.exitChan)
+	// })
+
+	taskgroupz.GoWithName("delim-writer-unix-proxy", func(ctx context.Context) error {
+		return r.runVsockUnixProxy(ctx, constants.DelimitedWriterProxyGuestUnixPath, r.logWriter)
+	})
+
+	taskgroupz.GoWithName("raw-writer-unix-proxy", func(ctx context.Context) error {
+		return r.runVsockUnixProxy(ctx, constants.RawWriterProxyGuestUnixPath, r.rawWriter)
+	})
+
+	go func() {
+		err := runProxyHooks(ctx)
+		if err != nil {
+			slog.ErrorContext(ctx, "problem proxying hooks", "error", err)
+		}
+	}()
+
+	taskgroupz.GoWithName("grpc-vsock-server", func(ctx context.Context) error {
+		return r.runGrpcVsockServer(ctx)
+	})
+
+	taskgroupz.GoWithName("pprof-vsock-server", func(ctx context.Context) error {
+		return r.runPprofVsockServer(ctx)
+	})
+
+	for target, port := range msockBinds {
+		portnum, err := strconv.Atoi(port)
+		if err != nil {
+			return errors.Errorf("problem parsing port: %w", err)
+		}
+		taskgroupz.GoWithName("msock-bind-"+strconv.Itoa(portnum), func(ctx context.Context) error {
+			return r.runReverseVsockUnixProxy(ctx, target, uint32(portnum))
+		})
+	}
+
+	r.taskgroup = taskgroupz
+
+	// // Demonstrate pprof helper functionality
+	// WrapTaskGroupGoWithLogging("pprof-demo", taskgroupz, func(ctx context.Context) error {
+	// 	return r.demonstratePprofHelper(ctx, taskgroupz)
+	// })
+
+	return taskgroupz.Wait()
+}
+
 func (r *runmLinuxInit) setupLogger(ctx context.Context) (context.Context, error) {
 	var err error
 
@@ -148,38 +287,6 @@ func (r *runmLinuxInit) setupLogger(ctx context.Context) (context.Context, error
 	r.logger = logger
 
 	return slogctx.NewCtx(ctx, logger), nil
-}
-
-func main() {
-	var exitCode = 0
-	defer func() {
-		os.Exit(exitCode)
-	}()
-
-	pid := os.Getpid()
-
-	// reap.SetSubreaper(os.Getpid())
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	runmLinuxInit := &runmLinuxInit{}
-
-	ctx, err := runmLinuxInit.setupLogger(ctx)
-	if err != nil {
-		fmt.Printf("failed to setup logger: %v\n", err)
-		exitCode = 1
-		return
-	}
-
-	ctx = slogctx.Append(ctx, slog.Int("pid", pid))
-
-	err = recoveryMain(ctx, runmLinuxInit)
-	if err != nil {
-		slog.ErrorContext(ctx, "error in main", "error", err)
-		exitCode = 1
-		return
-	}
 }
 
 func recoveryMain(ctx context.Context, r *runmLinuxInit) (err error) {
@@ -337,112 +444,6 @@ func reapOnSignals(ctx context.Context, signals chan os.Signal) error {
 			}
 		}
 	}
-}
-
-func (r *runmLinuxInit) run(ctx context.Context) error {
-
-	if containerId == "" {
-		return errors.Errorf("container-id flag is required")
-	}
-
-	if err := mount(ctx); err != nil {
-		return errors.Errorf("problem mounting rootfs: %w", err)
-	}
-
-	// WARNING: after we call this it will trigger intermitent 'no child processes' errors
-	// see https://github.com/firecracker-microvm/firecracker-containerd/issues/285
-	// if we call 'mount' after this point, we run into this often because of all the processes that are running
-	signals, err := setupSignals()
-	if err != nil {
-		return errors.Errorf("problem setting up signals: %w", err)
-	}
-
-	defer ticker.NewTicker(
-		ticker.WithMessage("RUNM:INIT[RUNNING]"),
-		ticker.WithDoneMessage("RUNM:INIT[DONE]"),
-		ticker.WithSlogBaseContext(ctx),
-		ticker.WithLogLevel(slog.LevelDebug),
-		ticker.WithFrequency(15),
-		ticker.WithStartBurst(5),
-		ticker.WithAttrFunc(func() []slog.Attr {
-			return []slog.Attr{
-				slog.Int("pid", os.Getpid()),
-				slog.String("gomaxprocs", strconv.Itoa(goruntime.GOMAXPROCS(0))),
-			}
-		}),
-	).RunAsDefer()()
-
-	ctx, cancel := context.WithCancel(ctx)
-	go handleExitSignals(ctx, cancel)
-
-	r.cancel = cancel
-	// Create TaskGroup with pprof enabled and custom labels
-	taskgroupz := taskgroup.NewTaskGroup(ctx,
-		taskgroup.WithName("runm-linux-init"),
-		taskgroup.WithEnablePprof(true),
-		taskgroup.WithPprofLabels(map[string]string{
-			"service":      serviceName,
-			"container-id": containerId,
-			"runm-mode":    runmMode,
-		}),
-		taskgroup.WithLogStart(true),
-		taskgroup.WithLogEnd(true),
-		taskgroup.WithLogTaskStart(false),
-		taskgroup.WithLogTaskEnd(false),
-		taskgroup.WithSlogBaseContext(ctx),
-	)
-
-	r.exitChan = make(chan gorunc.Exit, 32*100)
-
-	taskgroupz.GoWithName("reaper", func(ctx context.Context) (err error) {
-		return reapOnSignals(ctx, signals)
-	})
-
-	// taskgroupz.GoWithName("psnotify", func(ctx context.Context) error {
-	// 	return r.runPsnotify(ctx, r.exitChan)
-	// })
-
-	taskgroupz.GoWithName("delim-writer-unix-proxy", func(ctx context.Context) error {
-		return r.runVsockUnixProxy(ctx, constants.DelimitedWriterProxyGuestUnixPath, r.logWriter)
-	})
-
-	taskgroupz.GoWithName("raw-writer-unix-proxy", func(ctx context.Context) error {
-		return r.runVsockUnixProxy(ctx, constants.RawWriterProxyGuestUnixPath, r.rawWriter)
-	})
-
-	go func() {
-		err := runProxyHooks(ctx)
-		if err != nil {
-			slog.ErrorContext(ctx, "problem proxying hooks", "error", err)
-		}
-	}()
-
-	taskgroupz.GoWithName("grpc-vsock-server", func(ctx context.Context) error {
-		return r.runGrpcVsockServer(ctx)
-	})
-
-	taskgroupz.GoWithName("pprof-vsock-server", func(ctx context.Context) error {
-		return r.runPprofVsockServer(ctx)
-	})
-
-	for target, port := range msockBinds {
-		portnum, err := strconv.Atoi(port)
-		if err != nil {
-			return errors.Errorf("problem parsing port: %w", err)
-		}
-		taskgroupz.GoWithName("msock-bind-"+strconv.Itoa(portnum), func(ctx context.Context) error {
-			return r.runReverseVsockUnixProxy(ctx, target, uint32(portnum))
-		})
-	}
-
-	r.taskgroup = taskgroupz
-
-	// // Demonstrate pprof helper functionality
-	// WrapTaskGroupGoWithLogging("pprof-demo", taskgroupz, func(ctx context.Context) error {
-	// 	return r.demonstratePprofHelper(ctx, taskgroupz)
-	// })
-
-	return taskgroupz.Wait()
 }
 
 func printCaps(ctx context.Context) error {
