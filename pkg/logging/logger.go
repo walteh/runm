@@ -152,13 +152,13 @@ func NewLogger(opts ...LoggerOpt) *slog.Logger {
 		}
 	}
 
-	fan := newMultiHandler(copts.handlers...)
+	h := newMultiHandler(copts.handlers...)
 
-	ctxHandler := newContextHandler(fan)
+	h = newContextHandler(h)
 
-	otelHandler := NewOTelSlogTraceInjectionHandler(ctxHandler)
+	// h = NewOTelSlogTraceInjectionHandler(h)
 
-	l := slog.New(otelHandler)
+	l := slog.New(h)
 
 	for _, v := range copts.values {
 		l = l.With(v)

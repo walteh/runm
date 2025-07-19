@@ -31,12 +31,14 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/mdlayher/vsock"
 	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/vishvananda/netlink"
 	"gitlab.com/tozd/go/errors"
 	"google.golang.org/grpc"
 
 	gorunc "github.com/containerd/go-runc"
 	slogctx "github.com/veqryn/slog-context"
 
+	"github.com/walteh/runm/core/gvnet"
 	"github.com/walteh/runm/core/runc/process"
 	"github.com/walteh/runm/core/runc/runtime"
 	"github.com/walteh/runm/core/runc/runtime/gorunc/reaper"
@@ -45,6 +47,7 @@ import (
 	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/pkg/logging"
 	"github.com/walteh/runm/pkg/logging/otel"
+	"github.com/walteh/runm/pkg/netdiag"
 	"github.com/walteh/runm/pkg/taskgroup"
 	"github.com/walteh/runm/pkg/ticker"
 
@@ -86,14 +89,18 @@ func init() {
 	mfsBinds = make(map[string]string)
 	msockBinds = make(map[string]string)
 
-	for _, mbind := range strings.Split(mfsBindsString, ",") {
-		parts := strings.Split(mbind, constants.MbindSeparator)
-		mfsBinds[parts[0]] = parts[1]
+	if mfsBindsString != "" {
+		for _, mbind := range strings.Split(mfsBindsString, ",") {
+			parts := strings.Split(mbind, constants.MbindSeparator)
+			mfsBinds[parts[0]] = parts[1]
+		}
 	}
 
-	for _, mbind := range strings.Split(msockBindsString, ",") {
-		parts := strings.Split(mbind, constants.MbindSeparator)
-		msockBinds[parts[0]] = parts[1]
+	if msockBindsString != "" {
+		for _, mbind := range strings.Split(msockBindsString, ",") {
+			parts := strings.Split(mbind, constants.MbindSeparator)
+			msockBinds[parts[0]] = parts[1]
+		}
 	}
 
 }
@@ -196,6 +203,40 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 		taskgroup.WithLogTaskEnd(false),
 		taskgroup.WithSlogBaseContext(ctx),
 	)
+
+	// Check network interface status before diagnostic
+	if err := ExecCmdForwardingStdio(ctx, "ip", "link", "show"); err != nil {
+		slog.WarnContext(ctx, "failed to show network links", "error", err)
+	}
+
+	if err := ExecCmdForwardingStdio(ctx, "ip", "addr", "show"); err != nil {
+		slog.WarnContext(ctx, "failed to show network addresses", "error", err)
+	}
+
+	if err := ExecCmdForwardingStdio(ctx, "ip", "route", "show"); err != nil {
+		slog.WarnContext(ctx, "failed to show network routes", "error", err)
+	}
+
+	// Configure network using netlink in pure Go
+	if err := configureNetwork(ctx); err != nil {
+		slog.ErrorContext(ctx, "failed to configure network", "error", err)
+		return errors.Errorf("failed to configure network: %w", err)
+	}
+
+	// try to hit google.com with busybox verbose if not throw an error
+	res, err := netdiag.Diagnose(ctx, "https://www.google.com/", "GET", &http.Client{})
+	if err != nil {
+		slog.ErrorContext(ctx, "problem diagnosing network", "error", err)
+		return errors.Errorf("problem diagnosing network: %w", err)
+	}
+	slog.InfoContext(ctx, "network diagnosis", "result", res.StringVerbose())
+
+	// taskgroupz.GoWithName("gvproxy-vm-adapter", func(ctx context.Context) error {
+	// 	go func() {
+
+	// 	}()
+	// 	return NewDefaultGvproxyVMAdapter().Run()
+	// })
 
 	r.exitChan = make(chan gorunc.Exit, 32*100)
 
@@ -833,3 +874,113 @@ func (d *simpleVsockDialer) DialContext(ctx context.Context, _, _ string) (net.C
 	slog.InfoContext(ctx, "dialed vsock for otel", "conn", c)
 	return c, nil
 }
+
+func configureNetwork(ctx context.Context) error {
+
+	gatewayIp := gvnet.VIRTUAL_GATEWAY_IP
+	guestIp := gvnet.VIRTUAL_GUEST_IP
+	// Find eth0 interface
+	link, err := netlink.LinkByName("eth0")
+	if err != nil {
+		return errors.Errorf("finding eth0 interface: %w", err)
+	}
+
+	slog.InfoContext(ctx, "found network interface", "name", link.Attrs().Name, "mac", link.Attrs().HardwareAddr)
+
+	guestNet := guestIp + "/24"
+
+	// Bring up the interface
+	if err := netlink.LinkSetUp(link); err != nil {
+		return errors.Errorf("bringing up eth0: %w", err)
+	}
+
+	// Parse IP address and network
+	ipNet, err := netlink.ParseIPNet(guestNet)
+	if err != nil {
+		return errors.Errorf("parsing IP network: %w", err)
+	}
+
+	// Add IP address to interface
+	addr := &netlink.Addr{IPNet: ipNet}
+	if err := netlink.AddrAdd(link, addr); err != nil {
+		return errors.Errorf("adding IP address to eth0: %w", err)
+	}
+
+	slog.InfoContext(ctx, "configured IP address", "interface", "eth0", "ip", guestNet)
+
+	// Add default route
+	gateway := net.ParseIP(gatewayIp)
+	route := &netlink.Route{
+		LinkIndex: link.Attrs().Index,
+		Gw:        gateway,
+	}
+
+	if err := netlink.RouteAdd(route); err != nil {
+		return errors.Errorf("adding default route: %w", err)
+	}
+
+	slog.InfoContext(ctx, "configured default route", "gateway", gatewayIp)
+
+	return nil
+}
+
+// // Check network interface status before diagnostic
+// if err := ExecCmdForwardingStdio(ctx, "ip", "link", "show"); err != nil {
+// 	slog.WarnContext(ctx, "failed to show network links", "error", err)
+// }
+
+// if err := ExecCmdForwardingStdio(ctx, "ip", "addr", "show"); err != nil {
+// 	slog.WarnContext(ctx, "failed to show network addresses", "error", err)
+// }
+
+// if err := ExecCmdForwardingStdio(ctx, "ip", "route", "show"); err != nil {
+// 	slog.WarnContext(ctx, "failed to show network routes", "error", err)
+// }
+
+// if err := ExecCmdForwardingStdio(ctx, "cat", "/etc/resolv.conf"); err != nil {
+// 	slog.WarnContext(ctx, "failed to show resolv.conf", "error", err)
+// }
+
+// // Try to bring up network interface if it exists
+// if err := ExecCmdForwardingStdio(ctx, "ip", "link", "set", "eth0", "up"); err != nil {
+// 	slog.WarnContext(ctx, "failed to bring up eth0", "error", err)
+// }
+
+// // Try DHCP on eth0
+// if err := ExecCmdForwardingStdio(ctx, "udhcpc", "-i", "eth0", "-n", "-q"); err != nil {
+// 	slog.WarnContext(ctx, "failed to get DHCP lease on eth0", "error", err)
+// }
+
+// // Manually configure IP since udhcpc script isn't working
+// if err := ExecCmdForwardingStdio(ctx, "ip", "addr", "add", "192.168.127.2/24", "dev", "eth0"); err != nil {
+// 	slog.WarnContext(ctx, "failed to add IP to eth0", "error", err)
+// }
+
+// // Add default route
+// if err := ExecCmdForwardingStdio(ctx, "ip", "route", "add", "default", "via", "192.168.127.1"); err != nil {
+// 	slog.WarnContext(ctx, "failed to add default route", "error", err)
+// }
+
+// // Show network status after manual configuration
+// if err := ExecCmdForwardingStdio(ctx, "ip", "addr", "show", "eth0"); err != nil {
+// 	slog.WarnContext(ctx, "failed to show eth0 addresses after configuration", "error", err)
+// }
+
+// if err := ExecCmdForwardingStdio(ctx, "ip", "route", "show"); err != nil {
+// 	slog.WarnContext(ctx, "failed to show routes after configuration", "error", err)
+// }
+
+// // try to hit google.com with busybox verbose if not throw an error
+// res, err := netdiag.Diagnose(ctx, "https://www.google.com/", "GET", &http.Client{})
+// if err != nil {
+// 	slog.ErrorContext(ctx, "problem diagnosing network", "error", err)
+// 	return errors.Errorf("problem diagnosing network: %w", err)
+// }
+// slog.InfoContext(ctx, "network diagnosis", "result", res.StringVerbose())
+
+// // taskgroupz.GoWithName("gvproxy-vm-adapter", func(ctx context.Context) error {
+// // 	go func() {
+
+// // 	}()
+// // 	return NewDefaultGvproxyVMAdapter().Run()
+// // })

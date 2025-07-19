@@ -16,17 +16,9 @@ import (
 )
 
 type VirtualNetworkRunner struct {
-	name    string
-	running bool
 	swich   *tap.Switch
 	netConn net.Conn
-
-	// Direct references to Unix connections for better debugging
-	// hostConnUnix *net.UnixConn
-	// vmConnUnix   *net.UnixConn
-
 	cleanup func() error
-	// proxyErrChans []<-chan error
 }
 
 func IsolateNetworkSwitch(vn *virtualnetwork.VirtualNetwork) (*tap.Switch, error) {
@@ -73,31 +65,10 @@ func (me *VirtualNetworkRunner) Run(ctx context.Context) error {
 		return errors.New("virtual network is not set")
 	}
 
-	me.running = true
-	defer func() {
-		me.running = false
-	}()
-
-	// Create a copy of the netConn to use with the tap.Switch
-	// This way we can keep our original connections alive
 	slog.InfoContext(ctx, "preparing connection for tap.Switch",
 		"netConn_type", reflect.TypeOf(me.netConn).String(),
 		"local_addr", me.netConn.LocalAddr().String(),
 		"remote_addr", me.netConn.RemoteAddr().String())
-
-	// Send test packets to verify connectivity
-	// go sendTestPackets(ctx, me.hostConnUnix, me.vmConnUnix)
-
-	// Wrap the connection with debug logging
-	// wrappedConn := &debugLogConn{
-	// 	Conn: me.netConn,
-	// 	name: "VirtualNetworkRunner.netConn",
-	// 	ctx:  ctx,
-	// }
-
-	slog.InfoContext(ctx, "calling switch.Accept on connection",
-		"protocol", types.VfkitProtocol,
-		"switch_type", reflect.TypeOf(me.swich).String())
 
 	err := me.swich.Accept(ctx, me.netConn, types.VfkitProtocol)
 	if err != nil {
@@ -113,7 +84,7 @@ func (me *VirtualNetworkRunner) Run(ctx context.Context) error {
 }
 
 func (me *VirtualNetworkRunner) Close(ctx context.Context) error {
-	slog.InfoContext(ctx, "closing VirtualNetworkRunner", "name", me.name)
+	slog.InfoContext(ctx, "closing VirtualNetworkRunner")
 
 	// First close the netConn since it's a wrapper and doesn't actually close the underlying sockets
 	if me.netConn != nil {
@@ -129,8 +100,7 @@ func (me *VirtualNetworkRunner) Close(ctx context.Context) error {
 
 	me.cleanup()
 
-	me.running = false
-	slog.InfoContext(ctx, "VirtualNetworkRunner successfully closed", "name", me.name)
+	slog.InfoContext(ctx, "VirtualNetworkRunner successfully closed")
 
 	// If any errors occurred during closing, return the first one
 	if len(closeErrors) > 0 {
@@ -138,18 +108,4 @@ func (me *VirtualNetworkRunner) Close(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func (me *VirtualNetworkRunner) Alive() bool {
-	return me.running
-}
-
-func (me *VirtualNetworkRunner) Fields() []slog.Attr {
-	return []slog.Attr{
-		slog.String("name", me.name),
-	}
-}
-
-func (me *VirtualNetworkRunner) Name() string {
-	return me.name
 }

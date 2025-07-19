@@ -123,7 +123,6 @@ func NewDgramVirtioNet(ctx context.Context, macstr string) (*virtio.VirtioNet, *
 	}
 
 	runner := &VirtualNetworkRunner{
-		name:    "virtual-network-runner(" + macstr + ")",
 		netConn: hostNetConn,
 		cleanup: func() error {
 			for _, closer := range toCleanup {

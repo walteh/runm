@@ -37,14 +37,14 @@ func GvproxyVersion() string {
 type gvproxy struct {
 	netdev    *virtio.VirtioNet
 	taskGroup *taskgroup.TaskGroup
+	forwarder *tapsock.VirtualNetworkRunner
+	stack     *stack.Stack
+	magic     *MagicHostPort
+	cfg       *GvproxyConfig
 }
 
 func (p *gvproxy) VirtioNetDevice() *virtio.VirtioNet {
 	return p.netdev
-}
-
-func (p *gvproxy) Wait(ctx context.Context) error {
-	return p.taskGroup.Wait()
 }
 
 type Proxy interface {
@@ -58,18 +58,8 @@ func NewProxy(ctx context.Context, cfg *GvproxyConfig) (Proxy, error) {
 		return nil, errors.Errorf("cant start gvproxy, context cancelled: %w", ctx.Err())
 	}
 
-	// Create taskgroup for managing all gvproxy tasks
-	tg := taskgroup.NewTaskGroup(ctx,
-		taskgroup.WithName("gvproxy"),
-		taskgroup.WithLogStart(true),
-		taskgroup.WithLogEnd(true),
-		taskgroup.WithLogTaskStart(true),
-		taskgroup.WithLogTaskEnd(true),
-		taskgroup.WithSlogBaseContext(ctx),
-	)
-
 	// start the vmFileSocket
-	device, runner, err := tapsock.NewDgramVirtioNet(ctx, VIRTUAL_GUEST_MAC)
+	device, forwarder, err := tapsock.NewDgramVirtioNet(ctx, VIRTUAL_GUEST_MAC)
 	if err != nil {
 		return nil, errors.Errorf("vmFileSocket listen: %w", err)
 	}
@@ -84,7 +74,7 @@ func NewProxy(ctx context.Context, cfg *GvproxyConfig) (Proxy, error) {
 		return nil, errors.Errorf("creating virtual network: %w", err)
 	}
 
-	if err := runner.ApplyVirtualNetwork(vn); err != nil {
+	if err := forwarder.ApplyVirtualNetwork(vn); err != nil {
 		return nil, errors.Errorf("applying virtual network: %w", err)
 	}
 
@@ -93,38 +83,37 @@ func NewProxy(ctx context.Context, cfg *GvproxyConfig) (Proxy, error) {
 		return nil, errors.Errorf("isolating network stack: %w", err)
 	}
 
-	// Start tasks using taskgroup
-	tg.GoWithName("tapsock-runner", func(ctx context.Context) error {
-		if ctx.Err() != nil {
-			tg.LogCancellationIfCancelled("tapsock-runner")
-			return nil
-		}
+	return &gvproxy{
+		forwarder: forwarder,
+		netdev:    device,
+		stack:     stack,
+		cfg:       cfg,
+	}, nil
+}
 
-		if err := runner.Run(ctx); err != nil {
-			slog.ErrorContext(ctx, "running runner", "error", err)
-			return errors.Errorf("running runner: %w", err)
-		}
-		return nil
+func (p *gvproxy) Wait(ctx context.Context) error {
+	// Create taskgroup for managing all gvproxy tasks
+	tg := taskgroup.NewTaskGroup(ctx,
+		taskgroup.WithName("gvproxy"),
+		taskgroup.WithLogStart(true),
+		taskgroup.WithLogEnd(true),
+		taskgroup.WithLogTaskStart(true),
+		taskgroup.WithLogTaskEnd(true),
+		taskgroup.WithSlogBaseContext(ctx),
+	)
+
+	tg.GoWithName("tapsock-runner", func(ctx context.Context) error {
+		return p.forwarder.Run(ctx)
 	})
 
-	if cfg.MagicHostPort != "" {
+	if p.magic != nil {
+		m, err := p.setupMagicForwarding(tg, ctx, p.stack)
+		if err != nil {
+			return errors.Errorf("setting up magic forwarding: %w", err)
+		}
+
 		tg.GoWithName("magic-forwarding", func(ctx context.Context) error {
-			if ctx.Err() != nil {
-				tg.LogCancellationIfCancelled("magic-forwarding")
-				return nil
-			}
-
-			slog.InfoContext(ctx, "setting up magic forwarding", "magicHostPort", cfg.MagicHostPort)
-			m, err := cfg.setupMagicForwarding(tg, ctx, stack)
-			if err != nil {
-				return errors.Errorf("setting up magic forwarding: %w", err)
-			}
-
-			slog.InfoContext(ctx, "running magic forwarding")
-			if err := m.Run(ctx); err != nil {
-				return errors.Errorf("running magic forwarding: %w", err)
-			}
-			return nil
+			return m.Run(ctx)
 		})
 	}
 
@@ -135,11 +124,28 @@ func NewProxy(ctx context.Context, cfg *GvproxyConfig) (Proxy, error) {
 		return nil
 	})
 
-	return &gvproxy{
-		netdev:    device,
-		taskGroup: tg,
-	}, nil
+	return tg.Wait()
 }
+
+// func (p *gvproxy) proxyListener(ctx context.Context, listener net.Listener) error {
+// 	for {
+// 		conn, err := listener.Accept()
+// 		if err != nil {
+// 			return errors.Errorf("accepting connection: %w", err)
+// 		}
+
+// 		go func() {
+// 			defer conn.Close()
+
+// 			if err := p.forwarder.Run(ctx); err != nil {
+// 				slog.ErrorContext(ctx, "running forwarder", "error", err)
+// 			}
+// 		}()
+
+// 	}
+
+// 	return nil
+// }
 
 func captureFile(cfg *GvproxyConfig) string {
 	if !cfg.EnableDebug {
@@ -214,27 +220,27 @@ func (cfg *GvproxyConfig) buildConfiguration(ctx context.Context) (*types.Config
 	return &config, nil
 }
 
-func (cfg *GvproxyConfig) setupMagicForwarding(tg *taskgroup.TaskGroup, ctx context.Context, stack *stack.Stack) (*MagicHostPort, error) {
-	m, err := NewMagicHostPortStream(ctx, cfg.MagicHostPort, tg)
+func (p *gvproxy) setupMagicForwarding(tg *taskgroup.TaskGroup, ctx context.Context, stack *stack.Stack) (*MagicHostPort, error) {
+	m, err := NewMagicHostPortStream(ctx, p.cfg.MagicHostPort, tg)
 	if err != nil {
 		return nil, errors.Errorf("creating global host port: %w", err)
 	}
 
-	if cfg.EnableMagicSSHForwarding {
+	if p.cfg.EnableMagicSSHForwarding {
 		err = m.ForwardCMUXMatchToGuestPort(ctx, stack, 22, cmux.PrefixMatcher("SSH-"))
 		if err != nil {
 			return nil, errors.Errorf("forwarding cmux ssh to guest port: %w", err)
 		}
 	}
 
-	if cfg.EnableMagicHTTPSForwarding {
+	if p.cfg.EnableMagicHTTPSForwarding {
 		err = m.ForwardCMUXMatchToGuestPort(ctx, stack, 443, cmux.TLS())
 		if err != nil {
 			return nil, errors.Errorf("forwarding cmux https to guest port: %w", err)
 		}
 	}
 
-	if cfg.EnableMagicHTTPForwarding {
+	if p.cfg.EnableMagicHTTPForwarding {
 		err = m.ForwardCMUXMatchToGuestPort(ctx, stack, 80, cmux.HTTP1())
 		if err != nil {
 			return nil, errors.Errorf("forwarding cmux http to guest port: %w", err)

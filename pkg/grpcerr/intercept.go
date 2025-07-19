@@ -63,8 +63,13 @@ func mergeContext(ctx context.Context, grpcctx context.Context) context.Context 
 // }
 
 var ignoredMethods = map[string]bool{
-	"/containerd.services.content.v1.Content/Status": true,
-	"/grpc.health.v1.Health/Check":                   true,
+	"/containerd.services.content.v1.Content/Status":       true,
+	"/containerd.services.content.v1.Content/ListStatuses": true,
+	"/grpc.health.v1.Health/Check":                         true,
+	"/containerd.services.content.v1.Content/Info":         true,
+	"/containerd.services.content.v1.Content/Read":         true,
+	"/containerd.services.containers.v1.Containers/Get":    true,
+	"/containerd.services.leases.v1.Leases/Delete":         true,
 }
 
 var ignoredMethodsLock sync.Mutex

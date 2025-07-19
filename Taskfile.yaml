@@ -61,7 +61,7 @@ env:
     DOCKER_BUILDKIT: 1
     PAGER: less
     DEBUG_CONTAINERD_TEST: 0
-    DEBUG_BUILDKITD_TEST: 1
+    DEBUG_BUILDKITD_TEST: 0
     DEBUG_NERDCTL_TEST: 0
     DEBUG_CONTAINERD_SHIM_RUNM_V2_TEST:
         sh: mkdir -p /tmp/tcontainerd-fs-env && echo '0' | tee /tmp/tcontainerd-fs-env/DEBUG_CONTAINERD_SHIM_RUNM_V2_TEST

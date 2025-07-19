@@ -109,14 +109,18 @@ func init() {
 	mfsBinds = make(map[string]string)
 	msockBinds = make(map[string]string)
 
-	for _, mbind := range strings.Split(mfsBindsString, ",") {
-		parts := strings.Split(mbind, constants.MbindSeparator)
-		mfsBinds[parts[0]] = parts[1]
+	if mfsBindsString != "" {
+		for _, mbind := range strings.Split(mfsBindsString, ",") {
+			parts := strings.Split(mbind, constants.MbindSeparator)
+			mfsBinds[parts[0]] = parts[1]
+		}
 	}
 
-	for _, mbind := range strings.Split(msockBindsString, ",") {
-		parts := strings.Split(mbind, constants.MbindSeparator)
-		msockBinds[parts[0]] = parts[1]
+	if msockBindsString != "" {
+		for _, mbind := range strings.Split(msockBindsString, ",") {
+			parts := strings.Split(mbind, constants.MbindSeparator)
+			msockBinds[parts[0]] = parts[1]
+		}
 	}
 }
 
@@ -293,14 +297,84 @@ func mount(ctx context.Context) error {
 	}
 	slog.InfoContext(ctx, "cat /proc/mounts: "+string(procMounts))
 
+	os.MkdirAll(filepath.Join(constants.NewRootAbsPath, "etc"), 0755)
+
+	if err := os.WriteFile(filepath.Join(constants.NewRootAbsPath, "etc", "resolv.conf"), []byte("nameserver 192.168.127.1"), 0644); err != nil {
+		return errors.Errorf("problem updating resolve.conf: %w", err)
+	}
+
+	// os.MkdirAll(filepath.Join(constants.NewRootAbsPath, "/usr/share/udhcpc"), 0755)
+
+	// if err := os.WriteFile(filepath.Join(constants.NewRootAbsPath, "/usr/share/udhcpc/default.script"), []byte(udhcpcScript), 0755); err != nil {
+	// 	return errors.Errorf("problem updating udhcpc.script: %w", err)
+	// }
+
 	err = switchRoot(ctx)
 	if err != nil {
 		return errors.Errorf("problem switching root: %w", err)
 	}
 
+	// update the resolve.conf to nameserver 192.168.127.1
+
 	return nil
 
 }
+
+// var udhcpcScript = `
+// #!/bin/sh
+// # Busybox udhcpc dispatcher script. Copyright (C) 2009 by Axel Beckert.
+// #
+// # Based on the busybox example scripts and the old udhcp source
+// # package default.* scripts.
+// RESOLV_CONF="/etc/resolv.conf"
+
+// case $1 in
+// 	bound | renew)
+// 		[ -n "$broadcast" ] && BROADCAST="broadcast $broadcast"
+// 		[ -n "$subnet" ] && NETMASK="netmask $subnet"
+// 		/bin/busybox ifconfig $interface $ip $BROADCAST $NETMASK
+// 		if [ -n "$router" ]; then
+// 			echo "$0: Resetting default routes"
+// 			while /bin/busybox route del default gw 0.0.0.0 dev $interface; do :; done
+// 			metric=0
+// 			for i in $router; do
+// 				/bin/busybox route add default gw $i dev $interface metric $metric
+// 				metric=$(($metric + 1))
+// 			done
+// 		fi
+// 		# Update resolver configuration file
+// 		R=""
+// 		[ -n "$domain" ] && R="domain $domain
+// "
+// 		for i in $dns; do
+// 			echo "$0: Adding DNS $i"
+// 			R="${R}nameserver $i
+// "
+// 		done
+// 		#if [ -x /bin/busybox resolvconf ]; then
+// 			echo -n "$R" | /bin/busybox resolvconf -a "${interface}.udhcpc"
+// 		#else
+// 			# echo -n "$R" > "$RESOLV_CONF"
+// 		#fi
+// 		;;
+// 	deconfig)
+// 		#if [ -x /bin/busybox resolvconf ]; then
+// 			/bin/busybox resolvconf -d "${interface}.udhcpc"
+// 		#fi
+// 		/bin/busybox ifconfig $interface 0.0.0.0
+// 		;;
+// 	leasefail)
+// 		echo "$0: Lease failed: $message"
+// 		;;
+// 	nak)
+// 		echo "$0: Received a NAK: $message"
+// 		;;
+// 	*)
+// 		echo "$0: Unknown udhcpc command: $1"
+// 		exit 1
+// 		;;
+// esac
+// `
 
 func switchRoot(ctx context.Context) error {
 

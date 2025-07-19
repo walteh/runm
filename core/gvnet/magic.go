@@ -53,44 +53,8 @@ func (g *MagicHostPort) ApplyRestMux(name string, mux http.Handler) {
 }
 
 func (g *MagicHostPort) Run(ctx context.Context) error {
-	g.alive = true
-	defer func() {
-		g.alive = false
-	}()
-
-	// Start the cmux server task
-	g.taskGroup.GoWithName("cmux-server", func(ctx context.Context) error {
-		server := NewCmuxServer(fmt.Sprintf("globalhostport_cmux(%s)", g.addr.String()), g.mux)
-		return server.Run(ctx)
-	})
-
-	// Block until context is done
-	<-ctx.Done()
-	return ctx.Err()
-}
-
-func (g *MagicHostPort) Alive() bool {
-	return g.alive
-}
-
-func (g *MagicHostPort) Close(ctx context.Context) error {
-	for _, c := range g.toClose {
-		go c.Close()
-	}
-	return nil
-}
-
-func (g *MagicHostPort) Fields() []slog.Attr {
-	return []slog.Attr{
-		slog.Group("globalhostport",
-			slog.String("addr", g.addr.String()),
-			slog.Bool("alive", g.alive),
-		),
-	}
-}
-
-func (g *MagicHostPort) Name() string {
-	return fmt.Sprintf("globalhostport(%s)", g.addr.String())
+	server := NewCmuxServer(fmt.Sprintf("globalhostport_cmux(%s)", g.addr.String()), g.mux)
+	return server.Run(ctx)
 }
 
 func (g *MagicHostPort) ForwardCMUXMatchToGuestPort(ctx context.Context, switc *stack.Stack, guestPortTarget uint16, matcher cmux.Matcher) error {

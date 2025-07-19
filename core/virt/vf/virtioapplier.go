@@ -25,7 +25,8 @@ type vzVirtioDeviceApplier struct {
 	keyboardToSet                []vz.KeyboardConfiguration
 	pointingDevicesToSet         []vz.PointingDeviceConfiguration
 	graphicsDevicesToSet         []vz.GraphicsDeviceConfiguration
-	networkDevicesToSet          []*vz.VirtioNetworkDeviceConfiguration
+	// netDevicesToSet              []vz.NetworkDeviceAttachment
+	networkDevicesToSet []*vz.VirtioNetworkDeviceConfiguration
 	// entropyDevicesToSet          []*vz.VirtioEntropyDeviceConfiguration
 	serialPortsToSet []*vz.VirtioConsoleDeviceSerialPortConfiguration
 	// socketDevicesToSet           []vz.SocketDeviceConfiguration
@@ -52,11 +53,12 @@ func NewVzVirtioDeviceApplier(ctx context.Context, cfg *vz.VirtualMachineConfigu
 		networkDevicesToSet:          make([]*vz.VirtioNetworkDeviceConfiguration, 0),
 		serialPortsToSet:             make([]*vz.VirtioConsoleDeviceSerialPortConfiguration, 0),
 		consolePortsToSet:            make([]*vz.VirtioConsolePortConfiguration, 0),
-		addSocketDevice:              false,
-		bootLoader:                   bootLoader,
-		addMemoryBalloonDevice:       false,
-		addEntropyDevice:             false,
-		VirtualMachineConfiguration:  cfg,
+
+		addSocketDevice:             false,
+		bootLoader:                  bootLoader,
+		addMemoryBalloonDevice:      false,
+		addEntropyDevice:            false,
+		VirtualMachineConfiguration: cfg,
 	}
 
 	return wrapper, nil
