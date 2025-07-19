@@ -104,6 +104,13 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 	}
 	devices = append(devices, tzDev)
 
+	// Mount CA certificates for TLS verification (macOS has certs at /etc/ssl/)
+	caCertsDev, err := virtio.VirtioFsNew("/etc/ssl", constants.CaCertsVirtioTag)
+	if err != nil {
+		return nil, errors.Errorf("creating ca certs virtio device: %w", err)
+	}
+	devices = append(devices, caCertsDev)
+
 	mbindDevices, mfsBindMounts, msockBindMounts, err := findMbindDevices(ctx, ctrconfig.Spec, ctrconfig.RootfsMounts)
 	if err != nil {
 		return nil, errors.Errorf("finding mbind devices: %w", err)

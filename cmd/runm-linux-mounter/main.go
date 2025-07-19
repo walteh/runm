@@ -381,10 +381,16 @@ func mount(ctx context.Context) error {
 func switchRoot(ctx context.Context) error {
 
 	zoneinfoPath := filepath.Join(constants.NewRootAbsPath, "/usr/share/zoneinfo")
-
 	os.MkdirAll(zoneinfoPath, 0755)
 	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "virtiofs", constants.ZoneInfoVirtioTag, zoneinfoPath, "-o", "ro"); err != nil {
 		return errors.Errorf("mounting zoneinfo: %w", err)
+	}
+
+	// Mount CA certificates for TLS verification (mount whole /etc/ssl from macOS host)
+	caCertsPath := filepath.Join(constants.NewRootAbsPath, "/etc/ssl")
+	os.MkdirAll(caCertsPath, 0755)
+	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "virtiofs", constants.CaCertsVirtioTag, caCertsPath, "-o", "ro"); err != nil {
+		return errors.Errorf("mounting ca certs: %w", err)
 	}
 
 	// // Mount zoneinfo to VM-specific path to avoid conflicts with container /usr

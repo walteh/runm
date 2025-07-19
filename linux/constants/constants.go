@@ -11,6 +11,7 @@ const (
 	MbinFileName                      = "mbin.squashfs"
 	MbinFSType                        = "squashfs"
 	ZoneInfoVirtioTag                 = "zoneinfo"
+	CaCertsVirtioTag                  = "cacerts"
 	BundleVirtioTag                   = "bundle"
 	SupplementalVirioFSMountsFile     = "/supplemental-virio-fs-mounts.json"
 	VsockPidFile                      = "/ec1.vsock.pid"

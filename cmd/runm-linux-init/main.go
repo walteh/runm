@@ -7,6 +7,7 @@ import (
 
 	"bytes"
 	"context"
+	_ "crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -236,6 +237,20 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 		slog.ErrorContext(ctx, "failed to configure network", "error", err)
 		return errors.Errorf("failed to configure network: %w", err)
 	}
+
+	// Check what CA certs are available (should now have cert.pem from macOS)
+	if err := ExecCmdForwardingStdio(ctx, "ls", "-la", "/etc/ssl/"); err != nil {
+		slog.WarnContext(ctx, "failed to list CA certs", "error", err)
+	}
+
+	// Set SSL_CERT_FILE to macOS cert bundle and SSL_CERT_DIR environment variables for Go's crypto/tls
+	os.Setenv("SSL_CERT_FILE", "/etc/ssl/cert.pem")
+	os.Setenv("SSL_CERT_DIR", "/etc/ssl/certs")
+	os.Setenv("CA_BUNDLE", "/etc/ssl/cert.pem")
+
+	slog.InfoContext(ctx, "set TLS environment variables",
+		"SSL_CERT_FILE", os.Getenv("SSL_CERT_FILE"),
+		"SSL_CERT_DIR", os.Getenv("SSL_CERT_DIR"))
 
 	// Check network interface status before diagnostic
 	if err := ExecCmdForwardingStdio(ctx, "ip", "link", "show"); err != nil {
