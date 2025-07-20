@@ -9,14 +9,14 @@ import (
 
 	"gitlab.com/tozd/go/errors"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/propagation"
+	"google.golang.org/grpc"
+
 	realotel "go.opentelemetry.io/otel"
 	realotellog "go.opentelemetry.io/otel/log"
 	realglobal "go.opentelemetry.io/otel/log/global"
-
-	"go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"google.golang.org/grpc"
 )
 
 var defaultOTelInstances *OTelInstances

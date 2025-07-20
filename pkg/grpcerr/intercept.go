@@ -70,6 +70,15 @@ var ignoredMethods = map[string]bool{
 	"/containerd.services.content.v1.Content/Read":         true,
 	"/containerd.services.containers.v1.Containers/Get":    true,
 	"/containerd.services.leases.v1.Leases/Delete":         true,
+	"/containerd.services.images.v1.Images/List":           true,
+	"/containerd.services.snapshots.v1.Snapshots/Stat":     true,
+}
+
+var ignoredServices = map[string]bool{
+	"containerd.services.content.v1.Content":             true,
+	"grpc.health.v1.Health":                              true,
+	"containerd.services.leases.v1.Leases":               true,
+	"containerd.services.introspection.v1.Introspection": true,
 }
 
 var ignoredMethodsLock sync.Mutex
@@ -77,7 +86,7 @@ var ignoredMethodsLock sync.Mutex
 func isMethodIgnored(method string) bool {
 	ignoredMethodsLock.Lock()
 	defer ignoredMethodsLock.Unlock()
-	return ignoredMethods[method]
+	return ignoredMethods[method] || ignoredServices[filepath.Base(filepath.Dir(method))]
 }
 
 // implLocation returns the concrete service implementation’s PC, file and line.

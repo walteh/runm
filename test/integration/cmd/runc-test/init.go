@@ -3,13 +3,12 @@
 package main
 
 import (
-	"context"
-	"net"
-
 	_ "github.com/opencontainers/runc/libcontainer/nsenter"
 
+	"context"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"time"
 

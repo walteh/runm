@@ -9,11 +9,31 @@ vars:
     SUPPORTED_ARCHS:
       - arm64
     FORKS:
-
+      # replace (
+      # 	github.com/Code-Hex/vz/v3 => ../vz
+      # 	github.com/containerd/console => ../console
+      # 	github.com/containerd/containerd/api => ../containerd/api
+      # 	github.com/containerd/containerd/v2 => ../containerd
+      # 	github.com/containerd/containerd/v2/pkg/sys => ../containerd/pkg/sys
+      # 	github.com/containerd/go-runc => ../go-runc
+      # 	github.com/containerd/nerdctl/mod/tigron => ../nerdctl/mod/tigron
+      # 	github.com/containerd/nerdctl/v2 => ../nerdctl
+      # 	github.com/containerd/ttrpc => ../ttrpc
+      # 	github.com/containers/gvisor-tap-vsock => ../gvisor-tap-vsock
+      # 	github.com/moby/buildkit => ../buildkit
+      # 	github.com/opencontainers/runc => ../runc
+      # 	github.com/tonistiigi/fsutil => ../fsutil
+      # 	gitlab.com/tozd/go/errors => ../go-errors
+      # )
       - branch: main
         repo: "github.com/Code-Hex/vz"
         upstream: "github.com/Code-Hex/vz"
         path: "../vz"
+
+      - branch: main
+        repo: "github.com/walteh/ttrpc"
+        upstream: "github.com/containerd/ttrpc"
+        path: "../ttrpc"
 
       - branch: main
         repo: "github.com/walteh/containerd"
@@ -44,6 +64,36 @@ vars:
         repo: "github.com/walteh/ttrpc"
         upstream: "github.com/containerd/ttrpc"
         path: "../ttrpc"
+
+      - branch: main
+        repo: "github.com/walteh/console"
+        upstream: "github.com/containerd/console"
+        path: "../console"
+
+      - branch: main
+        repo: "github.com/walteh/go-runc"
+        upstream: "github.com/containerd/go-runc"
+        path: "../go-runc"
+
+      - branch: main
+        repo: "github.com/walteh/go-errors"
+        upstream: "gitlab.com/tozd/go/errors"
+        path: "../go-errors"
+
+      - branch: main
+        repo: "github.com/walteh/fsutil"
+        upstream: "github.com/tonistiigi/fsutil"
+        path: "../fsutil"
+
+      - branch: main
+        repo: "github.com/walteh/ttrpc"
+        upstream: "github.com/containerd/ttrpc"
+        path: "../ttrpc"
+
+      - branch: main
+        repo: "github.com/walteh/task"
+        upstream: "github.com/go-task/task"
+        path: "../task"
 
     BUILD_OUT_DIR: gen/build
     TEST_BIN_DIR: ./gen/build/test-bin

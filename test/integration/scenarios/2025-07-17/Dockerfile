@@ -32,6 +32,8 @@ COPY --from=runm . /app/runm
 
 WORKDIR /app/runm
 
+RUN ls -lash /app
+
 RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/go/pkg/mod <<EOF
 go mod download -x
 EOF
@@ -45,6 +47,11 @@ WORKDIR /app/runm
 
 ARG ARCH 
 
+
 RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/go/pkg/mod <<EOF
 GOOS=linux GOARCH=${ARCH} go build -x -ldflags="-s -w -extldflags=-static" -trimpath -o /out/runm-linux-mounter ./cmd/runm-linux-mounter
 EOF
+
+
+# note: curr prob
+#16 9.925 go: creating work dir: stat /tmp: no such file or directory

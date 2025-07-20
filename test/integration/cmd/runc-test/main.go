@@ -4,7 +4,6 @@ package main
 
 import (
 	_ "embed"
-
 	_ "github.com/opencontainers/cgroups/devices"
 
 	"errors"

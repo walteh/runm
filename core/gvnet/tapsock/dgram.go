@@ -108,13 +108,13 @@ func NewDgramVirtioNet(ctx context.Context, macstr string) (*virtio.VirtioNet, *
 
 	slog.InfoContext(ctx, "starting proxy goroutines")
 
-	hostNetConn := NewBidirectionalDgramNetConn(hostConnUnix, vmConnUnix)
+	// hostNetConn := NewBidirectionalDgramNetConn(hostConnUnix, vmConnUnix)
 
 	virtioNet := &virtio.VirtioNet{
 		MacAddress: mac,
 		Nat:        false,
 		Socket:     vmSocketCopy, // Use the duplicated socket for VirtioNet
-		LocalAddr:  vmConnUnix.LocalAddr().(*net.UnixAddr),
+		// LocalAddr:  vmConnUnix.LocalAddr().(*net.UnixAddr),
 	}
 
 	// delegate cleanup to the VirtualNetworkRunner
@@ -123,7 +123,7 @@ func NewDgramVirtioNet(ctx context.Context, macstr string) (*virtio.VirtioNet, *
 	}
 
 	runner := &VirtualNetworkRunner{
-		netConn: hostNetConn,
+		netConn: hostConnUnix,
 		cleanup: func() error {
 			for _, closer := range toCleanup {
 				closer.Close()
@@ -149,10 +149,12 @@ func setDgramUnixBuffers(conn *net.UnixConn) error {
 	}
 
 	err = rawConn.Control(func(fd uintptr) {
-		if err = syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_SNDBUF, 1*1024*1024); err != nil {
+		// 32 mb (was 1)
+		if err = syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_SNDBUF, 32*1024*1024); err != nil {
 			return
 		}
-		if err = syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_RCVBUF, 4*1024*1024); err != nil {
+		// 64 mb (was 4)
+		if err = syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_RCVBUF, 64*1024*1024); err != nil {
 			return
 		}
 	})
@@ -186,21 +188,6 @@ func (conn *bidirectionalDgramNetConn) RemoteAddr() net.Addr {
 
 func (conn *bidirectionalDgramNetConn) Write(b []byte) (int, error) {
 
-	// Log packet size and first few bytes for debugging
-	// packetInfo := fmt.Sprintf("size=%d first_bytes=%x", len(b), b[:min(16, len(b))])
-	// slog.Info("bidirectionalDgramNetConn.Write", "bytes", len(b), "packet_info", packetInfo)
-
-	// // Try to detect SSH traffic for debugging
-	// if len(b) >= 4 && string(b[:4]) == "SSH-" {
-	// 	slog.Info("SSH packet detected in Write", "data", string(b[:min(64, len(b))]))
-	// }
-
-	// // Write the data with a deadline to prevent blocking forever
-	// err := conn.host.SetWriteDeadline(time.Now().Add(1 * time.Second))
-	// if err != nil {
-	// 	slog.Error("bidirectionalDgramNetConn failed to set write deadline", "error", err)
-	// }
-
 	n, err := conn.host.Write(b)
 
 	if err != nil {
@@ -213,12 +200,6 @@ func (conn *bidirectionalDgramNetConn) Write(b []byte) (int, error) {
 
 func (conn *bidirectionalDgramNetConn) Read(b []byte) (int, error) {
 
-	// // Set a read deadline to prevent blocking forever
-	// err := conn.host.SetReadDeadline(time.Now().Add(1 * time.Second))
-	// if err != nil {
-	// 	slog.Error("bidirectionalDgramNetConn failed to set read deadline", "error", err)
-	// }
-
 	n, err := conn.host.Read(b)
 
 	if err != nil {
@@ -226,32 +207,6 @@ func (conn *bidirectionalDgramNetConn) Read(b []byte) (int, error) {
 	} else {
 		slog.Info("bidirectionalDgramNetConn.Read success", "bytes", n)
 	}
-	// Clear the deadline
-	// conn.host.SetReadDeadline(time.Time{})
-
-	// if err != nil && err != io.EOF {
-	// 	// Handle timeout by returning a temporary error
-	// 	if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-	// 		slog.Debug("bidirectionalDgramNetConn.Read timeout", "error", err)
-	// 		return 0, err
-	// 	}
-
-	// 	slog.Error("bidirectionalDgramNetConn.Read error", "error", err)
-	// 	if isClosedConnError(err) {
-	// 		conn.mu.Lock()
-	// 		conn.closed = true
-	// 		conn.mu.Unlock()
-	// 	}
-	// } else if n > 0 {
-	// 	// Log packet details for debugging
-	// 	packetInfo := fmt.Sprintf("size=%d first_bytes=%x", n, b[:min(16, n)])
-	// 	slog.Info("bidirectionalDgramNetConn.Read success", "bytes", n, "packet_info", packetInfo)
-
-	// 	// Try to detect SSH traffic for debugging
-	// 	if n >= 4 && string(b[:4]) == "SSH-" {
-	// 		slog.Info("SSH packet detected in Read", "data", string(b[:min(64, n)]))
-	// 	}
-	// }
 
 	return n, err
 }

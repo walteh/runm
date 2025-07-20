@@ -1,9 +1,8 @@
 package main
 
 import (
-	_ "net/http/pprof"
-
 	_ "github.com/containerd/containerd/v2/cmd/containerd/builtins"
+	_ "net/http/pprof"
 
 	"context"
 	"flag"

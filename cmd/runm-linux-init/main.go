@@ -3,11 +3,11 @@
 package main
 
 import (
+	_ "crypto/tls"
 	_ "net/http/pprof"
 
 	"bytes"
 	"context"
-	_ "crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
