@@ -110,6 +110,7 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 			"-runm-mode=oci",
 			"-container-id=" + ctrconfig.ID,
 			otelString,
+			"-init-mbin-name=" + "runm-linux-init",
 			"-mshare-dir-binds=" + defaults.MshareDirsWithTags(),
 			"-mshare-sock-binds=" + defaults.MshareSocketsWithPorts(),
 			// "-rootfs-bind-options=" + strings.Join(ctrconfig.RootfsMounts[0].Options, ","),

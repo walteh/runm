@@ -541,6 +541,7 @@ tasks:
             vars:
                 DEBUG: '1'
                 CGO_ENABLED: '1'
+                CODESIGN: '1'
                 BIN_DIR: '{{.TEST_BIN_DIR}}'
 
     build:vmfusectl:
@@ -782,7 +783,7 @@ tasks:
 
     linux:runtime:all:
         desc: builds the linux runtime
-        deps: ['linux:runtime:kernel', 'linux:runtime:initramfs', 'linux:runtime:mbins']
+        deps: ['linux:runtime:kernel', 'linux:runtime:initramfs', 'linux:runtime:mbins', 'linux:runtime:mbins:vmfuse']
 
     linux:runtime:mbins:
         desc: builds the mbin squashfs
@@ -1213,7 +1214,7 @@ tasks:
 
     dev:vmfuse:2025-07-21:01:
         desc: vmfuse POC end-to-end test - mount directory via Linux VM and NFS
-        deps: ['build:vmfused', 'build:vmfusectl', 'build:vmfuse-init', 'linux:runtime:mbins:vmfuse']
+        deps: ['linux:runtime:all', 'build:all-test-binaries']
         interactive: true
         vars:
             TMP_DIR:
@@ -1255,21 +1256,37 @@ tasks:
                 echo "Listing all mounts..."
                 {{.TEST_BIN_DIR}}/vmfusectl -server unix://{{.VMFUSED_SOCK}} list
           - cmd: |-
-                echo "Waiting for mount to become active (up to 60 seconds)..."
-                for i in {1..60}; do
-                    STATUS=$({{.TEST_BIN_DIR}}/vmfusectl -server unix://{{.VMFUSED_SOCK}} status {{.MOUNT_TARGET}} | grep Status: | awk '{print $2}' || echo "ERROR")
+                echo "Waiting for mount to become active (up to 15 seconds)..."
+                for i in {1..15}; do
+                    FULL_STATUS=$({{.TEST_BIN_DIR}}/vmfusectl -server unix://{{.VMFUSED_SOCK}} status {{.MOUNT_TARGET}} 2>/dev/null || echo "ERROR")
+                    STATUS=$(echo "$FULL_STATUS" | grep "Status:" | head -1 | awk '{print $2}' || echo "UNKNOWN")
                     echo "Attempt $i: Status = $STATUS"
+
                     if [ "$STATUS" = "MOUNT_STATUS_ACTIVE" ]; then
-                        echo "Mount is active!"
+                        echo "✅ Mount is active!"
                         break
+                    elif [ "$STATUS" = "MOUNT_STATUS_ERROR" ]; then
+                        echo "❌ Mount failed - showing full details:"
+                        echo "$FULL_STATUS"
+                        echo "STOPPING TEST DUE TO MOUNT ERROR"
+                        exit 1
+                    elif [ "$STATUS" = "ERROR" ] || [ "$STATUS" = "UNKNOWN" ]; then
+                        echo "❌ Connection or status error:"
+                        echo "$FULL_STATUS"
+                        echo "STOPPING TEST DUE TO CONNECTION ERROR"
+                        exit 1
                     fi
-                    if [ "$STATUS" = "MOUNT_STATUS_ERROR" ]; then
-                        echo "Mount failed - checking details..."
-                        {{.TEST_BIN_DIR}}/vmfusectl -server unix://{{.VMFUSED_SOCK}} status {{.MOUNT_TARGET}}
-                        break
-                    fi
+
+                    # Show current status for debugging
+                    echo "   Current status: $STATUS"
                     sleep 1
                 done
+                if [ "$STATUS" != "MOUNT_STATUS_ACTIVE" ]; then
+                    echo "⏰ TIMEOUT: Mount did not become active within 15 seconds"
+                    echo "Final status:"
+                    {{.TEST_BIN_DIR}}/vmfusectl -server unix://{{.VMFUSED_SOCK}} status {{.MOUNT_TARGET}}
+                    exit 1
+                fi
           - cmd: |-
                 echo "Testing mounted directory access..."
                 if [ -d "{{.MOUNT_TARGET}}" ]; then

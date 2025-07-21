@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"path/filepath"
 	"runtime/debug"
 	"strings"
+	"syscall"
 
 	"github.com/mdlayher/vsock"
 	"gitlab.com/tozd/go/errors"
@@ -44,12 +46,20 @@ type vmfuseInit struct {
 }
 
 func init() {
-	flag.StringVar(&mountType, "mount-type", "bind", "type of mount: bind or overlay")
-	flag.StringVar(&mountSources, "mount-sources", "", "comma-separated source paths")
-	flag.StringVar(&mountTarget, "mount-target", "/mnt/target", "target mount point")
-	flag.StringVar(&exportPath, "export-path", "/export", "NFS export path")
-	flag.StringVar(&readyFile, "ready-file", "/virtiofs/ready", "file to create when ready")
+	flag.StringVar(&mountType, "vmfuse-mount-type", "bind", "type of mount: bind or overlay")
+	flag.StringVar(&mountSources, "vmfuse-mount-sources", "", "comma-separated source paths")
+	flag.StringVar(&mountTarget, "vmfuse-mount-target", "/mnt/target", "target mount point")
+	flag.StringVar(&exportPath, "vmfuse-export-path", "/export", "NFS export path")
+	flag.StringVar(&readyFile, "vmfuse-ready-file", "/virtiofs/ready", "file to create when ready")
 	flag.BoolVar(&enableOtel, "enable-otlp", false, "enable otlp")
+
+	_ = flag.String("runm-mode", "vmfuse", "the runm mode")
+	_ = flag.String("timezone", "UTC", "the timezone")
+	_ = flag.String("time", "0", "the time")
+	_ = flag.String("init-mbin-name", "vmfuse-init", "the init mbin name")
+	_ = flag.String("mshare-dir-binds", "", "the mshare dir binds")
+	// _ = flag.String("tim")
+
 	flag.Parse()
 }
 
@@ -186,19 +196,20 @@ func (v *vmfuseInit) setupBasicMounts(ctx context.Context) error {
 	}
 
 	// Mount proc
-	if err := v.execCmd(ctx, "mount", "-t", "proc", "proc", "/proc"); err != nil {
+	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "proc", "proc", "/proc"); err != nil {
 		return errors.Errorf("mounting proc: %w", err)
 	}
 
 	// Mount sysfs
-	if err := v.execCmd(ctx, "mount", "-t", "sysfs", "sysfs", "/sys"); err != nil {
+	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "sysfs", "sysfs", "/sys"); err != nil {
 		return errors.Errorf("mounting sysfs: %w", err)
 	}
 
-	// Mount devtmpfs
-	if err := v.execCmd(ctx, "mount", "-t", "devtmpfs", "devtmpfs", "/dev"); err != nil {
+	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "devtmpfs", "devtmpfs", "/dev"); err != nil {
 		return errors.Errorf("mounting devtmpfs: %w", err)
 	}
+
+	// Mount devtmpfs
 
 	return nil
 }
@@ -213,7 +224,7 @@ func (v *vmfuseInit) performMount(ctx context.Context) error {
 		}
 
 		slog.InfoContext(ctx, "performing bind mount", "source", sources[0], "target", mountTarget)
-		return v.execCmd(ctx, "mount", "--bind", sources[0], mountTarget)
+		return ExecCmdForwardingStdio(ctx, "mount", "--bind", sources[0], mountTarget)
 
 	case "overlay":
 		if len(sources) < 2 {
@@ -243,7 +254,7 @@ func (v *vmfuseInit) performMount(ctx context.Context) error {
 		slog.InfoContext(ctx, "performing overlay mount",
 			"lower", lower, "upper", upper, "work", work, "target", mountTarget)
 
-		return v.execCmd(ctx, "mount", "-t", "overlay", "overlay", "-o", opts, mountTarget)
+		return ExecCmdForwardingStdio(ctx, "mount", "-t", "overlay", "overlay", "-o", opts, mountTarget)
 
 	default:
 		return errors.Errorf("unsupported mount type: %s", mountType)
@@ -269,19 +280,19 @@ func (v *vmfuseInit) setupNFS(ctx context.Context) error {
 	slog.InfoContext(ctx, "created NFS exports", "content", exportsContent)
 
 	// Start rpcbind (required for NFS)
-	if err := v.execCmd(ctx, "rpcbind", "-f"); err != nil {
+	if err := ExecCmdForwardingStdio(ctx, "rpcbind", "-f"); err != nil {
 		slog.WarnContext(ctx, "failed to start rpcbind (may not be available)", "error", err)
 	}
 
 	// Start NFS kernel server
 	go func() {
-		if err := v.execCmd(ctx, "nfsd", "8"); err != nil {
+		if err := ExecCmdForwardingStdio(ctx, "nfsd", "8"); err != nil {
 			slog.ErrorContext(ctx, "failed to start NFS server", "error", err)
 		}
 	}()
 
 	// Export filesystems
-	if err := v.execCmd(ctx, "exportfs", "-ra"); err != nil {
+	if err := ExecCmdForwardingStdio(ctx, "exportfs", "-ra"); err != nil {
 		return errors.Errorf("running exportfs: %w", err)
 	}
 
@@ -307,16 +318,49 @@ func (v *vmfuseInit) signalReady(ctx context.Context) error {
 	return nil
 }
 
-func (v *vmfuseInit) execCmd(ctx context.Context, name string, args ...string) error {
-	cmd := exec.CommandContext(ctx, name, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+func ExecCmdForwardingStdio(ctx context.Context, cmds ...string) error {
+	return ExecCmdForwardingStdioChroot(ctx, "", cmds...)
+}
 
-	slog.DebugContext(ctx, "executing command", "cmd", name, "args", args)
-
-	if err := cmd.Run(); err != nil {
-		return errors.Errorf("command %s failed: %w", name, err)
+func ExecCmdForwardingStdioChroot(ctx context.Context, chroot string, cmds ...string) error {
+	if len(cmds) == 0 {
+		return errors.Errorf("no command to execute")
 	}
 
-	return nil
+	argc := "/bin/busybox"
+	if strings.HasPrefix(cmds[0], "/") {
+		argc = cmds[0]
+		cmds = cmds[1:]
+	}
+	argv := cmds
+
+	cmd := exec.CommandContext(ctx, argc, argv...)
+
+	slog.DebugContext(ctx, "executing command '"+strings.Join(cmds, " ")+"'", "argc", argc, "argv", argv)
+
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		// Cloneflags: syscall.CLONE_NEWNS,
+		Chroot: chroot,
+	}
+
+	path := os.Getenv("PATH")
+
+	cmd.Env = append([]string{"PATH=" + path + ":/hbin"}, os.Environ()...)
+
+	stdoutBuf := bytes.NewBuffer(nil)
+	stderrBuf := bytes.NewBuffer(nil)
+
+	cmd.Stdin = bytes.NewBuffer(nil) // set to avoid reading /dev/null since it may not be mounted
+	cmd.Stdout = stdoutBuf
+	cmd.Stderr = stderrBuf
+	err := cmd.Run()
+	level := slog.LevelDebug
+
+	if err != nil {
+		level = slog.LevelError
+	}
+
+	slog.Log(ctx, level, "finished running command '"+strings.Join(cmds, " ")+"'", "stdout", stdoutBuf.String(), "stderr", stderrBuf.String(), "error", err)
+
+	return err
 }

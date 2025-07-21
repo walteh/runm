@@ -22,6 +22,7 @@ import (
 
 	slogctx "github.com/veqryn/slog-context"
 
+	"github.com/walteh/runm/core/gvnet"
 	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/logging"
 	"github.com/walteh/runm/pkg/logging/otel"
@@ -36,10 +37,12 @@ var (
 	runmModeFlag          string
 	bundleSource          string
 	enableOtel            bool
+	initMbinName          string
 	mshareDirBindsString  string
 	mshareSockBindsString string
 	timezone              string
 	time                  string // unix timestamp in nanoseconds, not meant to be exact (that is what the timesync does)
+	mountType             string
 
 	mfsBinds   map[string]string
 	msockBinds map[string]string
@@ -106,6 +109,14 @@ func init() {
 	flag.BoolVar(&enableOtel, "enable-otlp", false, "enable otel")
 	flag.StringVar(&timezone, "timezone", "UTC", "the timezone")
 	flag.StringVar(&time, "time", "0", "the time in nanoseconds")
+	flag.StringVar(&initMbinName, "init-mbin-name", "", "the init mbin name")
+
+	_ = flag.String("vmfuse-mount-type", "", "the mount type")
+	_ = flag.String("vmfuse-mount-sources", "", "the mount sources")
+	_ = flag.String("vmfuse-mount-target", "", "the mount target")
+	_ = flag.String("vmfuse-export-path", "", "the export path")
+	_ = flag.String("vmfuse-ready-file", "", "the ready file")
+
 	flag.Parse()
 
 	mfsBinds = make(map[string]string)
@@ -184,8 +195,8 @@ func mount(ctx context.Context) error {
 		return errors.Errorf("runm-mode flag is required")
 	}
 
-	if containerIdFlag == "" {
-		return errors.Errorf("container-id flag is required")
+	if initMbinName == "" {
+		return errors.Errorf("init-mbin-name flag is required")
 	}
 
 	if _, err := os.Stat(constants.Ec1AbsPath); os.IsNotExist(err) {
@@ -242,9 +253,12 @@ func mount(ctx context.Context) error {
 		return errors.Errorf("failed to enable memory controller: %w", err)
 	}
 
-	// Create a child cgroup so that per-controller files appear (including memory.events)
-	if err := ExecCmdForwardingStdio(ctx, "mkdir", "-p", "/sys/fs/cgroup/"+containerIdFlag); err != nil {
-		return errors.Errorf("failed to create child cgroup: %w", err)
+	if containerIdFlag != "" {
+
+		// Create a child cgroup so that per-controller files appear (including memory.events)
+		if err := ExecCmdForwardingStdio(ctx, "mkdir", "-p", "/sys/fs/cgroup/"+containerIdFlag); err != nil {
+			return errors.Errorf("failed to create child cgroup: %w", err)
+		}
 	}
 
 	// mkdir newroot
@@ -301,7 +315,7 @@ func mount(ctx context.Context) error {
 
 	os.MkdirAll(filepath.Join(constants.NewRootAbsPath, "etc"), 0755)
 
-	if err := os.WriteFile(filepath.Join(constants.NewRootAbsPath, "etc", "resolv.conf"), []byte("nameserver 192.168.127.1"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(constants.NewRootAbsPath, "etc", "resolv.conf"), []byte("nameserver "+gvnet.VIRTUAL_GATEWAY_IP), 0644); err != nil {
 		return errors.Errorf("problem updating resolve.conf: %w", err)
 	}
 
@@ -414,7 +428,7 @@ func switchRoot(ctx context.Context) error {
 		return errors.Errorf("copying localtime: %w", err)
 	}
 
-	entrypoint := append([]string{"/mbin/runm-linux-init"}, os.Args[1:]...)
+	entrypoint := append([]string{"/mbin/" + initMbinName}, os.Args[1:]...)
 
 	env := os.Environ()
 

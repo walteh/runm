@@ -107,7 +107,7 @@ func RenderEnhancedSourceWIthTrim(e *stackerr.EnhancedSource, styles *Styles, re
 	editorPrefix := os.Getenv("CODE_EDITOR_FILE_REF_PREFIX")
 
 	if editorPrefix == "" {
-		editorPrefix = "vscode://file/"
+		editorPrefix = "cursor://file/"
 	}
 
 	return hyperlink(editorPrefix+e.RawFilePath+":"+fmt.Sprintf("%d", e.RawFileLine), render(fullStyle, finalWithStyle))

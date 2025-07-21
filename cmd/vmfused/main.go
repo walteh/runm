@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -152,9 +153,14 @@ func (s *vmfusedServer) Mount(ctx context.Context, req *vmfusev1.MountRequest) (
 		return nil, status.Error(codes.InvalidArgument, "at least one source is required")
 	}
 
-	// Generate IDs
-	mountID := fmt.Sprintf("mount-%d", time.Now().UnixNano())
-	vmID := fmt.Sprintf("vm-%s", mountID)
+	// Generate unique IDs with random component to avoid cache conflicts
+	timestamp := time.Now().UnixNano()
+	randomBytes := make([]byte, 4)
+	rand.Read(randomBytes)
+	randomHex := fmt.Sprintf("%x", randomBytes)
+
+	mountID := fmt.Sprintf("mount-%d-%s", timestamp, randomHex)
+	vmID := fmt.Sprintf("vmfuse-%d-%s", timestamp, randomHex)
 
 	// Create mount state
 	mountState := &MountState{
@@ -171,7 +177,7 @@ func (s *vmfusedServer) Mount(ctx context.Context, req *vmfusev1.MountRequest) (
 	s.mu.Unlock()
 
 	// Start mount process asynchronously
-	go s.performMount(ctx, mountState)
+	go s.performMount(context.WithoutCancel(ctx), mountState)
 
 	response := vmfusev1.NewMountResponse(&vmfusev1.MountResponse_builder{
 		MountId: mountID,
@@ -265,6 +271,9 @@ func (s *vmfusedServer) mountStateToInfo(state *MountState) *vmfusev1.MountInfo 
 }
 
 func (s *vmfusedServer) performMount(ctx context.Context, mountState *MountState) {
+
+	// the
+
 	slog.InfoContext(ctx, "starting mount process",
 		"mount_id", mountState.ID,
 		"vm_id", mountState.VMID,
@@ -277,7 +286,7 @@ func (s *vmfusedServer) performMount(ctx context.Context, mountState *MountState
 	// This is where we would integrate with the existing VMM infrastructure
 	// Similar to NewOCIVirtualMachine but with vmfuse-init instead
 	if err := s.createAndStartVM(ctx, mountState); err != nil {
-		s.setError(mountState, errors.Errorf("failed to start VM: %v", err))
+		s.setError(mountState, errors.Errorf("failed to start VM: %w", err))
 		return
 	}
 
@@ -285,7 +294,7 @@ func (s *vmfusedServer) performMount(ctx context.Context, mountState *MountState
 
 	// TODO: Wait for NFS server to be ready in VM
 	if err := s.waitForNFS(ctx, mountState); err != nil {
-		s.setError(mountState, errors.Errorf("NFS server failed to start: %v", err))
+		s.setError(mountState, errors.Errorf("NFS server failed to start: %w", err))
 		return
 	}
 
@@ -293,7 +302,7 @@ func (s *vmfusedServer) performMount(ctx context.Context, mountState *MountState
 
 	// TODO: Mount NFS from VM to host target
 	if err := s.mountNFS(ctx, mountState); err != nil {
-		s.setError(mountState, errors.Errorf("NFS mount failed: %v", err))
+		s.setError(mountState, errors.Errorf("NFS mount failed: %w", err))
 		return
 	}
 
@@ -384,17 +393,17 @@ func (s *vmfusedServer) createAndStartVM(ctx context.Context, mountState *MountS
 
 	// Build vmfuse-init command arguments
 	initArgs := []string{
-		"-mount-type", mountState.Config.GetMountType(),
-		"-mount-sources", strings.Join(mountState.Config.GetSources(), ","),
-		"-mount-target", "/mnt/target",
-		"-export-path", "/export",
-		"-ready-file", "/virtiofs/ready",
+		"-vmfuse-mount-type", mountState.Config.GetMountType(),
+		"-vmfuse-mount-sources", strings.Join(mountState.Config.GetSources(), ","),
+		"-vmfuse-mount-target", "/mnt/target",
+		"-vmfuse-export-path", "/export",
+		"-vmfuse-ready-file", "/virtiofs/ready",
 		"-enable-otlp=false",
 	}
 
 	// Create vmfuse config
 	vmfuseConfig := vmm.VMFuseVMConfig{
-		ID:             mountState.ID,
+		ID:             mountState.VMID, // Use VM ID, not mount ID
 		MountType:      mountState.Config.GetMountType(),
 		Sources:        mountState.Config.GetSources(),
 		Target:         mountState.Config.GetTarget(),

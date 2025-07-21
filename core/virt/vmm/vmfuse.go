@@ -40,9 +40,9 @@ func NewVMFuseVirtualMachine[VM VirtualMachine](
 	devices ...virtio.VirtioDevice,
 ) (*RunningVM[VM], error) {
 
-	vmid := "vm-vmfuse-" + config.ID[:8]
+	vmid := config.ID
 
-	ctx = context.WithValue(ctx, "vmid", vmid)
+	// ctx = context.WithValue(ctx, "vmid", vmid)
 
 	startTime := time.Now()
 
@@ -70,12 +70,13 @@ func NewVMFuseVirtualMachine[VM VirtualMachine](
 			"pid_max=100000",
 			"--",
 			"-runm-mode=vmfuse",
-			"-mount-type=" + config.MountType,
-			"-mount-sources=" + strings.Join(config.Sources, ","),
-			"-mount-target=" + config.Target,
+			// "-vmfuse-mount-type=" + config.MountType,
+			// "-vmfuse-mount-sources=" + strings.Join(config.Sources, ","),
+			// "-vmfuse-mount-target=" + config.Target,
 			"-mshare-dir-binds=" + defaults.MshareDirsWithTags(),
 			"-timezone=" + defaults.Timezone,
 			"-time=" + defaults.StartTimeUnixNanoString(),
+			"-init-mbin-name=" + "vmfuse-init",
 		}
 
 		// Add init args if provided
