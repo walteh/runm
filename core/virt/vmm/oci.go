@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -23,7 +22,6 @@ import (
 	slogctx "github.com/veqryn/slog-context"
 
 	"github.com/walteh/runm/core/runc/process"
-	"github.com/walteh/runm/core/virt/host"
 	"github.com/walteh/runm/core/virt/virtio"
 	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/units"
@@ -47,6 +45,8 @@ func appendContext(ctx context.Context, id string) context.Context {
 	)
 }
 
+// m
+
 // devices:
 // - mbin (mbin.squashfs)
 // - bundle virtio fs (bundle.squashfs)
@@ -60,92 +60,71 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 	devices ...virtio.VirtioDevice,
 ) (*RunningVM[VM], error) {
 
-	id := "vm-oci-" + ctrconfig.ID[:8]
+	vmid := "vm-oci-" + ctrconfig.ID[:8]
 
-	ctx = appendContext(ctx, id)
+	ctx = appendContext(ctx, vmid)
 
 	startTime := time.Now()
 
-	linuxRuntimeBuildDir := os.Getenv("LINUX_RUNTIME_BUILD_DIR")
-	if linuxRuntimeBuildDir == "" {
-		return nil, errors.New("LINUX_RUNTIME_BUILD_DIR is not set")
+	mshareFiles := map[string]any{
+		constants.ContainerSpecFile:         ctrconfig.Spec,
+		constants.ContainerRootfsMountsFile: ctrconfig.RootfsMounts,
 	}
 
-	workingDir, err := host.EmphiricalVMCacheDir(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	// copy the build dir to the working dir
-	err = os.MkdirAll(filepath.Join(workingDir, "build"), 0755)
-	if err != nil {
-		return nil, errors.Errorf("creating build directory: %w", err)
-	}
-
-	if err = os.CopyFS(workingDir, os.DirFS(linuxRuntimeBuildDir)); err != nil {
-		return nil, errors.Errorf("copying build directory: %w", err)
-	}
-
-	mbinDev, _, err := NewMbinBlockDevice(ctx, workingDir)
-	if err != nil {
-		return nil, errors.Errorf("creating mbin block device: %w", err)
-	}
-
-	devices = append(devices, mbinDev)
-
-	bundleDev, err := virtio.VirtioFsNew(ctrconfig.Bundle, constants.BundleVirtioTag)
-	if err != nil {
-		return nil, errors.Errorf("creating bundle virtio device: %w", err)
-	}
-
-	tzDev, err := virtio.VirtioFsNew("/usr/share/zoneinfo", constants.ZoneInfoVirtioTag)
-	if err != nil {
-		return nil, errors.Errorf("creating zoneinfo virtio device: %w", err)
-	}
-	devices = append(devices, tzDev)
-
-	// Mount CA certificates for TLS verification (macOS has certs at /etc/ssl/)
-	caCertsDev, err := virtio.VirtioFsNew("/etc/ssl", constants.CaCertsVirtioTag)
-	if err != nil {
-		return nil, errors.Errorf("creating ca certs virtio device: %w", err)
-	}
-	devices = append(devices, caCertsDev)
-
-	mbindDevices, mfsBindMounts, msockBindMounts, err := findMbindDevices(ctx, ctrconfig.Spec, ctrconfig.RootfsMounts)
+	mshareDirs, mshareSocks, err := isolateMsharesFromOciSpec(ctx, ctrconfig.Spec)
 	if err != nil {
 		return nil, errors.Errorf("finding mbind devices: %w", err)
 	}
 
-	ec1Dev, ec1Proxy, err := makeEc1BlockDevice(ctx, workingDir, ctrconfig.Spec, ctrconfig.RootfsMounts)
+	mshareDirs = append(mshareDirs, ctrconfig.RootfsMounts[0].Source)
+	mshareDirs = append(mshareDirs, ctrconfig.Bundle)
+
+	defaults, err := newDefaultLinuxVM(ctx, vmid, mshareFiles, mshareDirs, mshareSocks)
 	if err != nil {
-		return nil, errors.Errorf("creating ec1 block device: %w", err)
-	}
-	devices = append(devices, ec1Dev)
-	mfsBindMounts = append(mfsBindMounts, *ec1Proxy)
-
-	mfsBindMounts = append(mfsBindMounts, mfsBindMount{
-		Target: ctrconfig.Bundle,
-		Tag:    constants.BundleVirtioTag,
-	})
-
-	mfsBindString := ""
-	for _, mfsBind := range mfsBindMounts {
-		slog.InfoContext(ctx, "mfs bind", "tag", mfsBind.Tag, "target", mfsBind.Target)
-		mfsBindString += mfsBind.Tag + constants.MbindSeparator + mfsBind.Target + ","
+		return nil, errors.Errorf("getting VM defaults: %w", err)
 	}
 
-	mfsBindString = strings.TrimSuffix(mfsBindString, ",")
+	// bundleDev, err := virtio.VirtioFsNew(ctrconfig.Bundle, constants.BundleVirtioTag)
+	// if err != nil {
+	// 	return nil, errors.Errorf("creating bundle virtio device: %w", err)
+	// }
 
-	msockBindString := ""
-	for _, msockBind := range msockBindMounts {
-		slog.InfoContext(ctx, "msock bind", "destination", msockBind.Source, "port", msockBind.Port)
-		msockBindString += msockBind.Source + constants.MbindSeparator + strconv.Itoa(int(msockBind.Port)) + ","
-	}
+	// mfsBindMounts = append(mfsBindMounts, mfsBindMount{
+	// 	Target: ctrconfig.Bundle,
+	// 	Tag:    constants.BundleVirtioTag,
+	// })
 
-	msockBindString = strings.TrimSuffix(msockBindString, ",")
+	// if len(ctrconfig.RootfsMounts) != 1 {
+	// 	return nil, errors.Errorf("%d rootfs mounts found, expected exactly one: %v", len(ctrconfig.RootfsMounts), ctrconfig.RootfsMounts)
+	// }
 
-	devices = append(devices, bundleDev)
-	devices = append(devices, mbindDevices...)
+	// rootfsDev, err := virtio.VirtioFsNew(ctrconfig.RootfsMounts[0].Source, constants.RootfsMbindVirtioTag)
+	// if err != nil {
+	// 	return nil, errors.Errorf("creating rootfs	 virtio device: %w", err)
+	// }
+
+	// mfsBindMounts = append(mfsBindMounts, mfsBindMount{
+	// 	Target: ctrconfig.RootfsMounts[0].Source,
+	// 	Tag:    constants.RootfsMbindVirtioTag,
+	// })
+
+	// mfsBindString := ""
+	// for _, mfsBind := range mfsBindMounts {
+	// 	slog.InfoContext(ctx, "mfs bind", "tag", mfsBind.Tag, "target", mfsBind.Target)
+	// 	mfsBindString += mfsBind.Tag + constants.MbindSeparator + mfsBind.Target + ","
+	// }
+	// mfsBindString = strings.TrimSuffix(mfsBindString, ",")
+
+	// msockBindString := ""
+	// for _, msockBind := range msockBindMounts {
+	// 	slog.InfoContext(ctx, "msock bind", "destination", msockBind.Source, "port", msockBind.Port)
+	// 	msockBindString += msockBind.Source + constants.MbindSeparator + strconv.Itoa(int(msockBind.Port)) + ","
+	// }
+	// msockBindString = strings.TrimSuffix(msockBindString, ",")
+
+	// mbindDevices = append(mbindDevices, rootfsDev)
+	// devices = append(devices, bundleDev)
+	// devices = append(devices, mbindDevices...)
 	// devices = append(devices, mountDevices...)
 
 	slog.InfoContext(ctx, "about to set up rootfs",
@@ -154,33 +133,12 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 		"spec.Root.Readonly", ctrconfig.Spec.Root.Readonly,
 	)
 
-	// ec1Devices, err := PrepareContainerVirtioDevicesFromRootfs(ctx, workingDir, ctrconfig.Spec, ctrconfig.RootfsMounts, bindMounts, creationErrGroup)
-	// if err != nil {
-	// 	return nil, errors.Errorf("creating ec1 block device from rootfs: %w", err)
-	// }
-	// devices = append(devices, ec1Devices...)
-
 	var bootloader virtio.Bootloader
 
 	var otelString string = ""
 
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" {
 		otelString = "-enable-otlp"
-	}
-
-	localTimeRef, err := os.Readlink("/etc/localtime")
-	if err != nil {
-		return nil, errors.Errorf("reading localtime: %w", err)
-	}
-
-	zisplit := strings.Split(localTimeRef, "zoneinfo/")
-	if len(zisplit) != 2 {
-		return nil, errors.Errorf("invalid localtime reference: %s", localTimeRef)
-	}
-
-	loc, err := time.LoadLocation(zisplit[1])
-	if err != nil {
-		return nil, errors.Errorf("loading location: %w", err)
 	}
 
 	switch ctrconfig.Platform {
@@ -196,47 +154,29 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 			"-runm-mode=oci",
 			"-container-id=" + ctrconfig.ID,
 			otelString,
-			"-mfs-binds=" + mfsBindString,
-			"-msock-binds=" + msockBindString,
-			"-timezone=" + loc.String(),
-			"-time=" + strconv.FormatInt(time.Now().UnixNano(), 10),
+			"-mshare-dir-binds=" + defaults.MshareDirsWithTags(),
+			"-mshare-sock-binds=" + defaults.MshareSocketsWithPorts(),
+			// "-rootfs-bind-options=" + strings.Join(ctrconfig.RootfsMounts[0].Options, ","),
+			// "-rootfs-bind-target=" + ctrconfig.RootfsMounts[0].Target,
+			// "-rootfs-bind-source=" + ctrconfig.RootfsMounts[0].Source,
+			// "-rootfs-bind-type=" + ctrconfig.RootfsMounts[0].Type,
+			"-timezone=" + defaults.Timezone,
+			"-time=" + defaults.StartTimeUnixNanoString(),
 		}
 
 		bootloader = &virtio.LinuxBootloader{
-			InitrdPath:    filepath.Join(linuxRuntimeBuildDir, "initramfs.cpio.gz"),
-			VmlinuzPath:   filepath.Join(linuxRuntimeBuildDir, "kernel"),
+			InitrdPath:    filepath.Join(defaults.HostRuntimeBuildDir, "initramfs.cpio.gz"),
+			VmlinuzPath:   filepath.Join(defaults.HostRuntimeBuildDir, "kernel"),
 			KernelCmdLine: strings.Join(cfgs, " "),
 		}
 	default:
 		return nil, errors.Errorf("unsupported OS: %s", ctrconfig.Platform.OS())
 	}
 
-	if ctrconfig.Spec.Process.Terminal {
-		return nil, errors.New("terminal support is not implemented yet")
-	} else {
-		// setup a log
-		devices = append(devices, &virtio.VirtioSerialLogFile{
-			Path:   filepath.Join(workingDir, "console.log"),
-			Append: false,
-		})
-
-	}
-
-	// add vsock and memory devices
-
-	netdev, hostIPPort, err := PrepareVirtualNetwork(ctx)
-	if err != nil {
-		return nil, errors.Errorf("creating net device: %w", err)
-	}
-	devices = append(devices, netdev.VirtioNetDevice())
-	devices = append(devices, &virtio.VirtioVsock{})
-	devices = append(devices, &virtio.VirtioBalloon{})
-	devices = append(devices, &virtio.VirtioRng{})
-
 	opts := NewVMOptions{
 		Vcpus:         ctrconfig.VCPUs,
 		Memory:        ctrconfig.StartingMemory,
-		Devices:       devices,
+		Devices:       append(defaults.Devices, devices...),
 		GuestPlatform: ctrconfig.Platform,
 	}
 
@@ -244,7 +184,7 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 
 	slog.InfoContext(ctx, "ready to create vm", "async_wait_duration", time.Since(waitStart))
 
-	vm, err := hpv.NewVirtualMachine(ctx, id, &opts, bootloader)
+	vm, err := hpv.NewVirtualMachine(ctx, vmid, &opts, bootloader)
 	if err != nil {
 		return nil, errors.Errorf("creating virtual machine: %w", err)
 	}
@@ -253,13 +193,13 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 		bootloader:   bootloader,
 		start:        startTime,
 		vm:           vm,
-		portOnHostIP: hostIPPort,
+		portOnHostIP: defaults.MagicHostPort,
 		wait:         make(chan error, 1),
-		workingDir:   workingDir,
-		netdev:       netdev,
+		workingDir:   defaults.WorkingDir,
+		netdev:       defaults.GvProxy,
 		rawWriter:    ctrconfig.RawWriter,
 		delimWriter:  ctrconfig.DelimWriter,
-		msockBinds:   msockBindMounts,
+		msockBinds:   defaults.MshareSockPorts,
 	}
 
 	slog.InfoContext(ctx, "created oci vm", "id", ctrconfig.ID, "rawWriter==nil", ctrconfig.RawWriter == nil, "delimWriter==nil", ctrconfig.DelimWriter == nil)
@@ -297,20 +237,20 @@ type msockBindMount struct {
 }
 
 type mfsBindMount struct {
-	Target string
-	Tag    string
+	Target  string
+	Tag     string
+	Options []string
 }
 
-func findMbindDevices(ctx context.Context, spec *oci.Spec, rootfsMounts []process.Mount) ([]virtio.VirtioDevice, []mfsBindMount, []msockBindMount, error) {
-	devices := []virtio.VirtioDevice{}
+func isolateMsharesFromOciSpec(ctx context.Context, spec *oci.Spec) ([]string, []string, error) {
 
-	proxyDevices := []mfsBindMount{}
+	proxyDevices := []string{}
 
 	seen := map[string]bool{}
 
-	msockCounter := constants.MsockBasePort
+	// msockCounter := constants.MsockBasePort
 
-	msockBindMounts := []msockBindMount{}
+	msockBindMounts := []string{}
 
 	for _, mount := range spec.Mounts {
 		if mount.Type != "bind" && mount.Type != "rbind" && !slices.Contains(mount.Options, "rbind") {
@@ -318,14 +258,16 @@ func findMbindDevices(ctx context.Context, spec *oci.Spec, rootfsMounts []proces
 		}
 
 		if strings.HasSuffix(mount.Source, ".sock") {
-			port := msockCounter
-			msockCounter++
+			msockBindMounts = append(msockBindMounts, mount.Source)
 
-			msockBindMounts = append(msockBindMounts, msockBindMount{
-				Destination: mount.Destination,
-				Port:        uint32(port),
-				Source:      mount.Source,
-			})
+			// port := msockCounter
+			// msockCounter++
+
+			// msockBindMounts = append(msockBindMounts, msockBindMount{
+			// 	Destination: mount.Destination,
+			// 	Port:        uint32(port),
+			// 	Source:      mount.Source,
+			// })
 			continue
 		}
 
@@ -341,43 +283,37 @@ func findMbindDevices(ctx context.Context, spec *oci.Spec, rootfsMounts []proces
 			continue
 		}
 
-		tag := "mbind-" + quickHash(src)
-
-		proxyDevices = append(proxyDevices, mfsBindMount{
-			Target: src,
-			Tag:    tag,
-		})
-
-		shareDev, err := virtio.VirtioFsNew(src, tag)
-		if err != nil {
-			return nil, nil, nil, errors.Errorf("creating share device: %w", err)
-		}
-
-		devices = append(devices, shareDev)
+		proxyDevices = append(proxyDevices, src)
 
 		seen[src] = true
 	}
 
-	for _, mount := range rootfsMounts {
-		shareDev, err := virtio.VirtioFsNew(mount.Source, "rootfs-"+quickHash(mount.Source))
-		if err != nil {
-			return nil, nil, nil, errors.Errorf("creating share device: %w", err)
-		}
+	// if len(rootfsMounts) > 1 {
+	// 	return nil, nil, nil, errors.Errorf("multiple rootfs mounts found, expected only one: %v", rootfsMounts)
+	// }
 
-		devices = append(devices, shareDev)
-		proxyDevices = append(proxyDevices, mfsBindMount{
-			Target: mount.Source,
-			Tag:    "rootfs-" + quickHash(mount.Source),
-		})
-	}
+	// for _, mount := range rootfsMounts {
+	// 	hashd := quickHash(mount.Source)
+	// 	shareDev, err := virtio.VirtioFsNew(mount.Source, "rootfs-"+hashd)
+	// 	if err != nil {
+	// 		return nil, nil, nil, errors.Errorf("creating share device: %w", err)
+	// 	}
+
+	// 	devices = append(devices, shareDev)
+	// 	proxyDevices = append(proxyDevices, mfsBindMount{
+	// 		Target:  mount.Source,
+	// 		Tag:     "rootfs-" + hashd,
+	// 		Options: mount.Options,
+	// 	})
+	// }
 
 	slog.InfoContext(ctx, "found mbind devices", "proxyDevices", proxyDevices)
 
-	return devices, proxyDevices, msockBindMounts, nil
+	return proxyDevices, msockBindMounts, nil
 }
 
 // PrepareContainerVirtioDevicesFromRootfs creates virtio devices using an existing rootfs directory
-func makeEc1BlockDevice(ctx context.Context, wrkdir string, ctrconfig *oci.Spec, rootfsMounts []process.Mount) (virtio.VirtioDevice, *mfsBindMount, error) {
+func makeMConfigDevice(ctx context.Context, wrkdir string, ctrconfig *oci.Spec, rootfsMounts []process.Mount) (virtio.VirtioDevice, *mfsBindMount, error) {
 	ec1DataPath := filepath.Join(wrkdir, "harpoon-runtime-fs-device")
 
 	err := os.MkdirAll(ec1DataPath, 0755)

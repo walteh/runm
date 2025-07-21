@@ -57,17 +57,21 @@ import (
 )
 
 var (
-	containerId      string
-	runmMode         string
-	bundleSource     string
-	mfsBindsString   string
-	msockBindsString string
-	enableOtel       bool
-	timezone         string
-	time             string // unix timestamp in nanoseconds, not meant to be exact (that is what the timesync does)
+	containerId          string
+	runmMode             string
+	bundleSource         string
+	mshareDirBindsString string
+	// rootfsBindOptions string
+	// rootfsBindTarget  string
+	// rootfsBindSource  string
+	// rootfsBindType    string
+	mshareSockBindsString string
+	enableOtel            bool
+	timezone              string
+	time                  string // unix timestamp in nanoseconds, not meant to be exact (that is what the timesync does)
 
-	mfsBinds   map[string]string
-	msockBinds map[string]string
+	mshareDirBinds  map[string]string
+	mshareSockBinds map[string]string
 )
 
 const (
@@ -83,26 +87,31 @@ func init() {
 	flag.StringVar(&runmMode, "runm-mode", "", "the runm mode")
 	flag.StringVar(&bundleSource, "bundle-source", "", "the bundle source")
 	flag.BoolVar(&enableOtel, "enable-otlp", false, "enable otlp")
-	flag.StringVar(&mfsBindsString, "mfs-binds", "", "the mfs binds")
-	flag.StringVar(&msockBindsString, "msock-binds", "", "the msock binds")
+	flag.StringVar(&mshareDirBindsString, "mshare-dir-binds", "", "the mshare dir binds")
+	flag.StringVar(&mshareSockBindsString, "mshare-sock-binds", "", "the mshare sock binds")
 	flag.StringVar(&timezone, "timezone", "", "the timezone")
 	flag.StringVar(&time, "time", "0", "the time in nanoseconds")
+	// flag.StringVar(&rootfsBindOptions, "rootfs-bind-options", "", "the rootfs bind options")
+	// flag.StringVar(&rootfsBindTarget, "rootfs-bind-target", "", "the rootfs bind target")
+	// flag.StringVar(&rootfsBindSource, "rootfs-bind-source", "", "the rootfs bind source")
+	// flag.StringVar(&rootfsBindType, "rootfs-bind-type", "", "the rootfs bind type")
+
 	flag.Parse()
 
-	mfsBinds = make(map[string]string)
-	msockBinds = make(map[string]string)
+	mshareDirBinds = make(map[string]string)
+	mshareSockBinds = make(map[string]string)
 
-	if mfsBindsString != "" {
-		for _, mbind := range strings.Split(mfsBindsString, ",") {
+	if mshareDirBindsString != "" {
+		for _, mbind := range strings.Split(mshareDirBindsString, ",") {
 			parts := strings.Split(mbind, constants.MbindSeparator)
-			mfsBinds[parts[0]] = parts[1]
+			mshareDirBinds[parts[0]] = parts[1]
 		}
 	}
 
-	if msockBindsString != "" {
-		for _, mbind := range strings.Split(msockBindsString, ",") {
+	if mshareSockBindsString != "" {
+		for _, mbind := range strings.Split(mshareSockBindsString, ",") {
 			parts := strings.Split(mbind, constants.MbindSeparator)
-			msockBinds[parts[0]] = parts[1]
+			mshareSockBinds[parts[0]] = parts[1]
 		}
 	}
 
@@ -313,7 +322,7 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 		return r.runPprofVsockServer(ctx)
 	})
 
-	for target, port := range msockBinds {
+	for target, port := range mshareSockBinds {
 		portnum, err := strconv.Atoi(port)
 		if err != nil {
 			return errors.Errorf("problem parsing port: %w", err)
@@ -397,7 +406,7 @@ func (r *runmLinuxInit) configureRuntimeServer(ctx context.Context) (*grpc.Serve
 
 	realRuntime := goruncruntime.WrapdGoRuncRuntime(&gorunc.Runc{
 		Command:       "/mbin/runc-test",
-		Log:           filepath.Join(constants.Ec1AbsPath, runtime.LogFileBase),
+		Log:           filepath.Join(constants.MShareAbsPath, runtime.LogFileBase),
 		LogFormat:     gorunc.JSON,
 		PdeathSignal:  unix.SIGKILL,
 		Debug:         true,
@@ -742,7 +751,8 @@ func (r *runmLinuxInit) runReverseVsockUnixProxy(ctx context.Context, path strin
 }
 
 func loadSpec(ctx context.Context) (spec *oci.Spec, exists bool, err error) {
-	specd, err := os.ReadFile(filepath.Join(constants.Ec1AbsPath, constants.ContainerSpecFile))
+	// specd, err := os.ReadFile(filepath.Join(constants.Ec1AbsPath, constants.ContainerSpecFile))
+	specd, err := os.ReadFile(filepath.Join(bundleSource, "config.json"))
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return nil, false, nil
@@ -759,7 +769,7 @@ func loadSpec(ctx context.Context) (spec *oci.Spec, exists bool, err error) {
 }
 
 func loadRootfsMounts(ctx context.Context) (mounts []process.Mount, exists bool, err error) {
-	specd, err := os.ReadFile(filepath.Join(constants.Ec1AbsPath, constants.ContainerRootfsMountsFile))
+	specd, err := os.ReadFile(filepath.Join(constants.MShareAbsPath, constants.ContainerRootfsMountsFile))
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return nil, false, nil
@@ -865,14 +875,14 @@ func mount(ctx context.Context) error {
 		return errors.Errorf("failed to enable memory controller: %w", err)
 	}
 
-	// check that /etc/localtime is a symlink to /usr/share/zoneinfo/something
-	localtime, err := os.Readlink("/etc/localtime")
-	if err != nil {
-		return errors.Errorf("problem reading localtime: %w", err)
-	}
-	if !strings.HasPrefix(localtime, "/usr/share/zoneinfo/") {
-		return errors.Errorf("/etc/localtime is not a symlink to /usr/share/zoneinfo/[something]: %s", localtime)
-	}
+	// // check that /etc/localtime is a symlink to /usr/share/zoneinfo/something
+	// localtime, err := os.Readlink("/etc/localtime")
+	// if err != nil {
+	// 	return errors.Errorf("problem reading localtime: %w", err)
+	// }
+	// if !strings.HasPrefix(localtime, "/usr/share/zoneinfo/") {
+	// 	return errors.Errorf("/etc/localtime is not a symlink to /usr/share/zoneinfo/[something]: %s", localtime)
+	// }
 
 	// list mounnts
 	procMounts, err := exec.CommandContext(ctx, "/bin/busybox", "cat", "/proc/mounts").CombinedOutput()
@@ -890,10 +900,16 @@ func mount(ctx context.Context) error {
 		return errors.Errorf("rootfs mounts do not exist")
 	}
 
-	for _, mount := range rootfsMounts {
+	for _, rootfsMounts := range rootfsMounts {
 		target := filepath.Join(bundleSource, "rootfs")
 
-		if err := ExecCmdForwardingStdio(ctx, "mount", "-o", strings.Join(mount.Options, ","), mount.Source, target); err != nil {
+		if rootfsMounts.Target != target {
+			slog.WarnContext(ctx, "rootfs mount target does not match expected target",
+				"expected_target", target,
+				"actual_target", rootfsMounts.Target)
+		}
+
+		if err := ExecCmdForwardingStdio(ctx, "mount", "-o", strings.Join(rootfsMounts.Options, ","), rootfsMounts.Source, target); err != nil {
 			return errors.Errorf("problem mounting bind mount: %w", err)
 		}
 

@@ -108,11 +108,12 @@ env:
     GOPROXY: 'https://proxy.golang.org'
     GOSUMDB: sum.golang.org
     GOPRIVATE: github.com/walteh
+    CODE_EDITOR_FILE_REF_PREFIX: cursor://file/
     # OTEL_EXPORTER_OTLP_ENDPOINT: localhost:4317
     DOCKER_BUILDKIT: 1
     PAGER: less
-    DEBUG_CONTAINERD_TEST: 1
-    DEBUG_BUILDKITD_TEST: 1
+    DEBUG_CONTAINERD_TEST: 0
+    DEBUG_BUILDKITD_TEST: 0
     DEBUG_NERDCTL_TEST: 0
     DEBUG_CONTAINERD_SHIM_RUNM_V2_TEST:
         sh: mkdir -p /tmp/tcontainerd-fs-env && echo '0' | tee /tmp/tcontainerd-fs-env/DEBUG_CONTAINERD_SHIM_RUNM_V2_TEST

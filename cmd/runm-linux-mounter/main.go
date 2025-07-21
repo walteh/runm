@@ -32,14 +32,14 @@ import (
 // }
 
 var (
-	containerIdFlag  string
-	runmModeFlag     string
-	bundleSource     string
-	enableOtel       bool
-	mfsBindsString   string
-	msockBindsString string
-	timezone         string
-	time             string // unix timestamp in nanoseconds, not meant to be exact (that is what the timesync does)
+	containerIdFlag       string
+	runmModeFlag          string
+	bundleSource          string
+	enableOtel            bool
+	mshareDirBindsString  string
+	mshareSockBindsString string
+	timezone              string
+	time                  string // unix timestamp in nanoseconds, not meant to be exact (that is what the timesync does)
 
 	mfsBinds   map[string]string
 	msockBinds map[string]string
@@ -101,8 +101,8 @@ func init() {
 	flag.StringVar(&containerIdFlag, "container-id", "", "the container id")
 	flag.StringVar(&runmModeFlag, "runm-mode", "", "the runm mode")
 	flag.StringVar(&bundleSource, "bundle-source", "", "the bundle source")
-	flag.StringVar(&mfsBindsString, "mfs-binds", "", "the mfs binds")
-	flag.StringVar(&msockBindsString, "msock-binds", "", "the msock binds")
+	flag.StringVar(&mshareDirBindsString, "mshare-dir-binds", "", "the mfs binds")
+	flag.StringVar(&mshareSockBindsString, "mshare-sock-binds", "", "the msock binds")
 	flag.BoolVar(&enableOtel, "enable-otlp", false, "enable otel")
 	flag.StringVar(&timezone, "timezone", "UTC", "the timezone")
 	flag.StringVar(&time, "time", "0", "the time in nanoseconds")
@@ -111,15 +111,15 @@ func init() {
 	mfsBinds = make(map[string]string)
 	msockBinds = make(map[string]string)
 
-	if mfsBindsString != "" {
-		for _, mbind := range strings.Split(mfsBindsString, ",") {
+	if mshareDirBindsString != "" {
+		for _, mbind := range strings.Split(mshareDirBindsString, ",") {
 			parts := strings.Split(mbind, constants.MbindSeparator)
 			mfsBinds[parts[0]] = parts[1]
 		}
 	}
 
-	if msockBindsString != "" {
-		for _, mbind := range strings.Split(msockBindsString, ",") {
+	if mshareSockBindsString != "" {
+		for _, mbind := range strings.Split(mshareSockBindsString, ",") {
 			parts := strings.Split(mbind, constants.MbindSeparator)
 			msockBinds[parts[0]] = parts[1]
 		}
@@ -380,6 +380,12 @@ func mount(ctx context.Context) error {
 
 func switchRoot(ctx context.Context) error {
 
+	// mshare files
+	os.MkdirAll(filepath.Join(constants.NewRootAbsPath, constants.MShareAbsPath), 0755)
+
+	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "virtiofs", constants.MShareVirtioTag, filepath.Join(constants.NewRootAbsPath, constants.MShareAbsPath), "-o", ""); err != nil {
+		return errors.Errorf("mounting mshare files: %w", err)
+	}
 	zoneinfoPath := filepath.Join(constants.NewRootAbsPath, "/usr/share/zoneinfo")
 	os.MkdirAll(zoneinfoPath, 0755)
 	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "virtiofs", constants.ZoneInfoVirtioTag, zoneinfoPath, "-o", "ro"); err != nil {
@@ -392,26 +398,6 @@ func switchRoot(ctx context.Context) error {
 	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "virtiofs", constants.CaCertsVirtioTag, caCertsPath, "-o", "ro"); err != nil {
 		return errors.Errorf("mounting ca certs: %w", err)
 	}
-
-	// // Mount zoneinfo to VM-specific path to avoid conflicts with container /usr
-	// vmZoneinfoPath := filepath.Join(constants.NewRootAbsPath, "/var/lib/runm/zoneinfo")
-	// os.MkdirAll(vmZoneinfoPath, 0755)
-	// if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "virtiofs", constants.ZoneInfoVirtioTag, vmZoneinfoPath, "-o", "ro"); err != nil {
-	// 	return errors.Errorf("mounting zoneinfo: %w", err)
-	// }
-
-	// // Create symlink from expected location to VM path
-	// os.MkdirAll(filepath.Join(constants.NewRootAbsPath, "usr/share"), 0755)
-	// // zoneinfoPath := filepath.Join(constants.NewRootAbsPath, "/usr/share/zoneinfo")
-	// if err := ExecCmdForwardingStdioChroot(ctx, constants.NewRootAbsPath, "ln", "-sf", "/var/lib/runm/zoneinfo", "/usr/share/zoneinfo"); err != nil {
-	// 	return errors.Errorf("symlinking zoneinfo: %w", err)
-	// }
-
-	// timezone in newroot
-
-	// if err := os.Symlink(filepath.Join(zoneinfoPath, timezone), filepath.Join(constants.NewRootAbsPath, "etc", "localtime")); err != nil {
-	// 	return errors.Errorf("symlinking localtime: %w", err)
-	// }
 
 	os.MkdirAll(filepath.Join(constants.NewRootAbsPath, "bin"), 0755)
 	if err := ExecCmdForwardingStdio(ctx, "cp", "/bin/busybox", "/newroot/bin/busybox"); err != nil {

@@ -2,6 +2,7 @@ package slogdevterm
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"runtime/debug"
@@ -103,7 +104,13 @@ func RenderEnhancedSourceWIthTrim(e *stackerr.EnhancedSource, styles *Styles, re
 		render(sepStyle, sep),
 		render(numStyle, num))
 
-	return hyperlink("vscode://file/"+e.RawFilePath+":"+fmt.Sprintf("%d", e.RawFileLine), render(fullStyle, finalWithStyle))
+	editorPrefix := os.Getenv("CODE_EDITOR_FILE_REF_PREFIX")
+
+	if editorPrefix == "" {
+		editorPrefix = "vscode://file/"
+	}
+
+	return hyperlink(editorPrefix+e.RawFilePath+":"+fmt.Sprintf("%d", e.RawFileLine), render(fullStyle, finalWithStyle))
 }
 
 func getIcon(e *stackerr.EnhancedSource) string {

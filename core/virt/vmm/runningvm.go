@@ -46,7 +46,7 @@ type RunningVM[VM VirtualMachine] struct {
 	delimWriter  io.Writer
 	taskGroup    *taskgroup.TaskGroup
 	stderrUndoFn func() error
-	msockBinds   []msockBindMount
+	msockBinds   map[string]uint16
 }
 
 func (r *RunningVM[VM]) GuestService(ctx context.Context) (runmv1.GuestManagementServiceClient, error) {
@@ -439,9 +439,9 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 		return nil
 	})
 
-	for _, msockBind := range rvm.msockBinds {
-		rvm.taskGroup.GoWithName(fmt.Sprintf("msock-bind-%d", msockBind.Port), func(ctx context.Context) error {
-			addr := &net.UnixAddr{Name: msockBind.Source, Net: "unix"}
+	for source, port := range rvm.msockBinds {
+		rvm.taskGroup.GoWithName(fmt.Sprintf("msock-bind-%d", port), func(ctx context.Context) error {
+			addr := &net.UnixAddr{Name: source, Net: "unix"}
 			// try to listen on the mbind file
 			listener, err := net.ListenUnix("unix", addr)
 			if err != nil {
@@ -451,10 +451,10 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 				}
 				defer conn.Close()
 				// run as a client
-				return rvm.RunVsockProxyServer(ctx, msockBind.Port, conn)
+				return rvm.RunVsockProxyServer(ctx, uint32(port), conn)
 			}
 			defer listener.Close()
-			return rvm.RunVsockProxyClient(ctx, msockBind.Port, listener)
+			return rvm.RunVsockProxyClient(ctx, uint32(port), listener)
 
 		})
 	}
