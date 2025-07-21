@@ -44,7 +44,7 @@ root = "%[3]s"
 address = ["unix://%[4]s"]
 
 [otel]
-socketPath = "unix://%[5]s"
+socketPath = "%[5]s"
 
 [worker.oci]
 enabled = false # maybe one day, not worth the effort right

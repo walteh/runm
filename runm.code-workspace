@@ -115,7 +115,7 @@
 			"ui.semanticTokens": true
 			// "build.buildFlags": ["-tags=!windows"]
 		},
-		"go.languageServerFlags": ["-mcp-listen=localhost:50051"],
+		"go.languageServerFlags": ["-mcp.listen=localhost:50051"],
 		// "go.buildTags": "!windows",
 		// "go.testTags": "!windows",
 		"go.useLanguageServer": true,

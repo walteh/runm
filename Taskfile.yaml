@@ -108,10 +108,11 @@ env:
     GOPROXY: 'https://proxy.golang.org'
     GOSUMDB: sum.golang.org
     GOPRIVATE: github.com/walteh
+    # OTEL_EXPORTER_OTLP_ENDPOINT: localhost:4317
     DOCKER_BUILDKIT: 1
     PAGER: less
-    DEBUG_CONTAINERD_TEST: 0
-    DEBUG_BUILDKITD_TEST: 0
+    DEBUG_CONTAINERD_TEST: 1
+    DEBUG_BUILDKITD_TEST: 1
     DEBUG_NERDCTL_TEST: 0
     DEBUG_CONTAINERD_SHIM_RUNM_V2_TEST:
         sh: mkdir -p /tmp/tcontainerd-fs-env && echo '0' | tee /tmp/tcontainerd-fs-env/DEBUG_CONTAINERD_SHIM_RUNM_V2_TEST
@@ -1115,6 +1116,26 @@ tasks:
                     --build-context=forks={{.TMP_DIR}}/forks \
                     --target=runm-linux-mounter-builder \
                     --output=type=local,dest={{.TEST_BIN_DIR}} \
+                    {{.TEST_SCENARIO_DIR}}
+
+    dev:2025-07-20:01:
+        desc: runs the shim for 2025-07-20
+        deps: ['linux:runtime:all', 'build:all-test-binaries']
+        vars:
+            TEST_SCENARIO_DIR:
+                sh: realpath ./test/integration/scenarios/2025-07-20
+            TMP_DIR:
+                sh: mktemp -d
+        cmds:
+          - defer: rm -rf {{.TMP_DIR}}
+          - task: run:nerdctl-test:rm-all-running-containers
+          - cmd: |-
+                {{.NERDCTL_CMD}} build \
+                    --platform=linux/arm64 \
+                    --progress=plain \
+                    --build-context=data={{.TEST_SCENARIO_DIR}}/data \
+                    --target=export \
+                    --output=type=local,dest={{.TEST_BIN_DIR}}/buildtest \
                     {{.TEST_SCENARIO_DIR}}
 
     #endregion dev

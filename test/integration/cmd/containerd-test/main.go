@@ -1,8 +1,13 @@
 package main
 
 import (
-	_ "github.com/containerd/containerd/v2/cmd/containerd/builtins"
 	_ "net/http/pprof"
+
+	"github.com/containerd/containerd/v2/client"
+	_ "github.com/containerd/containerd/v2/cmd/containerd/builtins"
+	"github.com/moby/buildkit/frontend/gateway/grpcclient"
+	"github.com/moby/buildkit/session"
+	"google.golang.org/grpc"
 
 	"context"
 	"flag"
@@ -25,6 +30,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"gitlab.com/tozd/go/errors"
 
+	containerdclient "github.com/containerd/containerd/v2/client"
 	slogctx "github.com/veqryn/slog-context"
 
 	"github.com/walteh/runm/pkg/grpcerr"
@@ -80,6 +86,16 @@ func main() {
 		os.Exit(1)
 	}
 	defer cleanup()
+
+	clientopts := []grpc.DialOption{
+		otel.GetGrpcClientOpts(),
+		grpcerr.GetGrpcClientOptsCtx(ctx),
+	}
+
+	grpcclient.AddHackedClientOpts(clientopts...)
+	session.AddHackedClientOpts(clientopts...)
+	client.AddHackedClientOpts(clientopts...)
+	containerdclient.AddHackedClientOpts(clientopts...)
 
 	if json {
 		logger := logging.NewDefaultJSONLogger("containerd", os.Stdout)

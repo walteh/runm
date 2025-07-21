@@ -579,9 +579,9 @@ func runProxyHooks(ctx context.Context) error {
 		}
 	}
 
-	if err := cleanRootfsSpecMounts(ctx); err != nil {
-		return errors.Errorf("failed to clean rootfs spec mounts: %w", err)
-	}
+	// if err := cleanRootfsSpecMounts(ctx); err != nil {
+	// 	return errors.Errorf("failed to clean rootfs spec mounts: %w", err)
+	// }
 
 	// format and print out spec
 	specBytes, err := json.MarshalIndent(spec, "", "  ")
@@ -704,7 +704,7 @@ func (r *runmLinuxInit) runVsockUnixProxy(ctx context.Context, path string, writ
 
 func (r *runmLinuxInit) runReverseVsockUnixProxy(ctx context.Context, path string, port uint32) error {
 	slog.InfoContext(ctx, "running reverse vsock unix proxy", "path", path, "port", port)
-	listener, err := net.Listen("unix", strings.TrimPrefix(path, "unix://"))
+	listener, err := net.Listen("unix", path)
 	if err != nil {
 		slog.ErrorContext(ctx, "problem listening vsock for log proxy", "error", err)
 		return errors.Errorf("problem listening vsock for log proxy: %w", err)

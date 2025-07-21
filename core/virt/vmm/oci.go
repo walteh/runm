@@ -317,7 +317,7 @@ func findMbindDevices(ctx context.Context, spec *oci.Spec, rootfsMounts []proces
 			continue
 		}
 
-		if strings.HasPrefix(mount.Source, "unix://") {
+		if strings.HasSuffix(mount.Source, ".sock") {
 			port := msockCounter
 			msockCounter++
 

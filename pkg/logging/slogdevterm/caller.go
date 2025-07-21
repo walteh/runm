@@ -103,7 +103,7 @@ func RenderEnhancedSourceWIthTrim(e *stackerr.EnhancedSource, styles *Styles, re
 		render(sepStyle, sep),
 		render(numStyle, num))
 
-	return hyperlink("cursor://file/"+e.RawFilePath+":"+fmt.Sprintf("%d", e.RawFileLine), render(fullStyle, finalWithStyle))
+	return hyperlink("vscode://file/"+e.RawFilePath+":"+fmt.Sprintf("%d", e.RawFileLine), render(fullStyle, finalWithStyle))
 }
 
 func getIcon(e *stackerr.EnhancedSource) string {
