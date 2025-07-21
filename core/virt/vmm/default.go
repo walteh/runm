@@ -49,7 +49,7 @@ func (me *DefaultVMConfig) StartTimeUnixNanoString() string {
 	return strconv.FormatInt(me.StartTime.UnixNano(), 10)
 }
 
-func newDefaultLinuxVM(ctx context.Context, vmid string, mshareFiles map[string]any, mshareDirs []string, mshareSocks []string) (*DefaultVMConfig, error) {
+func newDefaultLinuxVM(ctx context.Context, vmid string, mbinFile string, mshareFiles map[string]any, mshareDirs []string, mshareSocks []string) (*DefaultVMConfig, error) {
 	start := time.Now()
 
 	workingDir, err := host.EmphiricalVMCacheDir(ctx, vmid)
@@ -95,7 +95,7 @@ func newDefaultLinuxVM(ctx context.Context, vmid string, mshareFiles map[string]
 		return nil, errors.Errorf("getting host timezone: %w", err)
 	}
 
-	mbinDev, err := virtio.VirtioBlkNew(filepath.Join(linuxRuntimeBuildDir, constants.MbinFileName))
+	mbinDev, err := virtio.VirtioBlkNew(filepath.Join(linuxRuntimeBuildDir, mbinFile))
 	if err != nil {
 		return nil, errors.Errorf("creating mbin virtio device: %w", err)
 	}

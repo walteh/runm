@@ -1,0 +1,150 @@
+edition = "2023";
+
+package github.com.walteh.runm.proto.vmfuse.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/go_features.proto";
+
+option features.(pb.go).api_level = API_OPAQUE;
+option features.field_presence = IMPLICIT;  // makes everything by default required, for optional set to EXPLICIT
+option go_package = "github.com/walteh/runm/proto/vmfuse/v1;vmfusev1";
+
+service VmfuseService {
+	// Mount creates a VM with the specified mount configuration and mounts it to the target
+	rpc Mount(MountRequest) returns (MountResponse);
+
+
+	// Unmount stops the VM and unmounts the target
+	rpc Unmount(UnmountRequest) returns (google.protobuf.Empty);
+
+
+	// List returns all active mounts managed by vmfused
+	rpc List(google.protobuf.Empty) returns (ListResponse);
+
+
+	// Status returns the status of a specific mount
+	rpc Status(StatusRequest) returns (StatusResponse);
+}
+
+message MountRequest {
+	// Type of mount: "bind" or "overlay"
+	string mount_type = 1 [
+		(buf.validate.field).string = {
+			in: [
+				"bind",
+				"overlay"
+			]
+		}
+	];
+
+	// Source paths to mount
+	// For bind: single source directory
+	// For overlay: [lower, upper, work] (work is optional)
+	repeated string sources = 2 [
+		(buf.validate.field).repeated.min_items = 1
+	];
+
+	// Target path on host where mount will be available
+	string target = 3 [
+		(buf.validate.field).string.min_len = 1
+	];
+
+	// VM configuration
+	VmConfig vm_config = 4;
+}
+
+message VmConfig {
+	// Memory allocation for VM (e.g. "512M", "1G")
+	string memory = 1 [
+		(buf.validate.field).string.min_len = 1
+	];
+
+	// Number of CPUs for VM
+	uint32 cpus = 2 [
+		(buf.validate.field).uint32 = {
+			gte: 1,
+			lte: 16
+		}
+	];
+
+	// Timeout for VM operations in seconds
+	uint32 timeout_seconds = 3 [
+		(buf.validate.field).uint32.gte = 30
+	];
+}
+
+message MountResponse {
+	// Unique identifier for this mount
+	string mount_id = 1;
+
+	// VM identifier
+	string vm_id = 2;
+
+	// Target path where mount is available
+	string target = 3;
+
+	// Mount status
+	MountStatus status = 4;
+}
+
+message UnmountRequest {
+	// Target path to unmount
+	string target = 1 [
+		(buf.validate.field).string.min_len = 1
+	];
+}
+
+message ListResponse {
+	repeated MountInfo mounts = 1;
+}
+
+message StatusRequest {
+	// Either mount_id or target must be specified
+	oneof identifier {
+		string mount_id = 1;
+		string target   = 2 [
+			(buf.validate.field).string.min_len = 1
+		];
+	}
+}
+
+message StatusResponse {
+	MountInfo mount_info = 1;
+}
+
+message MountInfo {
+	// Unique identifier for this mount
+	string mount_id = 1;
+
+	// VM identifier
+	string vm_id = 2;
+
+	// Mount configuration
+	string          mount_type = 3;
+	repeated string sources    = 4;
+	string          target     = 5;
+
+	// Status information
+	MountStatus status = 6;
+
+	// VM IP address (for debugging)
+	string vm_ip = 7;
+
+	// Creation timestamp (unix nano)
+	int64 created_at = 8;
+
+	// Error message if status is ERROR
+	string error_message = 9;
+}
+
+enum MountStatus {
+	MOUNT_STATUS_UNKNOWN         = 0;
+	MOUNT_STATUS_CREATING        = 1;
+	MOUNT_STATUS_STARTING_VM     = 2;
+	MOUNT_STATUS_WAITING_FOR_NFS = 3;
+	MOUNT_STATUS_MOUNTING_NFS    = 4;
+	MOUNT_STATUS_ACTIVE          = 5;
+	MOUNT_STATUS_UNMOUNTING      = 6;
+	MOUNT_STATUS_ERROR           = 7;
+}

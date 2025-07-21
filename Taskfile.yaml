@@ -513,6 +513,50 @@ tasks:
                 STATIC: '1'
                 BIN_DIR: '{{.TEST_BIN_DIR}}'
 
+    build:vmfuse-init:
+        desc: builds the vmfuse-init binary (Linux guest)
+        run: once
+        sources:
+          - "**/*.go"
+          - "proto/vmfuse/**/*.proto"
+        generates:
+          - '{{.TEST_BIN_DIR}}/vmfuse-init'
+        cmds:
+          - task: build:go:vmfuse-init:linux:arm64
+            vars:
+                DEBUG: '1'
+                STATIC: '1'
+                BIN_DIR: '{{.TEST_BIN_DIR}}'
+
+    build:vmfused:
+        desc: builds the vmfused daemon (macOS host)
+        run: once
+        sources:
+          - "**/*.go"
+          - "proto/vmfuse/**/*.proto"
+        generates:
+          - '{{.TEST_BIN_DIR}}/vmfused'
+        cmds:
+          - task: build:go:vmfused:darwin:arm64
+            vars:
+                DEBUG: '1'
+                CGO_ENABLED: '1'
+                BIN_DIR: '{{.TEST_BIN_DIR}}'
+
+    build:vmfusectl:
+        desc: builds the vmfusectl CLI client (macOS host)
+        run: once
+        sources:
+          - "**/*.go"
+          - "proto/vmfuse/**/*.proto"
+        generates:
+          - '{{.TEST_BIN_DIR}}/vmfusectl'
+        cmds:
+          - task: build:go:vmfusectl:darwin:arm64
+            vars:
+                DEBUG: '1'
+                BIN_DIR: '{{.TEST_BIN_DIR}}'
+
     build:runc-test:
         desc: builds the runc binary
         run: once
@@ -562,6 +606,9 @@ tasks:
           - build:runm-linux-init
           - build:runm-linux-host-fork-exec-proxy
           - build:runm-linux-mounter
+          - build:vmfuse-init
+          - build:vmfused
+          - build:vmfusectl
           - build:busybox
           - build:buildkitd-test
           - build:buildctl-test
@@ -764,6 +811,31 @@ tasks:
           - cmd: cd {{.TMP_DIR}}/wrk && mksquashfs . ../mbin.squashfs -quiet
             silent: true
           - cmd: cp {{.TMP_DIR}}/mbin.squashfs {{.LINUX_RUNTIME_DIR}}/mbin.squashfs
+            silent: true
+
+    linux:runtime:mbins:vmfuse:
+        desc: builds the mbin squashfs
+        deps: ['build:all-test-binaries']
+        run: once
+        sources:
+          - '{{.TEST_BIN_DIR}}/vmfuse-init'
+        generates:
+          - '{{.LINUX_RUNTIME_DIR}}/mbin-vmfuse.squashfs'
+        vars:
+            TMP_DIR:
+                sh: mktemp -d -t runm-linux-runtime-mbin-vmfuse-XXXXXX
+            FS:
+                map:
+                    vmfuse-init: '{{.TEST_BIN_DIR}}/vmfuse-init'
+        cmds:
+          - defer: rm -rf {{.TMP_DIR}}
+          - cmd: mkdir -p {{.TMP_DIR}}/wrk {{.LINUX_RUNTIME_DIR}}
+          - for: {var: FS}
+            cmd: mkdir -p $(dirname {{.TMP_DIR}}/wrk/{{.KEY}}) && cp {{.ITEM}} {{.TMP_DIR}}/wrk/{{.KEY}}
+            silent: true
+          - cmd: cd {{.TMP_DIR}}/wrk && mksquashfs . ../mbin-vmfuse.squashfs -quiet
+            silent: true
+          - cmd: cp {{.TMP_DIR}}/mbin-vmfuse.squashfs {{.LINUX_RUNTIME_DIR}}/mbin-vmfuse.squashfs
             silent: true
 
     linux:runtime:initramfs:
@@ -1138,6 +1210,90 @@ tasks:
                     --target=export \
                     --output=type=local,dest={{.TEST_BIN_DIR}}/buildtest \
                     {{.TEST_SCENARIO_DIR}}
+
+    dev:vmfuse:2025-07-21:01:
+        desc: vmfuse POC end-to-end test - mount directory via Linux VM and NFS
+        deps: ['build:vmfused', 'build:vmfusectl', 'build:vmfuse-init', 'linux:runtime:mbins:vmfuse']
+        interactive: true
+        vars:
+            TMP_DIR:
+                sh: mktemp -d
+            TEST_DIR:
+                sh: echo "{{.TMP_DIR}}/test-source"
+            MOUNT_TARGET:
+                sh: echo "{{.TMP_DIR}}/test-mount"
+            VMFUSED_SOCK:
+                sh: echo "{{.TMP_DIR}}/vmfused.sock"
+        env:
+            LINUX_RUNTIME_BUILD_DIR: '{{.LINUX_RUNTIME_DIR}}'
+        cmds:
+          - defer: |-
+                echo "Cleaning up vmfuse test..."
+                pkill -f vmfused || true
+                {{.TEST_BIN_DIR}}/vmfusectl -server unix://{{.VMFUSED_SOCK}} list || true
+                sleep 2
+                rm -rf {{.TMP_DIR}} || true
+          - cmd: |-
+                echo "Setting up vmfuse test environment..."
+                mkdir -p {{.TEST_DIR}} {{.MOUNT_TARGET}}
+                echo "Hello from vmfuse test!" > {{.TEST_DIR}}/test-file.txt
+                echo "This is a bind mount test via Linux VM and NFS" >> {{.TEST_DIR}}/test-file.txt
+                ls -la {{.TEST_DIR}}
+          - cmd: |-
+                echo "Starting vmfused daemon..."
+                {{.TEST_BIN_DIR}}/vmfused -listen unix://{{.VMFUSED_SOCK}} &
+                VMFUSED_PID=$!
+                echo "vmfused PID: $VMFUSED_PID"
+                sleep 3
+          - cmd: |-
+                echo "Testing vmfusectl mount command..."
+                {{.TEST_BIN_DIR}}/vmfusectl -server unix://{{.VMFUSED_SOCK}} mount -t bind {{.TEST_DIR}} {{.MOUNT_TARGET}}
+          - cmd: |-
+                echo "Checking mount status..."
+                {{.TEST_BIN_DIR}}/vmfusectl -server unix://{{.VMFUSED_SOCK}} status {{.MOUNT_TARGET}}
+          - cmd: |-
+                echo "Listing all mounts..."
+                {{.TEST_BIN_DIR}}/vmfusectl -server unix://{{.VMFUSED_SOCK}} list
+          - cmd: |-
+                echo "Waiting for mount to become active (up to 60 seconds)..."
+                for i in {1..60}; do
+                    STATUS=$({{.TEST_BIN_DIR}}/vmfusectl -server unix://{{.VMFUSED_SOCK}} status {{.MOUNT_TARGET}} | grep Status: | awk '{print $2}' || echo "ERROR")
+                    echo "Attempt $i: Status = $STATUS"
+                    if [ "$STATUS" = "MOUNT_STATUS_ACTIVE" ]; then
+                        echo "Mount is active!"
+                        break
+                    fi
+                    if [ "$STATUS" = "MOUNT_STATUS_ERROR" ]; then
+                        echo "Mount failed - checking details..."
+                        {{.TEST_BIN_DIR}}/vmfusectl -server unix://{{.VMFUSED_SOCK}} status {{.MOUNT_TARGET}}
+                        break
+                    fi
+                    sleep 1
+                done
+          - cmd: |-
+                echo "Testing mounted directory access..."
+                if [ -d "{{.MOUNT_TARGET}}" ]; then
+                    echo "Mount target exists"
+                    if [ -f "{{.MOUNT_TARGET}}/test-file.txt" ]; then
+                        echo "SUCCESS: Test file accessible through vmfuse mount!"
+                        echo "File contents:"
+                        cat "{{.MOUNT_TARGET}}/test-file.txt"
+                    else
+                        echo "FAIL: Test file not found in mount target"
+                        echo "Mount target contents:"
+                        ls -la "{{.MOUNT_TARGET}}" || echo "Cannot list mount target"
+                    fi
+                else
+                    echo "FAIL: Mount target directory not accessible"
+                fi
+          - cmd: |-
+                echo "Unmounting..."
+                {{.TEST_BIN_DIR}}/vmfusectl -server unix://{{.VMFUSED_SOCK}} umount {{.MOUNT_TARGET}}
+                sleep 2
+          - cmd: |-
+                echo "Final status check..."
+                {{.TEST_BIN_DIR}}/vmfusectl -server unix://{{.VMFUSED_SOCK}} list
+                echo "vmfuse test completed!"
 
     #endregion dev
 

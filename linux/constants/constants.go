@@ -11,6 +11,7 @@ const (
 	MbinAbsPath                       = "/mbin"
 	MbinVirtioTag                     = "/dev/vda"
 	MbinFileName                      = "mbin.squashfs"
+	MbinVMFUSEFileName                = "mbin-vmfuse.squashfs"
 	MbinFSType                        = "squashfs"
 	ZoneInfoVirtioTag                 = "zoneinfo"
 	RootfsMbindVirtioTag              = "rootfs-mbind"
