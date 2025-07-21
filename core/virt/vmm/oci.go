@@ -5,7 +5,6 @@ package vmm
 import (
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"hash/fnv"
 	"io"
 	"log/slog"
@@ -83,49 +82,6 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 	if err != nil {
 		return nil, errors.Errorf("getting VM defaults: %w", err)
 	}
-
-	// bundleDev, err := virtio.VirtioFsNew(ctrconfig.Bundle, constants.BundleVirtioTag)
-	// if err != nil {
-	// 	return nil, errors.Errorf("creating bundle virtio device: %w", err)
-	// }
-
-	// mfsBindMounts = append(mfsBindMounts, mfsBindMount{
-	// 	Target: ctrconfig.Bundle,
-	// 	Tag:    constants.BundleVirtioTag,
-	// })
-
-	// if len(ctrconfig.RootfsMounts) != 1 {
-	// 	return nil, errors.Errorf("%d rootfs mounts found, expected exactly one: %v", len(ctrconfig.RootfsMounts), ctrconfig.RootfsMounts)
-	// }
-
-	// rootfsDev, err := virtio.VirtioFsNew(ctrconfig.RootfsMounts[0].Source, constants.RootfsMbindVirtioTag)
-	// if err != nil {
-	// 	return nil, errors.Errorf("creating rootfs	 virtio device: %w", err)
-	// }
-
-	// mfsBindMounts = append(mfsBindMounts, mfsBindMount{
-	// 	Target: ctrconfig.RootfsMounts[0].Source,
-	// 	Tag:    constants.RootfsMbindVirtioTag,
-	// })
-
-	// mfsBindString := ""
-	// for _, mfsBind := range mfsBindMounts {
-	// 	slog.InfoContext(ctx, "mfs bind", "tag", mfsBind.Tag, "target", mfsBind.Target)
-	// 	mfsBindString += mfsBind.Tag + constants.MbindSeparator + mfsBind.Target + ","
-	// }
-	// mfsBindString = strings.TrimSuffix(mfsBindString, ",")
-
-	// msockBindString := ""
-	// for _, msockBind := range msockBindMounts {
-	// 	slog.InfoContext(ctx, "msock bind", "destination", msockBind.Source, "port", msockBind.Port)
-	// 	msockBindString += msockBind.Source + constants.MbindSeparator + strconv.Itoa(int(msockBind.Port)) + ","
-	// }
-	// msockBindString = strings.TrimSuffix(msockBindString, ",")
-
-	// mbindDevices = append(mbindDevices, rootfsDev)
-	// devices = append(devices, bundleDev)
-	// devices = append(devices, mbindDevices...)
-	// devices = append(devices, mountDevices...)
 
 	slog.InfoContext(ctx, "about to set up rootfs",
 		"ctrconfig.RootfsMounts", ctrconfig.RootfsMounts,
@@ -215,33 +171,6 @@ func quickHash(s string) string {
 	return hex.EncodeToString(out)
 }
 
-// func findOverlays(ctx context.Context, spec *oci.Spec, rootfsMounts []process.Mount) ([]proxyVirtioFs, error) {
-// 	proxyDevices := []proxyVirtioFs{}
-
-// 	for _, mount := range rootfsMounts {
-// 		if mount.Type == "bind" || mount.Type == "rbind" {
-// 			proxyDevices = append(proxyDevices, proxyVirtioFs{
-// 				Target: mount.Source,
-// 				Tag:    "overlay-" + quickHash(mount.Source),
-// 			})
-// 		}
-// 	}
-
-// 	return proxyDevices, nil
-// }
-
-type msockBindMount struct {
-	Destination string
-	Port        uint32
-	Source      string
-}
-
-type mfsBindMount struct {
-	Target  string
-	Tag     string
-	Options []string
-}
-
 func isolateMsharesFromOciSpec(ctx context.Context, spec *oci.Spec) ([]string, []string, error) {
 
 	proxyDevices := []string{}
@@ -310,47 +239,4 @@ func isolateMsharesFromOciSpec(ctx context.Context, spec *oci.Spec) ([]string, [
 	slog.InfoContext(ctx, "found mbind devices", "proxyDevices", proxyDevices)
 
 	return proxyDevices, msockBindMounts, nil
-}
-
-// PrepareContainerVirtioDevicesFromRootfs creates virtio devices using an existing rootfs directory
-func makeMConfigDevice(ctx context.Context, wrkdir string, ctrconfig *oci.Spec, rootfsMounts []process.Mount) (virtio.VirtioDevice, *mfsBindMount, error) {
-	ec1DataPath := filepath.Join(wrkdir, "harpoon-runtime-fs-device")
-
-	err := os.MkdirAll(ec1DataPath, 0755)
-	if err != nil {
-		return nil, nil, errors.Errorf("creating block device directory: %w", err)
-	}
-
-	specBytes, err := json.Marshal(ctrconfig)
-	if err != nil {
-		return nil, nil, errors.Errorf("marshalling spec: %w", err)
-	}
-
-	mountBytes, err := json.Marshal(rootfsMounts)
-	if err != nil {
-		return nil, nil, errors.Errorf("marshalling rootfs mounts: %w", err)
-	}
-
-	files := map[string][]byte{
-		constants.ContainerSpecFile:         specBytes,
-		constants.ContainerRootfsMountsFile: mountBytes,
-	}
-
-	for name, file := range files {
-		filePath := filepath.Join(ec1DataPath, name)
-		err = os.WriteFile(filePath, file, 0644)
-		if err != nil {
-			return nil, nil, errors.Errorf("writing file to block device: %w", err)
-		}
-	}
-
-	device, err := virtio.VirtioFsNew(ec1DataPath, constants.Ec1VirtioTag)
-	if err != nil {
-		return nil, nil, errors.Errorf("creating ec1 virtio device: %w", err)
-	}
-
-	return device, &mfsBindMount{
-		Target: constants.Ec1AbsPath,
-		Tag:    constants.Ec1VirtioTag,
-	}, nil
 }

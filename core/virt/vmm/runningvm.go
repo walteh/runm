@@ -587,14 +587,14 @@ func (rvm *RunningVM[VM]) SetupOtelForwarder(ctx context.Context) error {
 	}
 }
 
-func (rvm *RunningVM[VM]) dialMsockBind(ctx context.Context, msockBind msockBindMount) (net.Conn, error) {
-	conn, err := net.Dial("unix", msockBind.Source)
+func (rvm *RunningVM[VM]) dialMsockBind(ctx context.Context, msockBind string, port uint32) (net.Conn, error) {
+	conn, err := net.Dial("unix", msockBind)
 	if err != nil {
 		return nil, errors.Errorf("dialing msock bind source: %w", err)
 	}
 	defer conn.Close()
 	// open up the vsock port
-	vConn, err := rvm.vm.VSockConnect(ctx, msockBind.Port)
+	vConn, err := rvm.vm.VSockConnect(ctx, port)
 	if err != nil {
 		return nil, errors.Errorf("connecting to vsock port: %w", err)
 	}
