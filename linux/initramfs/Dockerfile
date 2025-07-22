@@ -9,7 +9,7 @@ ARG ALPINE_BUSYBOX_VERSION=3.21
 ARG DEBIAN_CODENAME=bookworm
 ARG SOCAT_VERSION=1.8.0.3
 ARG TZDATA_VERSION=2025b
-ARG GANESHA_VERSION=V5.7
+ARG GANESHA_VERSION=V7-dev.19
 
 ARG JQ_GIT_REF=master
 ARG LSHW_GIT_REF=master
@@ -43,146 +43,7 @@ RUN apt-get update \
 		flex \
 		wget \
 	&& rm -rf /var/lib/apt/lists/*
-	
 
-# ganesha builder 
-# -------- Build stage --------
-	FROM alpine-busybox-ref AS ganesha-static-builder-alpine
-
-
-
-ARG GANESHA_VERSION
-
-RUN apk add --no-cache \
-    git build-base cmake ninja bison flex \
-    libtirpc-dev userspace-rcu-dev userspace-rcu-static \
-    libcap-dev libcap-static \
-    e2fsprogs-dev zlib-dev openssl-dev linux-headers \
-    libnsl libnsl-dev libnsl-static
-
-RUN apk add --no-cache \
-    libtirpc libtirpc-dev libtirpc-static
-
-RUN git clone --depth 1 --branch ${GANESHA_VERSION} https://github.com/nfs-ganesha/nfs-ganesha.git /src
-WORKDIR /src
-RUN git submodule update --init --recursive
-
-RUN mkdir build && cd build && \
-    cmake ../src -G Ninja \
-	-DCMAKE_BUILD_TYPE=Release \
-	-DUSE_FSAL_VFS=ON \
-	-DUSE_GSS=OFF -DUSE_DBUS=OFF \
-	-DCMAKE_EXE_LINKER_FLAGS="-static" \
-	-DCMAKE_C_FLAGS="-O2" -DCMAKE_CXX_FLAGS="-O2" && \
-    ninja ganesha.nfsd && strip MainNFSD/ganesha.nfsd
-
-
-
-FROM debian-ref AS ganesha-static-builder
-
-ARG GANESHA_VERSION
-
-# Base tooling + certs (needed for git clone TLS)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates git build-essential cmake ninja-build bison flex \
-    libtirpc-dev liburcu-dev libnsl-dev libcap-dev libacl1-dev \
-    zlib1g-dev libssl-dev e2fsprogs pkg-config && \
-    update-ca-certificates && rm -rf /var/lib/apt/lists/*
-
-# Fetch source
-RUN git clone --depth 1 --branch ${GANESHA_VERSION} https://github.com/nfs-ganesha/nfs-ganesha.git /src
-WORKDIR /src
-RUN git submodule update --init --recursive
-
-# Configure & build static daemon (glibc provides libc.a)
-RUN mkdir build && cd build
-WORKDIR /src/build
-
-RUN cmake ../src -G Ninja \
-      -DCMAKE_BUILD_TYPE=Release \
-      -DUSE_FSAL_VFS=ON \
-      -DUSE_GSS=OFF -DUSE_DBUS=OFF \
-      -DCMAKE_EXE_LINKER_FLAGS="-static"
-
-RUN ninja ganesha.nfsd
-RUN strip MainNFSD/ganesha.nfsd
-
-# FROM scratch AS ganesha-export
-# COPY --from=ganesha-static-builder /src/build/MainNFSD/ganesha.nfsd /bin/ganesha.nfsd
-
-
-FROM debian-ref AS ganesha-dynamic-builder
-
-ARG GANESHA_VERSION
-
-# Build deps (includes static + shared dev libs)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates git build-essential cmake ninja-build bison flex \
-    libtirpc-dev liburcu-dev libnsl-dev libcap-dev libacl1-dev \
-    zlib1g-dev libssl-dev e2fsprogs pkg-config python3 && \
-    rm -rf /var/lib/apt/lists/*
-
-# Fetch source
-RUN git clone --depth 1 --branch ${GANESHA_VERSION} https://github.com/nfs-ganesha/nfs-ganesha.git /src
-WORKDIR /src
-RUN git submodule update --init --recursive
-
-# Configure & build (dynamic build; only VFS FSAL)
-RUN mkdir build && cd build && cmake ../src -G Ninja \
-      -DCMAKE_BUILD_TYPE=Release \
-      -DUSE_FSAL_VFS=ON \
-      -DUSE_GSS=OFF -DUSE_DBUS=OFF && \
-    ninja ganesha.nfsd 
-	
-RUN cd build && strip ganesha.nfsd
-
-# "Install" into a staging prefix for easier collection
-RUN cd build && DESTDIR=/staging ninja install
-
-# -------- Collector stage --------
-FROM debian-ref AS ganesha-dynamic-builder-collector
-
-# We only need ldd/coreutils to gather dependencies at build time
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates libtirpc3 liburcu8 libnsl2 libcap2 libacl1 && \
-    rm -rf /var/lib/apt/lists/*
-
-# Copy installed tree from builder
-COPY --from=ganesha-dynamic-builder /staging/ /
-
-# Create /everything and copy minimal config + required libs/binaries.
-# We detect runtime .so deps via ldd on ganesha.nfsd and libfsalvfs.so.
-RUN bash <<'SCRIPT'
-set -euo pipefail
-mkdir -p /everything/bin /everything/lib /everything/etc/ganesha
-cat > /everything/etc/ganesha/ganesha.conf <<'EOF'
-NFS_Core_Param { NFS_Protocols = 4; }
-EXPORT {
-  Export_Id = 1;
-  Path = /export;
-  Pseudo = /export;
-  Access_Type = RW;
-  Protocols = 4;
-  Squash = No_Root_Squash;
-  FSAL { Name = VFS; }
-}
-EOF
-cp /usr/bin/ganesha.nfsd /everything/bin/
-cp /usr/lib/libganesha_nfsd.so* /everything/lib/
-cp /usr/lib/ganesha/libfsalvfs.so* /everything/lib/
-for f in /usr/local/bin/ganesha.nfsd /usr/local/lib/libganesha_nfsd.so* /usr/local/lib/ganesha/libfsalvfs.so*; do
-  ldd "$f" | awk '/=>/ {print $3} /^[^\t]/ && /\/lib/ {print $1}' | grep -v '^(' || true
-done | sort -u | while read -r lib; do
-  [ -f "$lib" ] && cp -v --parents "$lib" /everything/
-done
-SCRIPT
-    # Flatten libs into /everything/lib
-RUN find /everything/lib -type f -name "*.so*" -exec cp -n {} /everything/lib \; || true
-
-RUN ls -lahrs /everything
-
-FROM scratch AS ganesha-export
-COPY --from=ganesha-dynamic-builder-collector /everything /
 
 
 ########################################################
