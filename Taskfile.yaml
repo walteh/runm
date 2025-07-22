@@ -609,8 +609,9 @@ tasks:
                 docker buildx build \
                     --platform=linux/arm64 \
                     --progress=plain \
-                    --target=ganesha-export \
-                    --output=type=local,dest={{.TEST_BIN_DIR}}/ganesha \
+                    --file=linux/initramfs/Dockerfile.ganesha \
+                    --target=ganesha-staticx-export \
+                    --output=type=local,dest={{.TEST_BIN_DIR}} \
                     ./linux/initramfs
 
     build:all-test-binaries:
@@ -844,6 +845,7 @@ tasks:
             FS:
                 map:
                     vmfuse-init: '{{.TEST_BIN_DIR}}/vmfuse-init'
+                    ganesha: '{{.TEST_BIN_DIR}}/ganesha'
         cmds:
           - defer: rm -rf {{.TMP_DIR}}
           - cmd: mkdir -p {{.TMP_DIR}}/wrk {{.LINUX_RUNTIME_DIR}}

@@ -9,7 +9,7 @@ ARG ALPINE_BUSYBOX_VERSION=3.21
 ARG DEBIAN_CODENAME=bookworm
 ARG SOCAT_VERSION=1.8.0.3
 ARG TZDATA_VERSION=2025b
-ARG GANESHA_VERSION=V7-dev.19
+ARG GANESHA_VERSION=V6.5
 
 FROM alpine:${ALPINE_VERSION} AS alpine-ref
 FROM alpine:${ALPINE_BUSYBOX_VERSION} AS alpine-busybox-ref
@@ -57,7 +57,7 @@ RUN git submodule update --init --recursive
 	
 
 ########################################################
-# ganesha alpine static 
+# ganesha alpine static (attempt 1)
 ########################################################
 
 FROM alpine-ref AS ganesha-static-builder-alpine
@@ -67,7 +67,8 @@ RUN apk add --no-cache \
     libtirpc-dev userspace-rcu-dev userspace-rcu-static \
     libcap-dev libcap-static \
     e2fsprogs-dev zlib-dev openssl-dev linux-headers \
-    libnsl libnsl-dev libnsl-static
+    libnsl libnsl-dev libnsl-static zlib-static openssl-libs-static \
+	acl acl-dev acl-static
 
 RUN apk add --no-cache \
     libtirpc libtirpc-dev libtirpc-static
@@ -79,7 +80,7 @@ RUN mkdir /build && cd /build && \
 	-DCMAKE_BUILD_TYPE=Release \
 	-DUSE_FSAL_VFS=ON \
 	-DUSE_GSS=OFF -DUSE_DBUS=OFF \
-	-DCMAKE_EXE_LINKER_FLAGS="-static" \
+	-DCMAKE_EXE_LINKER_FLAGS="-static -no-pie" \
 	-DCMAKE_C_FLAGS="-O2" -DCMAKE_CXX_FLAGS="-O2" && \
     ninja ganesha.nfsd
 
@@ -89,7 +90,7 @@ FROM scratch AS ganesha-static-alpine-export
 COPY --from=ganesha-static-builder-alpine /build/ganesha.nfsd /bin/ganesha.nfsd
 
 ########################################################
-# ganesha debian static 
+# ganesha debian static (attempt 2)
 ########################################################
 
 FROM debian-ref AS ganesha-static-builder-debian
@@ -110,14 +111,49 @@ RUN mkdir /build && cd /build && \
       -DUSE_GSS=OFF -DUSE_DBUS=OFF \
       -DCMAKE_EXE_LINKER_FLAGS="-static"
 
-RUN ninja ganesha.nfsd
+RUN cd /build && ninja ganesha.nfsd
 RUN strip /build/ganesha.nfsd
 
 FROM scratch AS ganesha-static-debian-export
 COPY --from=ganesha-static-builder-debian /build/ganesha.nfsd /bin/ganesha.nfsd
 
+
 ########################################################
-# ganesha debian dynamic 
+# ganesha debian static (attempt 2.1)
+########################################################
+
+FROM debian-ref AS ganesha-static-debian-v2
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates git build-essential cmake ninja-build bison flex \
+    libtirpc-dev liburcu-dev libnsl-dev libcap-dev libacl1-dev \
+    zlib1g-dev libssl-dev e2fsprogs pkg-config \
+    # Add static libraries
+    libc6-dev libgcc-s1 libtirpc3 liburcu8 libnsl2 libcap2 libacl1 && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY --from=ganesha-base /git-repo /git-repo
+
+RUN mkdir /build
+WORKDIR /build
+
+# Try aggressive static linking
+RUN cmake /git-repo/src -G Ninja \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DUSE_FSAL_VFS=ON \
+      -DUSE_GSS=OFF -DUSE_DBUS=OFF -DUSE_MONITORING=OFF \
+      -DCMAKE_EXE_LINKER_FLAGS="-static -Wl,--whole-archive -lpthread -Wl,--no-whole-archive" \
+      -DCMAKE_FIND_LIBRARY_SUFFIXES=".a" \
+      -DBUILD_SHARED_LIBS=OFF && \
+    ninja ganesha.nfsd
+
+RUN ldd ganesha.nfsd || echo "Static binary!"
+
+FROM scratch AS ganesha-static-debian-v2-export
+COPY --from=ganesha-static-debian-v2 /build/ganesha.nfsd /bin/ganesha.nfsd
+
+########################################################
+# ganesha debian dynamic (attempt 3)
 ########################################################
 
 FROM debian-ref AS ganesha-dynamic-builder
@@ -135,8 +171,9 @@ RUN mkdir /build && cd /build && \
     cmake /git-repo/src -G Ninja \
       -DCMAKE_BUILD_TYPE=Release \
       -DUSE_FSAL_VFS=ON \
-      -DUSE_GSS=OFF -DUSE_DBUS=OFF && \
-    ninja ganesha.nfsd 
+      -DUSE_GSS=OFF -DUSE_DBUS=OFF
+	
+RUN cd /build && ninja ganesha.nfsd 
 
 RUN strip /build/ganesha.nfsd
 
@@ -188,4 +225,44 @@ RUN ls -lahrs /everything
 FROM scratch AS ganesha-export
 COPY --from=ganesha-dynamic-builder-collector /everything /
 
+########################################################
+# ganesha debian static (attempt 4)
+########################################################
 
+FROM debian-ref AS ganesha-staticx-builder
+
+# Build your working dynamic NFS-Ganesha (your Attempt 3)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates git build-essential cmake ninja-build bison flex \
+    libtirpc-dev liburcu-dev libnsl-dev libcap-dev libacl1-dev \
+    zlib1g-dev libssl-dev e2fsprogs patchelf zstd \
+	pkg-config python3 python3-pip python3-venv python3-dev scons && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY --from=ganesha-base /git-repo /git-repo
+
+# Build dynamic binary (your working recipe)
+RUN mkdir /build && cd /build && \
+    cmake /git-repo/src -G Ninja \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DUSE_FSAL_VFS=ON \
+      -DUSE_GSS=OFF -DUSE_DBUS=OFF -DUSE_MONITORING=OFF && \
+    ninja ganesha.nfsd 
+
+RUN mkdir /output
+WORKDIR /output
+
+# Install StaticX
+# create a virtual environment
+RUN python3 -m venv /output/venv
+# activate the virtual environment
+RUN . /output/venv/bin/activate
+# install staticx
+RUN /output/venv/bin/pip install wheel
+RUN /output/venv/bin/pip install staticx
+# Bundle everything into single static-like executable
+RUN /output/venv/bin/staticx /build/ganesha.nfsd /ganesha-static
+
+
+FROM scratch AS ganesha-staticx-export
+COPY --from=ganesha-staticx-builder /ganesha-static /ganesha
