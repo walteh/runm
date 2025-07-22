@@ -55,46 +55,6 @@ func (s *Server) DialOpenListener(ctx context.Context, req *runmv1.DialOpenListe
 	return &runmv1.DialOpenListenerResponse{}, nil
 }
 
-// func (s *Server) AllocateSocketStream(req *runmv1.AllocateSocketStreamRequest, stream runmv1.SocketAllocatorService_AllocateSocketStreamServer) error {
-// 	as, err := s.socketAllocator.AllocateSocket(stream.Context())
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	st, err := storeSocket(s.state, as)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	res := &runmv1.AllocateSocketStreamResponse{}
-// 	res.SetSocketType(st)
-// 	if err := stream.Send(res); err != nil {
-// 		return err
-// 	}
-
-// 	ready := make(chan error)
-// 	go func() {
-// 		ready <- as.Ready()
-// 	}()
-
-// 	select {
-// 	case <-stream.Context().Done():
-// 		return errors.Errorf("context done before socket was ready: %w", stream.Context().Err())
-// 	case <-time.After(10 * time.Second):
-// 		return errors.Errorf("timeout waiting for socket to be ready")
-// 	case err := <-ready:
-// 		if err != nil {
-// 			return errors.Errorf("socket not ready: %w", err)
-// 		}
-// 		st, err := storeSocket(s.state, as)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		res.SetSocketType(st)
-// 		return nil
-// 	}
-// }
-
 func (s *Server) AllocateConsole(ctx context.Context, req *runmv1.AllocateConsoleRequest) (*runmv1.AllocateConsoleResponse, error) {
 	referenceId := runtime.NewConsoleReferenceId()
 	path := socket.NewGuestPathProviderConsoleSocket()

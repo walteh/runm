@@ -10,11 +10,12 @@ import (
 	"strings"
 	"time"
 
+	"gitlab.com/tozd/go/errors"
+
 	"github.com/walteh/runm/core/gvnet"
 	"github.com/walteh/runm/core/virt/host"
 	"github.com/walteh/runm/core/virt/virtio"
 	"github.com/walteh/runm/linux/constants"
-	"gitlab.com/tozd/go/errors"
 )
 
 type DefaultVMConfig struct {

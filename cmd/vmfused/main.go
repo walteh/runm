@@ -17,20 +17,20 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/containers/common/pkg/strongunits"
+	"gitlab.com/tozd/go/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"gitlab.com/tozd/go/errors"
-
 	slogctx "github.com/veqryn/slog-context"
 
-	"github.com/containers/common/pkg/strongunits"
 	"github.com/walteh/runm/core/virt/vf"
 	"github.com/walteh/runm/core/virt/vmm"
 	"github.com/walteh/runm/pkg/logging"
 	"github.com/walteh/runm/pkg/units"
+
 	vmfusev1 "github.com/walteh/runm/proto/vmfuse/v1"
 )
 

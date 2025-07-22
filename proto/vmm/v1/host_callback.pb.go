@@ -2,9 +2,9 @@
 // versions:
 // 	protoc-gen-go v1.36.6
 // 	protoc        (unknown)
-// source: v1/host.proto
+// source: vmm/v1/host_callback.proto
 
-package runmv1
+package vmmv1
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -33,7 +33,7 @@ type ForkExecProxyRequest struct {
 
 func (x *ForkExecProxyRequest) Reset() {
 	*x = ForkExecProxyRequest{}
-	mi := &file_v1_host_proto_msgTypes[0]
+	mi := &file_vmm_v1_host_callback_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -45,7 +45,7 @@ func (x *ForkExecProxyRequest) String() string {
 func (*ForkExecProxyRequest) ProtoMessage() {}
 
 func (x *ForkExecProxyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_host_proto_msgTypes[0]
+	mi := &file_vmm_v1_host_callback_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -134,7 +134,7 @@ type ForkExecProxyResponse struct {
 
 func (x *ForkExecProxyResponse) Reset() {
 	*x = ForkExecProxyResponse{}
-	mi := &file_v1_host_proto_msgTypes[1]
+	mi := &file_vmm_v1_host_callback_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -146,7 +146,7 @@ func (x *ForkExecProxyResponse) String() string {
 func (*ForkExecProxyResponse) ProtoMessage() {}
 
 func (x *ForkExecProxyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_host_proto_msgTypes[1]
+	mi := &file_vmm_v1_host_callback_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -214,11 +214,11 @@ func (b0 ForkExecProxyResponse_builder) Build() *ForkExecProxyResponse {
 	return m0
 }
 
-var File_v1_host_proto protoreflect.FileDescriptor
+var File_vmm_v1_host_callback_proto protoreflect.FileDescriptor
 
-const file_v1_host_proto_rawDesc = "" +
+const file_vmm_v1_host_callback_proto_rawDesc = "" +
 	"\n" +
-	"\rv1/host.proto\x12\arunm.v1\x1a!google/protobuf/go_features.proto\"f\n" +
+	"\x1avmm/v1/host_callback.proto\x12\vrunm.vmm.v1\x1a!google/protobuf/go_features.proto\"f\n" +
 	"\x14ForkExecProxyRequest\x12\x12\n" +
 	"\x04argc\x18\x01 \x01(\tR\x04argc\x12\x12\n" +
 	"\x04argv\x18\x02 \x03(\tR\x04argv\x12\x10\n" +
@@ -227,19 +227,19 @@ const file_v1_host_proto_rawDesc = "" +
 	"\x15ForkExecProxyResponse\x12\x16\n" +
 	"\x06stdout\x18\x01 \x01(\fR\x06stdout\x12\x16\n" +
 	"\x06stderr\x18\x02 \x01(\fR\x06stderr\x12\x1b\n" +
-	"\texit_code\x18\x03 \x01(\x05R\bexitCode2_\n" +
-	"\vHostService\x12P\n" +
-	"\rForkExecProxy\x12\x1d.runm.v1.ForkExecProxyRequest\x1a\x1e.runm.v1.ForkExecProxyResponse\"\x00B\x87\x01\n" +
-	"\vcom.runm.v1B\tHostProtoP\x01Z&github.com/walteh/runm/proto/v1;runmv1\xa2\x02\x03RXX\xaa\x02\aRunm.V1\xca\x02\aRunm\\V1\xe2\x02\x13Runm\\V1\\GPBMetadata\xea\x02\bRunm::V1\x92\x03\a\xd2>\x02\x10\x03\b\x02b\beditionsp\xe8\a"
+	"\texit_code\x18\x03 \x01(\x05R\bexitCode2o\n" +
+	"\x13HostCallbackService\x12X\n" +
+	"\rForkExecProxy\x12!.runm.vmm.v1.ForkExecProxyRequest\x1a\".runm.vmm.v1.ForkExecProxyResponse\"\x00B\xa7\x01\n" +
+	"\x0fcom.runm.vmm.v1B\x11HostCallbackProtoP\x01Z)github.com/walteh/runm/proto/vmm/v1;vmmv1\xa2\x02\x03RVX\xaa\x02\vRunm.Vmm.V1\xca\x02\vRunm\\Vmm\\V1\xe2\x02\x17Runm\\Vmm\\V1\\GPBMetadata\xea\x02\rRunm::Vmm::V1\x92\x03\a\xd2>\x02\x10\x03\b\x02b\beditionsp\xe8\a"
 
-var file_v1_host_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
-var file_v1_host_proto_goTypes = []any{
-	(*ForkExecProxyRequest)(nil),  // 0: runm.v1.ForkExecProxyRequest
-	(*ForkExecProxyResponse)(nil), // 1: runm.v1.ForkExecProxyResponse
+var file_vmm_v1_host_callback_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_vmm_v1_host_callback_proto_goTypes = []any{
+	(*ForkExecProxyRequest)(nil),  // 0: runm.vmm.v1.ForkExecProxyRequest
+	(*ForkExecProxyResponse)(nil), // 1: runm.vmm.v1.ForkExecProxyResponse
 }
-var file_v1_host_proto_depIdxs = []int32{
-	0, // 0: runm.v1.HostService.ForkExecProxy:input_type -> runm.v1.ForkExecProxyRequest
-	1, // 1: runm.v1.HostService.ForkExecProxy:output_type -> runm.v1.ForkExecProxyResponse
+var file_vmm_v1_host_callback_proto_depIdxs = []int32{
+	0, // 0: runm.vmm.v1.HostCallbackService.ForkExecProxy:input_type -> runm.vmm.v1.ForkExecProxyRequest
+	1, // 1: runm.vmm.v1.HostCallbackService.ForkExecProxy:output_type -> runm.vmm.v1.ForkExecProxyResponse
 	1, // [1:2] is the sub-list for method output_type
 	0, // [0:1] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
@@ -247,26 +247,26 @@ var file_v1_host_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
-func init() { file_v1_host_proto_init() }
-func file_v1_host_proto_init() {
-	if File_v1_host_proto != nil {
+func init() { file_vmm_v1_host_callback_proto_init() }
+func file_vmm_v1_host_callback_proto_init() {
+	if File_vmm_v1_host_callback_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_host_proto_rawDesc), len(file_v1_host_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_vmm_v1_host_callback_proto_rawDesc), len(file_vmm_v1_host_callback_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_v1_host_proto_goTypes,
-		DependencyIndexes: file_v1_host_proto_depIdxs,
-		MessageInfos:      file_v1_host_proto_msgTypes,
+		GoTypes:           file_vmm_v1_host_callback_proto_goTypes,
+		DependencyIndexes: file_vmm_v1_host_callback_proto_depIdxs,
+		MessageInfos:      file_vmm_v1_host_callback_proto_msgTypes,
 	}.Build()
-	File_v1_host_proto = out.File
-	file_v1_host_proto_goTypes = nil
-	file_v1_host_proto_depIdxs = nil
+	File_vmm_v1_host_callback_proto = out.File
+	file_vmm_v1_host_callback_proto_goTypes = nil
+	file_vmm_v1_host_callback_proto_depIdxs = nil
 }

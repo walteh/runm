@@ -14,7 +14,7 @@ import (
 
 	"github.com/walteh/runm/linux/constants"
 
-	runmv1 "github.com/walteh/runm/proto/v1"
+	vmmv1 "github.com/walteh/runm/proto/vmm/v1"
 )
 
 func main() {
@@ -31,7 +31,7 @@ func main() {
 		return
 	}
 
-	hostService := runmv1.NewHostServiceClient(conn)
+	hostService := vmmv1.NewHostCallbackServiceClient(conn)
 
 	// read all from stdin
 	stdin, err := io.ReadAll(os.Stdin)
@@ -40,7 +40,7 @@ func main() {
 		return
 	}
 
-	req := &runmv1.ForkExecProxyRequest{}
+	req := &vmmv1.ForkExecProxyRequest{}
 	req.SetArgc(os.Args[0])
 	req.SetArgv(os.Args[1:])
 	req.SetEnv(os.Environ())

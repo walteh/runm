@@ -2,50 +2,50 @@
 // github.com/vektra/mockery
 // template: matryer
 
-package mockrunmv1
+package mockvmmv1
 
 import (
 	"context"
 	"sync"
 
-	"github.com/walteh/runm/proto/v1"
+	"github.com/walteh/runm/proto/vmm/v1"
 	"google.golang.org/grpc"
 )
 
-// Ensure that MockGuestManagementServiceClient does implement runmv1.GuestManagementServiceClient.
+// Ensure that MockGuestManagementServiceClient does implement vmmv1.GuestManagementServiceClient.
 // If this is not the case, regenerate this file with mockery.
-var _ runmv1.GuestManagementServiceClient = &MockGuestManagementServiceClient{}
+var _ vmmv1.GuestManagementServiceClient = &MockGuestManagementServiceClient{}
 
-// MockGuestManagementServiceClient is a mock implementation of runmv1.GuestManagementServiceClient.
+// MockGuestManagementServiceClient is a mock implementation of vmmv1.GuestManagementServiceClient.
 //
 //	func TestSomethingThatUsesGuestManagementServiceClient(t *testing.T) {
 //
-//		// make and configure a mocked runmv1.GuestManagementServiceClient
+//		// make and configure a mocked vmmv1.GuestManagementServiceClient
 //		mockedGuestManagementServiceClient := &MockGuestManagementServiceClient{
-//			GuestReadinessFunc: func(ctx context.Context, in *runmv1.GuestReadinessRequest, opts ...grpc.CallOption) (*runmv1.GuestReadinessResponse, error) {
+//			GuestReadinessFunc: func(ctx context.Context, in *vmmv1.GuestReadinessRequest, opts ...grpc.CallOption) (*vmmv1.GuestReadinessResponse, error) {
 //				panic("mock out the GuestReadiness method")
 //			},
-//			GuestRunCommandFunc: func(ctx context.Context, in *runmv1.GuestRunCommandRequest, opts ...grpc.CallOption) (*runmv1.GuestRunCommandResponse, error) {
+//			GuestRunCommandFunc: func(ctx context.Context, in *vmmv1.GuestRunCommandRequest, opts ...grpc.CallOption) (*vmmv1.GuestRunCommandResponse, error) {
 //				panic("mock out the GuestRunCommand method")
 //			},
-//			GuestTimeSyncFunc: func(ctx context.Context, in *runmv1.GuestTimeSyncRequest, opts ...grpc.CallOption) (*runmv1.GuestTimeSyncResponse, error) {
+//			GuestTimeSyncFunc: func(ctx context.Context, in *vmmv1.GuestTimeSyncRequest, opts ...grpc.CallOption) (*vmmv1.GuestTimeSyncResponse, error) {
 //				panic("mock out the GuestTimeSync method")
 //			},
 //		}
 //
-//		// use mockedGuestManagementServiceClient in code that requires runmv1.GuestManagementServiceClient
+//		// use mockedGuestManagementServiceClient in code that requires vmmv1.GuestManagementServiceClient
 //		// and then make assertions.
 //
 //	}
 type MockGuestManagementServiceClient struct {
 	// GuestReadinessFunc mocks the GuestReadiness method.
-	GuestReadinessFunc func(ctx context.Context, in *runmv1.GuestReadinessRequest, opts ...grpc.CallOption) (*runmv1.GuestReadinessResponse, error)
+	GuestReadinessFunc func(ctx context.Context, in *vmmv1.GuestReadinessRequest, opts ...grpc.CallOption) (*vmmv1.GuestReadinessResponse, error)
 
 	// GuestRunCommandFunc mocks the GuestRunCommand method.
-	GuestRunCommandFunc func(ctx context.Context, in *runmv1.GuestRunCommandRequest, opts ...grpc.CallOption) (*runmv1.GuestRunCommandResponse, error)
+	GuestRunCommandFunc func(ctx context.Context, in *vmmv1.GuestRunCommandRequest, opts ...grpc.CallOption) (*vmmv1.GuestRunCommandResponse, error)
 
 	// GuestTimeSyncFunc mocks the GuestTimeSync method.
-	GuestTimeSyncFunc func(ctx context.Context, in *runmv1.GuestTimeSyncRequest, opts ...grpc.CallOption) (*runmv1.GuestTimeSyncResponse, error)
+	GuestTimeSyncFunc func(ctx context.Context, in *vmmv1.GuestTimeSyncRequest, opts ...grpc.CallOption) (*vmmv1.GuestTimeSyncResponse, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -54,7 +54,7 @@ type MockGuestManagementServiceClient struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// In is the in argument value.
-			In *runmv1.GuestReadinessRequest
+			In *vmmv1.GuestReadinessRequest
 			// Opts is the opts argument value.
 			Opts []grpc.CallOption
 		}
@@ -63,7 +63,7 @@ type MockGuestManagementServiceClient struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// In is the in argument value.
-			In *runmv1.GuestRunCommandRequest
+			In *vmmv1.GuestRunCommandRequest
 			// Opts is the opts argument value.
 			Opts []grpc.CallOption
 		}
@@ -72,7 +72,7 @@ type MockGuestManagementServiceClient struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// In is the in argument value.
-			In *runmv1.GuestTimeSyncRequest
+			In *vmmv1.GuestTimeSyncRequest
 			// Opts is the opts argument value.
 			Opts []grpc.CallOption
 		}
@@ -83,13 +83,13 @@ type MockGuestManagementServiceClient struct {
 }
 
 // GuestReadiness calls GuestReadinessFunc.
-func (mock *MockGuestManagementServiceClient) GuestReadiness(ctx context.Context, in *runmv1.GuestReadinessRequest, opts ...grpc.CallOption) (*runmv1.GuestReadinessResponse, error) {
+func (mock *MockGuestManagementServiceClient) GuestReadiness(ctx context.Context, in *vmmv1.GuestReadinessRequest, opts ...grpc.CallOption) (*vmmv1.GuestReadinessResponse, error) {
 	if mock.GuestReadinessFunc == nil {
 		panic("MockGuestManagementServiceClient.GuestReadinessFunc: method is nil but GuestManagementServiceClient.GuestReadiness was just called")
 	}
 	callInfo := struct {
 		Ctx  context.Context
-		In   *runmv1.GuestReadinessRequest
+		In   *vmmv1.GuestReadinessRequest
 		Opts []grpc.CallOption
 	}{
 		Ctx:  ctx,
@@ -108,12 +108,12 @@ func (mock *MockGuestManagementServiceClient) GuestReadiness(ctx context.Context
 //	len(mockedGuestManagementServiceClient.GuestReadinessCalls())
 func (mock *MockGuestManagementServiceClient) GuestReadinessCalls() []struct {
 	Ctx  context.Context
-	In   *runmv1.GuestReadinessRequest
+	In   *vmmv1.GuestReadinessRequest
 	Opts []grpc.CallOption
 } {
 	var calls []struct {
 		Ctx  context.Context
-		In   *runmv1.GuestReadinessRequest
+		In   *vmmv1.GuestReadinessRequest
 		Opts []grpc.CallOption
 	}
 	mock.lockGuestReadiness.RLock()
@@ -123,13 +123,13 @@ func (mock *MockGuestManagementServiceClient) GuestReadinessCalls() []struct {
 }
 
 // GuestRunCommand calls GuestRunCommandFunc.
-func (mock *MockGuestManagementServiceClient) GuestRunCommand(ctx context.Context, in *runmv1.GuestRunCommandRequest, opts ...grpc.CallOption) (*runmv1.GuestRunCommandResponse, error) {
+func (mock *MockGuestManagementServiceClient) GuestRunCommand(ctx context.Context, in *vmmv1.GuestRunCommandRequest, opts ...grpc.CallOption) (*vmmv1.GuestRunCommandResponse, error) {
 	if mock.GuestRunCommandFunc == nil {
 		panic("MockGuestManagementServiceClient.GuestRunCommandFunc: method is nil but GuestManagementServiceClient.GuestRunCommand was just called")
 	}
 	callInfo := struct {
 		Ctx  context.Context
-		In   *runmv1.GuestRunCommandRequest
+		In   *vmmv1.GuestRunCommandRequest
 		Opts []grpc.CallOption
 	}{
 		Ctx:  ctx,
@@ -148,12 +148,12 @@ func (mock *MockGuestManagementServiceClient) GuestRunCommand(ctx context.Contex
 //	len(mockedGuestManagementServiceClient.GuestRunCommandCalls())
 func (mock *MockGuestManagementServiceClient) GuestRunCommandCalls() []struct {
 	Ctx  context.Context
-	In   *runmv1.GuestRunCommandRequest
+	In   *vmmv1.GuestRunCommandRequest
 	Opts []grpc.CallOption
 } {
 	var calls []struct {
 		Ctx  context.Context
-		In   *runmv1.GuestRunCommandRequest
+		In   *vmmv1.GuestRunCommandRequest
 		Opts []grpc.CallOption
 	}
 	mock.lockGuestRunCommand.RLock()
@@ -163,13 +163,13 @@ func (mock *MockGuestManagementServiceClient) GuestRunCommandCalls() []struct {
 }
 
 // GuestTimeSync calls GuestTimeSyncFunc.
-func (mock *MockGuestManagementServiceClient) GuestTimeSync(ctx context.Context, in *runmv1.GuestTimeSyncRequest, opts ...grpc.CallOption) (*runmv1.GuestTimeSyncResponse, error) {
+func (mock *MockGuestManagementServiceClient) GuestTimeSync(ctx context.Context, in *vmmv1.GuestTimeSyncRequest, opts ...grpc.CallOption) (*vmmv1.GuestTimeSyncResponse, error) {
 	if mock.GuestTimeSyncFunc == nil {
 		panic("MockGuestManagementServiceClient.GuestTimeSyncFunc: method is nil but GuestManagementServiceClient.GuestTimeSync was just called")
 	}
 	callInfo := struct {
 		Ctx  context.Context
-		In   *runmv1.GuestTimeSyncRequest
+		In   *vmmv1.GuestTimeSyncRequest
 		Opts []grpc.CallOption
 	}{
 		Ctx:  ctx,
@@ -188,12 +188,12 @@ func (mock *MockGuestManagementServiceClient) GuestTimeSync(ctx context.Context,
 //	len(mockedGuestManagementServiceClient.GuestTimeSyncCalls())
 func (mock *MockGuestManagementServiceClient) GuestTimeSyncCalls() []struct {
 	Ctx  context.Context
-	In   *runmv1.GuestTimeSyncRequest
+	In   *vmmv1.GuestTimeSyncRequest
 	Opts []grpc.CallOption
 } {
 	var calls []struct {
 		Ctx  context.Context
-		In   *runmv1.GuestTimeSyncRequest
+		In   *vmmv1.GuestTimeSyncRequest
 		Opts []grpc.CallOption
 	}
 	mock.lockGuestTimeSync.RLock()

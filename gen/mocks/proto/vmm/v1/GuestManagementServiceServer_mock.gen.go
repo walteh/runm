@@ -2,49 +2,49 @@
 // github.com/vektra/mockery
 // template: matryer
 
-package mockrunmv1
+package mockvmmv1
 
 import (
 	"context"
 	"sync"
 
-	"github.com/walteh/runm/proto/v1"
+	"github.com/walteh/runm/proto/vmm/v1"
 )
 
-// Ensure that MockGuestManagementServiceServer does implement runmv1.GuestManagementServiceServer.
+// Ensure that MockGuestManagementServiceServer does implement vmmv1.GuestManagementServiceServer.
 // If this is not the case, regenerate this file with mockery.
-var _ runmv1.GuestManagementServiceServer = &MockGuestManagementServiceServer{}
+var _ vmmv1.GuestManagementServiceServer = &MockGuestManagementServiceServer{}
 
-// MockGuestManagementServiceServer is a mock implementation of runmv1.GuestManagementServiceServer.
+// MockGuestManagementServiceServer is a mock implementation of vmmv1.GuestManagementServiceServer.
 //
 //	func TestSomethingThatUsesGuestManagementServiceServer(t *testing.T) {
 //
-//		// make and configure a mocked runmv1.GuestManagementServiceServer
+//		// make and configure a mocked vmmv1.GuestManagementServiceServer
 //		mockedGuestManagementServiceServer := &MockGuestManagementServiceServer{
-//			GuestReadinessFunc: func(context1 context.Context, guestReadinessRequest *runmv1.GuestReadinessRequest) (*runmv1.GuestReadinessResponse, error) {
+//			GuestReadinessFunc: func(context1 context.Context, guestReadinessRequest *vmmv1.GuestReadinessRequest) (*vmmv1.GuestReadinessResponse, error) {
 //				panic("mock out the GuestReadiness method")
 //			},
-//			GuestRunCommandFunc: func(context1 context.Context, guestRunCommandRequest *runmv1.GuestRunCommandRequest) (*runmv1.GuestRunCommandResponse, error) {
+//			GuestRunCommandFunc: func(context1 context.Context, guestRunCommandRequest *vmmv1.GuestRunCommandRequest) (*vmmv1.GuestRunCommandResponse, error) {
 //				panic("mock out the GuestRunCommand method")
 //			},
-//			GuestTimeSyncFunc: func(context1 context.Context, guestTimeSyncRequest *runmv1.GuestTimeSyncRequest) (*runmv1.GuestTimeSyncResponse, error) {
+//			GuestTimeSyncFunc: func(context1 context.Context, guestTimeSyncRequest *vmmv1.GuestTimeSyncRequest) (*vmmv1.GuestTimeSyncResponse, error) {
 //				panic("mock out the GuestTimeSync method")
 //			},
 //		}
 //
-//		// use mockedGuestManagementServiceServer in code that requires runmv1.GuestManagementServiceServer
+//		// use mockedGuestManagementServiceServer in code that requires vmmv1.GuestManagementServiceServer
 //		// and then make assertions.
 //
 //	}
 type MockGuestManagementServiceServer struct {
 	// GuestReadinessFunc mocks the GuestReadiness method.
-	GuestReadinessFunc func(context1 context.Context, guestReadinessRequest *runmv1.GuestReadinessRequest) (*runmv1.GuestReadinessResponse, error)
+	GuestReadinessFunc func(context1 context.Context, guestReadinessRequest *vmmv1.GuestReadinessRequest) (*vmmv1.GuestReadinessResponse, error)
 
 	// GuestRunCommandFunc mocks the GuestRunCommand method.
-	GuestRunCommandFunc func(context1 context.Context, guestRunCommandRequest *runmv1.GuestRunCommandRequest) (*runmv1.GuestRunCommandResponse, error)
+	GuestRunCommandFunc func(context1 context.Context, guestRunCommandRequest *vmmv1.GuestRunCommandRequest) (*vmmv1.GuestRunCommandResponse, error)
 
 	// GuestTimeSyncFunc mocks the GuestTimeSync method.
-	GuestTimeSyncFunc func(context1 context.Context, guestTimeSyncRequest *runmv1.GuestTimeSyncRequest) (*runmv1.GuestTimeSyncResponse, error)
+	GuestTimeSyncFunc func(context1 context.Context, guestTimeSyncRequest *vmmv1.GuestTimeSyncRequest) (*vmmv1.GuestTimeSyncResponse, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -53,21 +53,21 @@ type MockGuestManagementServiceServer struct {
 			// Context1 is the context1 argument value.
 			Context1 context.Context
 			// GuestReadinessRequest is the guestReadinessRequest argument value.
-			GuestReadinessRequest *runmv1.GuestReadinessRequest
+			GuestReadinessRequest *vmmv1.GuestReadinessRequest
 		}
 		// GuestRunCommand holds details about calls to the GuestRunCommand method.
 		GuestRunCommand []struct {
 			// Context1 is the context1 argument value.
 			Context1 context.Context
 			// GuestRunCommandRequest is the guestRunCommandRequest argument value.
-			GuestRunCommandRequest *runmv1.GuestRunCommandRequest
+			GuestRunCommandRequest *vmmv1.GuestRunCommandRequest
 		}
 		// GuestTimeSync holds details about calls to the GuestTimeSync method.
 		GuestTimeSync []struct {
 			// Context1 is the context1 argument value.
 			Context1 context.Context
 			// GuestTimeSyncRequest is the guestTimeSyncRequest argument value.
-			GuestTimeSyncRequest *runmv1.GuestTimeSyncRequest
+			GuestTimeSyncRequest *vmmv1.GuestTimeSyncRequest
 		}
 	}
 	lockGuestReadiness  sync.RWMutex
@@ -76,13 +76,13 @@ type MockGuestManagementServiceServer struct {
 }
 
 // GuestReadiness calls GuestReadinessFunc.
-func (mock *MockGuestManagementServiceServer) GuestReadiness(context1 context.Context, guestReadinessRequest *runmv1.GuestReadinessRequest) (*runmv1.GuestReadinessResponse, error) {
+func (mock *MockGuestManagementServiceServer) GuestReadiness(context1 context.Context, guestReadinessRequest *vmmv1.GuestReadinessRequest) (*vmmv1.GuestReadinessResponse, error) {
 	if mock.GuestReadinessFunc == nil {
 		panic("MockGuestManagementServiceServer.GuestReadinessFunc: method is nil but GuestManagementServiceServer.GuestReadiness was just called")
 	}
 	callInfo := struct {
 		Context1              context.Context
-		GuestReadinessRequest *runmv1.GuestReadinessRequest
+		GuestReadinessRequest *vmmv1.GuestReadinessRequest
 	}{
 		Context1:              context1,
 		GuestReadinessRequest: guestReadinessRequest,
@@ -99,11 +99,11 @@ func (mock *MockGuestManagementServiceServer) GuestReadiness(context1 context.Co
 //	len(mockedGuestManagementServiceServer.GuestReadinessCalls())
 func (mock *MockGuestManagementServiceServer) GuestReadinessCalls() []struct {
 	Context1              context.Context
-	GuestReadinessRequest *runmv1.GuestReadinessRequest
+	GuestReadinessRequest *vmmv1.GuestReadinessRequest
 } {
 	var calls []struct {
 		Context1              context.Context
-		GuestReadinessRequest *runmv1.GuestReadinessRequest
+		GuestReadinessRequest *vmmv1.GuestReadinessRequest
 	}
 	mock.lockGuestReadiness.RLock()
 	calls = mock.calls.GuestReadiness
@@ -112,13 +112,13 @@ func (mock *MockGuestManagementServiceServer) GuestReadinessCalls() []struct {
 }
 
 // GuestRunCommand calls GuestRunCommandFunc.
-func (mock *MockGuestManagementServiceServer) GuestRunCommand(context1 context.Context, guestRunCommandRequest *runmv1.GuestRunCommandRequest) (*runmv1.GuestRunCommandResponse, error) {
+func (mock *MockGuestManagementServiceServer) GuestRunCommand(context1 context.Context, guestRunCommandRequest *vmmv1.GuestRunCommandRequest) (*vmmv1.GuestRunCommandResponse, error) {
 	if mock.GuestRunCommandFunc == nil {
 		panic("MockGuestManagementServiceServer.GuestRunCommandFunc: method is nil but GuestManagementServiceServer.GuestRunCommand was just called")
 	}
 	callInfo := struct {
 		Context1               context.Context
-		GuestRunCommandRequest *runmv1.GuestRunCommandRequest
+		GuestRunCommandRequest *vmmv1.GuestRunCommandRequest
 	}{
 		Context1:               context1,
 		GuestRunCommandRequest: guestRunCommandRequest,
@@ -135,11 +135,11 @@ func (mock *MockGuestManagementServiceServer) GuestRunCommand(context1 context.C
 //	len(mockedGuestManagementServiceServer.GuestRunCommandCalls())
 func (mock *MockGuestManagementServiceServer) GuestRunCommandCalls() []struct {
 	Context1               context.Context
-	GuestRunCommandRequest *runmv1.GuestRunCommandRequest
+	GuestRunCommandRequest *vmmv1.GuestRunCommandRequest
 } {
 	var calls []struct {
 		Context1               context.Context
-		GuestRunCommandRequest *runmv1.GuestRunCommandRequest
+		GuestRunCommandRequest *vmmv1.GuestRunCommandRequest
 	}
 	mock.lockGuestRunCommand.RLock()
 	calls = mock.calls.GuestRunCommand
@@ -148,13 +148,13 @@ func (mock *MockGuestManagementServiceServer) GuestRunCommandCalls() []struct {
 }
 
 // GuestTimeSync calls GuestTimeSyncFunc.
-func (mock *MockGuestManagementServiceServer) GuestTimeSync(context1 context.Context, guestTimeSyncRequest *runmv1.GuestTimeSyncRequest) (*runmv1.GuestTimeSyncResponse, error) {
+func (mock *MockGuestManagementServiceServer) GuestTimeSync(context1 context.Context, guestTimeSyncRequest *vmmv1.GuestTimeSyncRequest) (*vmmv1.GuestTimeSyncResponse, error) {
 	if mock.GuestTimeSyncFunc == nil {
 		panic("MockGuestManagementServiceServer.GuestTimeSyncFunc: method is nil but GuestManagementServiceServer.GuestTimeSync was just called")
 	}
 	callInfo := struct {
 		Context1             context.Context
-		GuestTimeSyncRequest *runmv1.GuestTimeSyncRequest
+		GuestTimeSyncRequest *vmmv1.GuestTimeSyncRequest
 	}{
 		Context1:             context1,
 		GuestTimeSyncRequest: guestTimeSyncRequest,
@@ -171,11 +171,11 @@ func (mock *MockGuestManagementServiceServer) GuestTimeSync(context1 context.Con
 //	len(mockedGuestManagementServiceServer.GuestTimeSyncCalls())
 func (mock *MockGuestManagementServiceServer) GuestTimeSyncCalls() []struct {
 	Context1             context.Context
-	GuestTimeSyncRequest *runmv1.GuestTimeSyncRequest
+	GuestTimeSyncRequest *vmmv1.GuestTimeSyncRequest
 } {
 	var calls []struct {
 		Context1             context.Context
-		GuestTimeSyncRequest *runmv1.GuestTimeSyncRequest
+		GuestTimeSyncRequest *vmmv1.GuestTimeSyncRequest
 	}
 	mock.lockGuestTimeSync.RLock()
 	calls = mock.calls.GuestTimeSync

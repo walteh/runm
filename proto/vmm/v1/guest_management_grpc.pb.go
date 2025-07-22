@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             (unknown)
-// source: v1/management.proto
+// source: vmm/v1/guest_management.proto
 
-package runmv1
+package vmmv1
 
 import (
 	context "context"
@@ -19,9 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	GuestManagementService_GuestTimeSync_FullMethodName   = "/runm.v1.GuestManagementService/GuestTimeSync"
-	GuestManagementService_GuestReadiness_FullMethodName  = "/runm.v1.GuestManagementService/GuestReadiness"
-	GuestManagementService_GuestRunCommand_FullMethodName = "/runm.v1.GuestManagementService/GuestRunCommand"
+	GuestManagementService_GuestTimeSync_FullMethodName   = "/runm.vmm.v1.GuestManagementService/GuestTimeSync"
+	GuestManagementService_GuestReadiness_FullMethodName  = "/runm.vmm.v1.GuestManagementService/GuestReadiness"
+	GuestManagementService_GuestRunCommand_FullMethodName = "/runm.vmm.v1.GuestManagementService/GuestRunCommand"
 )
 
 // GuestManagementServiceClient is the client API for GuestManagementService service.
@@ -174,7 +174,7 @@ func _GuestManagementService_GuestRunCommand_Handler(srv interface{}, ctx contex
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var GuestManagementService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "runm.v1.GuestManagementService",
+	ServiceName: "runm.vmm.v1.GuestManagementService",
 	HandlerType: (*GuestManagementServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -191,5 +191,5 @@ var GuestManagementService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "v1/management.proto",
+	Metadata: "vmm/v1/guest_management.proto",
 }

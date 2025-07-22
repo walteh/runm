@@ -1,6 +1,6 @@
 //go:build !windows
 
-package server
+package managerserver
 
 import (
 	"bytes"
@@ -14,24 +14,32 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	runmv1 "github.com/walteh/runm/proto/v1"
+	vmmv1 "github.com/walteh/runm/proto/vmm/v1"
 )
 
-var _ runmv1.GuestManagementServiceServer = (*Server)(nil)
+var _ vmmv1.GuestManagementServiceServer = (*Server)(nil)
 
-// GuestReadiness implements runmv1.GuestManagementServiceServer.
-func (s *Server) GuestReadiness(context.Context, *runmv1.GuestReadinessRequest) (*runmv1.GuestReadinessResponse, error) {
-	res := &runmv1.GuestReadinessResponse{}
+type Server struct {
+}
+
+func Register(s *grpc.Server) {
+	vmmv1.RegisterGuestManagementServiceServer(s, &Server{})
+}
+
+// GuestReadiness implements vmmv1.GuestManagementServiceServer.
+func (s *Server) GuestReadiness(context.Context, *vmmv1.GuestReadinessRequest) (*vmmv1.GuestReadinessResponse, error) {
+	res := &vmmv1.GuestReadinessResponse{}
 	res.SetReady(true)
 	return res, nil
 }
 
-// GuestRunCommand implements runmv1.GuestManagementServiceServer.
-func (s *Server) GuestRunCommand(ctx context.Context, req *runmv1.GuestRunCommandRequest) (*runmv1.GuestRunCommandResponse, error) {
-	res := &runmv1.GuestRunCommandResponse{}
+// GuestRunCommand implements vmmv1.GuestManagementServiceServer.
+func (s *Server) GuestRunCommand(ctx context.Context, req *vmmv1.GuestRunCommandRequest) (*vmmv1.GuestRunCommandResponse, error) {
+	res := &vmmv1.GuestRunCommandResponse{}
 	stderr := &bytes.Buffer{}
 	stdout := &bytes.Buffer{}
 	cmd := exec.CommandContext(ctx, req.GetArgc(), req.GetArgv()...)
@@ -90,9 +98,9 @@ func formatTimeDiff(after, before uint64) (int64, string) {
 	return diff, diffString
 }
 
-// GuestTimeSync implements runmv1.GuestManagementServiceServer.
-func (s *Server) GuestTimeSync(ctx context.Context, req *runmv1.GuestTimeSyncRequest) (*runmv1.GuestTimeSyncResponse, error) {
-	res := &runmv1.GuestTimeSyncResponse{}
+// GuestTimeSync implements vmmv1.GuestManagementServiceServer.
+func (s *Server) GuestTimeSync(ctx context.Context, req *vmmv1.GuestTimeSyncRequest) (*vmmv1.GuestTimeSyncResponse, error) {
+	res := &vmmv1.GuestTimeSyncResponse{}
 	beforeNano := uint64(time.Now().UnixNano())
 	requestedNano := uint64(req.GetUnixTimeNs())
 

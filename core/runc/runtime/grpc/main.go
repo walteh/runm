@@ -18,11 +18,10 @@ import (
 )
 
 var (
-	_ runtime.Runtime         = (*GRPCClientRuntime)(nil)
-	_ runtime.RuntimeExtras   = (*GRPCClientRuntime)(nil)
-	_ runtime.CgroupAdapter   = (*GRPCClientRuntime)(nil)
-	_ runtime.EventHandler    = (*GRPCClientRuntime)(nil)
-	_ runtime.GuestManagement = (*GRPCClientRuntime)(nil)
+	_ runtime.Runtime       = (*GRPCClientRuntime)(nil)
+	_ runtime.RuntimeExtras = (*GRPCClientRuntime)(nil)
+	_ runtime.CgroupAdapter = (*GRPCClientRuntime)(nil)
+	_ runtime.EventHandler  = (*GRPCClientRuntime)(nil)
 )
 
 // Client is a client for the runc service.
@@ -30,7 +29,6 @@ var (
 type GRPCClientRuntime struct {
 	runtimeGrpcService        runmv1.RuncServiceClient
 	runtimeExtrasGprcService  runmv1.RuncExtrasServiceClient
-	guestManagmentService     runmv1.GuestManagementServiceClient
 	guestCgroupAdapterService runmv1.CgroupAdapterServiceClient
 	eventService              runmv1.EventServiceClient
 
@@ -71,7 +69,6 @@ func NewGRPCClientRuntimeFromConn(conn *grpc.ClientConn) (*GRPCClientRuntime, er
 		runtimeGrpcService:         runmv1.NewRuncServiceClient(conn),
 		runtimeExtrasGprcService:   runmv1.NewRuncExtrasServiceClient(conn),
 		socketAllocatorGrpcService: runmv1.NewSocketAllocatorServiceClient(conn),
-		guestManagmentService:      runmv1.NewGuestManagementServiceClient(conn),
 		guestCgroupAdapterService:  runmv1.NewCgroupAdapterServiceClient(conn),
 		eventService:               runmv1.NewEventServiceClient(conn),
 		conn:                       conn,
@@ -83,10 +80,6 @@ func NewGRPCClientRuntimeFromConn(conn *grpc.ClientConn) (*GRPCClientRuntime, er
 
 func (me *GRPCClientRuntime) SetVsockProxier(proxier runtime.VsockProxier) {
 	me.vsockProxier = proxier
-}
-
-func (me *GRPCClientRuntime) Management() runmv1.GuestManagementServiceClient {
-	return me.guestManagmentService
 }
 
 func (me *GRPCClientRuntime) Runtime() runmv1.RuncServiceClient {

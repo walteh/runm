@@ -1,13 +1,13 @@
 edition = "2023";
 
-package runm.v1;
+package runm.vmm.v1;
 
 import "google/protobuf/go_features.proto";
 
 option features.(pb.go).api_level = API_OPAQUE;
 option features.field_presence = IMPLICIT;  // makes everything by default required, for optional set to EXPLICIT
 
-service HostService {
+service HostCallbackService {
 	rpc ForkExecProxy(ForkExecProxyRequest) returns (ForkExecProxyResponse) {}
 }
 

@@ -44,6 +44,7 @@ import (
 	"github.com/walteh/runm/core/runc/runtime"
 	"github.com/walteh/runm/core/runc/runtime/gorunc/reaper"
 	"github.com/walteh/runm/core/runc/server"
+	"github.com/walteh/runm/core/virt/guest/managerserver"
 	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/pkg/logging"
@@ -317,7 +318,14 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 	}()
 
 	taskgroupz.GoWithName("grpc-vsock-server", func(ctx context.Context) error {
-		return r.runGrpcVsockServer(ctx)
+		grpcVsockServer, _, err := r.configureRuntimeServer(ctx)
+		if err != nil {
+			return errors.Errorf("problem configuring runtime server: %w", err)
+		}
+
+		managerserver.Register(grpcVsockServer)
+
+		return r.runGrpcVsockServer(ctx, grpcVsockServer)
 	})
 
 	taskgroupz.GoWithName("pprof-vsock-server", func(ctx context.Context) error {
@@ -452,7 +460,7 @@ func (r *runmLinuxInit) configureRuntimeServer(ctx context.Context) (*grpc.Serve
 	return grpcVsockServer, serverz, nil
 }
 
-func (r *runmLinuxInit) runGrpcVsockServer(ctx context.Context) error {
+func (r *runmLinuxInit) runGrpcVsockServer(ctx context.Context, server *grpc.Server) error {
 	slog.InfoContext(ctx, "listening on vsock", "port", constants.RunmGuestServerVsockPort)
 	listener, err := vsock.ListenContextID(3, uint32(constants.RunmGuestServerVsockPort), nil)
 	if err != nil {
@@ -460,12 +468,7 @@ func (r *runmLinuxInit) runGrpcVsockServer(ctx context.Context) error {
 		return errors.Errorf("problem listening vsock: %w", err)
 	}
 
-	grpcVsockServer, _, err := r.configureRuntimeServer(ctx)
-	if err != nil {
-		return errors.Errorf("problem configuring runtime server: %w", err)
-	}
-
-	if err := grpcVsockServer.Serve(listener); err != nil {
+	if err := server.Serve(listener); err != nil {
 		return errors.Errorf("problem serving grpc vsock server: %w", err)
 	}
 

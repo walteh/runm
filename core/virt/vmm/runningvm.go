@@ -28,7 +28,7 @@ import (
 	"github.com/walteh/runm/pkg/logging/otel"
 	"github.com/walteh/runm/pkg/taskgroup"
 
-	runmv1 "github.com/walteh/runm/proto/v1"
+	vmmv1 "github.com/walteh/runm/proto/vmm/v1"
 )
 
 type RunningVM[VM VirtualMachine] struct {
@@ -49,7 +49,7 @@ type RunningVM[VM VirtualMachine] struct {
 	msockBinds   map[string]uint16
 }
 
-func (r *RunningVM[VM]) GuestService(ctx context.Context) (runmv1.GuestManagementServiceClient, error) {
+func (r *RunningVM[VM]) GuestService(ctx context.Context) (vmmv1.GuestManagementServiceClient, error) {
 	slog.InfoContext(ctx, "getting guest service", "id", r.vm.ID())
 
 	conn, err := r.GuestVsockConn(ctx)
@@ -57,7 +57,7 @@ func (r *RunningVM[VM]) GuestService(ctx context.Context) (runmv1.GuestManagemen
 		return nil, errors.Errorf("getting guest vsock conn: %w", err)
 	}
 
-	return runmv1.NewGuestManagementServiceClient(conn), nil
+	return vmmv1.NewGuestManagementServiceClient(conn), nil
 
 }
 
@@ -267,7 +267,7 @@ func (r *RunningVM[VM]) RunCommandSimple(ctx context.Context, command string) ([
 	// req, err := harpoonv1.NewValidatedRunRequest(func(b *harpoonv1.RunRequest_builder) {
 	// 	// b.Stdin = stdinData
 	// })
-	req, err := runmv1.NewGuestRunCommandRequestE(&runmv1.GuestRunCommandRequest_builder{
+	req, err := vmmv1.NewGuestRunCommandRequestE(&vmmv1.GuestRunCommandRequest_builder{
 		Argc:    argc,
 		Argv:    argv,
 		EnvVars: map[string]string{},
@@ -492,7 +492,7 @@ func (rvm *RunningVM[VM]) RunInitalTimesyncRequests(ctx context.Context) error {
 
 	slog.InfoContext(ctx, "got guest service - making time sync request to management service")
 
-	tsreq := &runmv1.GuestTimeSyncRequest{}
+	tsreq := &vmmv1.GuestTimeSyncRequest{}
 	tsreq.SetUnixTimeNs(uint64(now.UnixNano()))
 	// tsreq.SetTimezone(fmt.Sprintf("%s%d", zone, offset))
 	response, err := connection.GuestTimeSync(ctx, tsreq)
@@ -530,7 +530,7 @@ func (rvm *RunningVM[VM]) SetupHostService(ctx context.Context) error {
 		grpcerr.GetGrpcServerOpts(),
 	)
 
-	runmv1.RegisterHostServiceServer(grpcServer, rvm)
+	vmmv1.RegisterHostCallbackServiceServer(grpcServer, rvm)
 
 	err = grpcServer.Serve(vsockListener)
 	if err != nil {

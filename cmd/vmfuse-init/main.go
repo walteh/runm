@@ -12,19 +12,28 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/mdlayher/vsock"
 	"gitlab.com/tozd/go/errors"
+	"google.golang.org/grpc"
 
 	slogctx "github.com/veqryn/slog-context"
 
+	"github.com/walteh/runm/core/virt/guest/managerserver"
 	"github.com/walteh/runm/linux/constants"
+	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/pkg/logging"
 	"github.com/walteh/runm/pkg/logging/otel"
+	"github.com/walteh/runm/pkg/taskgroup"
+	"github.com/walteh/runm/pkg/ticker"
 )
 
 var (
@@ -43,6 +52,7 @@ type vmfuseInit struct {
 	logWriter  io.WriteCloser
 	otelWriter io.WriteCloser
 	logger     *slog.Logger
+	cancel     context.CancelFunc
 }
 
 func init() {
@@ -74,6 +84,12 @@ func main() {
 	defer cancel()
 
 	vmfuseInit := &vmfuseInit{}
+
+	defer func() {
+		if vmfuseInit.cancel != nil {
+			vmfuseInit.cancel()
+		}
+	}()
 
 	ctx, err := vmfuseInit.setupLogger(ctx)
 	if err != nil {
@@ -146,6 +162,22 @@ func recoveryMain(ctx context.Context, v *vmfuseInit) (err error) {
 	return <-errChan
 }
 
+func handleExitSignals(ctx context.Context, cancel context.CancelFunc) {
+	ch := make(chan os.Signal, 32)
+	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+
+	for {
+		select {
+		case s := <-ch:
+			slog.InfoContext(ctx, "Caught exit signal", "signal", s)
+			cancel()
+			return
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
 func (v *vmfuseInit) run(ctx context.Context) error {
 	slog.InfoContext(ctx, "starting vmfuse-init",
 		"mount_type", mountType,
@@ -153,6 +185,52 @@ func (v *vmfuseInit) run(ctx context.Context) error {
 		"mount_target", mountTarget,
 		"export_path", exportPath,
 		"ready_file", readyFile)
+
+	defer ticker.NewTicker(
+		ticker.WithMessage("VMFUSE:INIT[RUNNING]"),
+		ticker.WithDoneMessage("VMFUSE:INIT[DONE]"),
+		ticker.WithSlogBaseContext(ctx),
+		ticker.WithLogLevel(slog.LevelDebug),
+		ticker.WithFrequency(15),
+		ticker.WithStartBurst(5),
+		ticker.WithAttrFunc(func() []slog.Attr {
+			return []slog.Attr{
+				slog.Int("pid", os.Getpid()),
+				slog.String("gomaxprocs", strconv.Itoa(runtime.GOMAXPROCS(0))),
+			}
+		}),
+	).RunAsDefer()()
+
+	ctx, cancel := context.WithCancel(ctx)
+	go handleExitSignals(ctx, cancel)
+
+	v.cancel = cancel
+	// Create TaskGroup with pprof enabled and custom labels
+	taskgroupz := taskgroup.NewTaskGroup(ctx,
+		taskgroup.WithName("vmfuse-init"),
+		taskgroup.WithEnablePprof(true),
+		taskgroup.WithPprofLabels(map[string]string{
+			"service":   serviceName,
+			"runm-mode": "vmfuse",
+		}),
+		taskgroup.WithLogStart(true),
+		taskgroup.WithLogEnd(true),
+		taskgroup.WithLogTaskStart(false),
+		taskgroup.WithLogTaskEnd(false),
+		taskgroup.WithSlogBaseContext(ctx),
+	)
+
+	taskgroupz.GoWithName("grpc-vsock-server", func(ctx context.Context) error {
+
+		server := grpc.NewServer(
+			grpcerr.GetGrpcServerOptsCtx(ctx),
+			otel.GetGrpcServerOpts(),
+		)
+
+		managerserver.Register(server)
+
+		return v.runGrpcVsockServer(ctx, server)
+	})
 
 	// Setup basic mounts needed for Linux environment
 	if err := v.setupBasicMounts(ctx); err != nil {
@@ -169,9 +247,9 @@ func (v *vmfuseInit) run(ctx context.Context) error {
 		return errors.Errorf("performing mount: %w", err)
 	}
 
-	// Setup and start NFS server
-	if err := v.setupNFS(ctx); err != nil {
-		return errors.Errorf("setting up NFS: %w", err)
+	// Setup and start Ganesha NFS server
+	if err := v.setupGaneshaNFS(ctx); err != nil {
+		return errors.Errorf("setting up Ganesha NFS: %w", err)
 	}
 
 	// Signal readiness
@@ -180,10 +258,8 @@ func (v *vmfuseInit) run(ctx context.Context) error {
 	}
 
 	// Keep running to serve NFS
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	}
+	<-ctx.Done()
+	return ctx.Err()
 }
 
 func (v *vmfuseInit) setupBasicMounts(ctx context.Context) error {
@@ -261,46 +337,114 @@ func (v *vmfuseInit) performMount(ctx context.Context) error {
 	}
 }
 
-func (v *vmfuseInit) setupNFS(ctx context.Context) error {
-	// Create NFS export directory
-	// if err := os.MkdirAll(exportPath, 0755); err != nil {
-	// 	return errors.Errorf("creating export path: %w", err)
-	// }
-
-	// // // Create /etc/exports
-	// if err := os.MkdirAll("/etc", 0755); err != nil {
-	// 	return errors.Errorf("creating /etc directory: %w", err)
-	// }
-
-	// exportsContent := fmt.Sprintf("%s *(rw,sync,no_subtree_check,no_root_squash,fsid=0)\n", mountTarget)
-	// if err := os.WriteFile("/etc/exports", []byte(exportsContent), 0644); err != nil {
-	// 	return errors.Errorf("writing /etc/exports: %w", err)
-	// }
-
-	// slog.InfoContext(ctx, "created NFS exports", "content", exportsContent)
-
-	// // Start NFS kernel server
-	// go func() {
-	// 	// if err := ExecCmdForwardingStdio(ctx, "nfsd", "8"); err != nil {
-	// 	// 	slog.ErrorContext(ctx, "failed to start NFS server", "error", err)
-	// 	// }
-	// 	if err := startNFS(ctx, 8); err != nil {
-	// 		slog.ErrorContext(ctx, "failed to start NFS server", "error", err)
-	// 	}
-	// }()
-
-	if err := exportNfsDir(ctx, mountTarget, 8); err != nil {
-		return errors.Errorf("exporting path: %w", err)
+func (v *vmfuseInit) runGrpcVsockServer(ctx context.Context, server *grpc.Server) error {
+	slog.InfoContext(ctx, "listening on vsock", "port", constants.RunmGuestServerVsockPort)
+	listener, err := vsock.ListenContextID(3, uint32(constants.RunmGuestServerVsockPort), nil)
+	if err != nil {
+		slog.ErrorContext(ctx, "problem listening vsock", "error", err)
+		return errors.Errorf("problem listening vsock: %w", err)
 	}
 
-	// Export filesystems
-	// if err := ExecCmdForwardingStdio(ctx, "exportfs", "-ra"); err != nil {
-	// 	return errors.Errorf("running exportfs: %w", err)
-	// }
-
-	slog.InfoContext(ctx, "NFS server started", "export_path", mountTarget)
+	if err := server.Serve(listener); err != nil {
+		return errors.Errorf("problem serving grpc vsock server: %w", err)
+	}
 
 	return nil
+}
+
+func (v *vmfuseInit) setupGaneshaNFS(ctx context.Context) error {
+	// Create Ganesha configuration directory
+	if err := os.MkdirAll("/etc/ganesha", 0755); err != nil {
+		return errors.Errorf("creating ganesha config directory: %w", err)
+	}
+
+	// Create Ganesha configuration file
+	ganeshaConfig := fmt.Sprintf(`NFS_Core_Param {
+	NFS_Protocols = 4;
+	NFS_Port = 2049;
+	RPC_Port = 111;
+	UDP_Port = 32768;
+	TCP_Port = 32768;
+	MNT_Port = 20048;
+	NLM_Port = 32803;
+	RQUOTA_Port = 875;
+	Disable_UDP = true;
+	Enable_NLM = false;
+	Enable_RQUOTA = false;
+	NSM_Use_Caller_Name = true;
+	ClusterId = "runm-ganesha";
+	Grace_Period = 90;
+}
+
+NFS_IP_Name {
+	Index_Size = 17;
+	Expiration_Time = 3600;
+}
+
+EXPORT {
+	Export_Id = 1;
+	Path = "%s";
+	Pseudo = "/";
+	Access_Type = RW;
+	Squash = No_Root_Squash;
+	Protocols = 4;
+	Transports = TCP;
+	FSAL {
+		Name = VFS;
+	}
+}
+`, mountTarget)
+
+	if err := os.WriteFile("/etc/ganesha/ganesha.conf", []byte(ganeshaConfig), 0644); err != nil {
+		return errors.Errorf("writing ganesha config: %w", err)
+	}
+
+	slog.InfoContext(ctx, "created Ganesha config", "path", "/etc/ganesha/ganesha.conf", "export_path", mountTarget)
+
+	// Set up network interfaces
+	if err := ExecCmdForwardingStdio(ctx, "ip", "link", "set", "lo", "up"); err != nil {
+		return errors.Errorf("setting up loopback: %w", err)
+	}
+
+	// Start Ganesha NFS server in background
+	go func() {
+		// Use the built Ganesha binary from /mbin/ganesha
+		if err := ExecCmdForwardingStdio(ctx, "/mbin/ganesha", "-f", "/etc/ganesha/ganesha.conf", "-L", "/dev/stdout", "-N", "NIV_EVENT"); err != nil {
+			slog.ErrorContext(ctx, "Ganesha NFS server failed", "error", err)
+		} else {
+			slog.InfoContext(ctx, "Ganesha NFS server exited cleanly")
+		}
+	}()
+
+	// Wait for Ganesha to be ready by checking if port 2049 is listening
+	if err := v.waitForGaneshaReady(ctx); err != nil {
+		return errors.Errorf("waiting for Ganesha readiness: %w", err)
+	}
+
+	slog.InfoContext(ctx, "Ganesha NFS server started", "export_path", mountTarget, "config", "/etc/ganesha/ganesha.conf")
+
+	return nil
+}
+
+func (v *vmfuseInit) waitForGaneshaReady(ctx context.Context) error {
+	// Wait for Ganesha to be ready by checking if port 2049 is listening
+	for i := range 30 { // Try for up to 30 seconds
+		conn, err := net.DialTimeout("tcp", "localhost:2049", 500*time.Millisecond)
+		if err == nil {
+			_ = conn.Close()
+			slog.InfoContext(ctx, "Ganesha NFS server is ready", "attempts", i+1)
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(1 * time.Second):
+			continue
+		}
+	}
+
+	return errors.Errorf("Ganesha NFS server did not become ready within 30 seconds")
 }
 
 func (v *vmfuseInit) signalReady(ctx context.Context) error {

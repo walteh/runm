@@ -2,9 +2,9 @@
 // versions:
 // 	protoc-gen-go v1.36.6
 // 	protoc        (unknown)
-// source: v1/management.proto
+// source: vmm/v1/guest_management.proto
 
-package runmv1
+package vmmv1
 
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
@@ -32,7 +32,7 @@ type GuestTimeSyncRequest struct {
 
 func (x *GuestTimeSyncRequest) Reset() {
 	*x = GuestTimeSyncRequest{}
-	mi := &file_v1_management_proto_msgTypes[0]
+	mi := &file_vmm_v1_guest_management_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -44,7 +44,7 @@ func (x *GuestTimeSyncRequest) String() string {
 func (*GuestTimeSyncRequest) ProtoMessage() {}
 
 func (x *GuestTimeSyncRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_management_proto_msgTypes[0]
+	mi := &file_vmm_v1_guest_management_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -102,7 +102,7 @@ type GuestTimeSyncResponse struct {
 
 func (x *GuestTimeSyncResponse) Reset() {
 	*x = GuestTimeSyncResponse{}
-	mi := &file_v1_management_proto_msgTypes[1]
+	mi := &file_vmm_v1_guest_management_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -114,7 +114,7 @@ func (x *GuestTimeSyncResponse) String() string {
 func (*GuestTimeSyncResponse) ProtoMessage() {}
 
 func (x *GuestTimeSyncResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_management_proto_msgTypes[1]
+	mi := &file_vmm_v1_guest_management_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -158,7 +158,7 @@ type GuestReadinessRequest struct {
 
 func (x *GuestReadinessRequest) Reset() {
 	*x = GuestReadinessRequest{}
-	mi := &file_v1_management_proto_msgTypes[2]
+	mi := &file_vmm_v1_guest_management_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -170,7 +170,7 @@ func (x *GuestReadinessRequest) String() string {
 func (*GuestReadinessRequest) ProtoMessage() {}
 
 func (x *GuestReadinessRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_management_proto_msgTypes[2]
+	mi := &file_vmm_v1_guest_management_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -202,7 +202,7 @@ type GuestReadinessResponse struct {
 
 func (x *GuestReadinessResponse) Reset() {
 	*x = GuestReadinessResponse{}
-	mi := &file_v1_management_proto_msgTypes[3]
+	mi := &file_vmm_v1_guest_management_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -214,7 +214,7 @@ func (x *GuestReadinessResponse) String() string {
 func (*GuestReadinessResponse) ProtoMessage() {}
 
 func (x *GuestReadinessResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_management_proto_msgTypes[3]
+	mi := &file_vmm_v1_guest_management_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -264,7 +264,7 @@ type GuestRunCommandRequest struct {
 
 func (x *GuestRunCommandRequest) Reset() {
 	*x = GuestRunCommandRequest{}
-	mi := &file_v1_management_proto_msgTypes[4]
+	mi := &file_vmm_v1_guest_management_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -276,7 +276,7 @@ func (x *GuestRunCommandRequest) String() string {
 func (*GuestRunCommandRequest) ProtoMessage() {}
 
 func (x *GuestRunCommandRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_management_proto_msgTypes[4]
+	mi := &file_vmm_v1_guest_management_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -394,7 +394,7 @@ type GuestRunCommandResponse struct {
 
 func (x *GuestRunCommandResponse) Reset() {
 	*x = GuestRunCommandResponse{}
-	mi := &file_v1_management_proto_msgTypes[5]
+	mi := &file_vmm_v1_guest_management_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -406,7 +406,7 @@ func (x *GuestRunCommandResponse) String() string {
 func (*GuestRunCommandResponse) ProtoMessage() {}
 
 func (x *GuestRunCommandResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_management_proto_msgTypes[5]
+	mi := &file_vmm_v1_guest_management_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -474,11 +474,11 @@ func (b0 GuestRunCommandResponse_builder) Build() *GuestRunCommandResponse {
 	return m0
 }
 
-var File_v1_management_proto protoreflect.FileDescriptor
+var File_vmm_v1_guest_management_proto protoreflect.FileDescriptor
 
-const file_v1_management_proto_rawDesc = "" +
+const file_vmm_v1_guest_management_proto_rawDesc = "" +
 	"\n" +
-	"\x13v1/management.proto\x12\arunm.v1\x1a\x1bbuf/validate/validate.proto\x1a!google/protobuf/go_features.proto\"d\n" +
+	"\x1dvmm/v1/guest_management.proto\x12\vrunm.vmm.v1\x1a\x1bbuf/validate/validate.proto\x1a!google/protobuf/go_features.proto\"d\n" +
 	"\x14GuestTimeSyncRequest\x12(\n" +
 	"\funix_time_ns\x18\x01 \x01(\x04B\x06\xbaH\x03\xc8\x01\x01R\n" +
 	"unixTimeNs\x12\"\n" +
@@ -487,12 +487,12 @@ const file_v1_management_proto_rawDesc = "" +
 	"\x10previous_time_ns\x18\x01 \x01(\x04B\x06\xbaH\x03\xc8\x01\x01R\x0epreviousTimeNs\"\x17\n" +
 	"\x15GuestReadinessRequest\"6\n" +
 	"\x16GuestReadinessResponse\x12\x1c\n" +
-	"\x05ready\x18\x01 \x01(\bB\x06\xbaH\x03\xc8\x01\x01R\x05ready\"\xb5\x02\n" +
+	"\x05ready\x18\x01 \x01(\bB\x06\xbaH\x03\xc8\x01\x01R\x05ready\"\xb9\x02\n" +
 	"\x16GuestRunCommandRequest\x12\x1c\n" +
 	"\x05stdin\x18\x01 \x01(\fB\x06\xbaH\x03\xc8\x01\x00R\x05stdin\x12\x1a\n" +
 	"\x04argc\x18\x02 \x01(\tB\x06\xbaH\x03\xc8\x01\x01R\x04argc\x12\x1a\n" +
-	"\x04argv\x18\x03 \x03(\tB\x06\xbaH\x03\xc8\x01\x01R\x04argv\x12O\n" +
-	"\benv_vars\x18\x04 \x03(\v2,.runm.v1.GuestRunCommandRequest.EnvVarsEntryB\x06\xbaH\x03\xc8\x01\x01R\aenvVars\x12\x1e\n" +
+	"\x04argv\x18\x03 \x03(\tB\x06\xbaH\x03\xc8\x01\x01R\x04argv\x12S\n" +
+	"\benv_vars\x18\x04 \x03(\v20.runm.vmm.v1.GuestRunCommandRequest.EnvVarsEntryB\x06\xbaH\x03\xc8\x01\x01R\aenvVars\x12\x1e\n" +
 	"\x06chroot\x18\x05 \x01(\tB\x06\xbaH\x03\xc8\x01\x00R\x06chroot\x12\x18\n" +
 	"\x03cwd\x18\x06 \x01(\tB\x06\xbaH\x03\xc8\x01\x00R\x03cwd\x1a:\n" +
 	"\fEnvVarsEntry\x12\x10\n" +
@@ -501,31 +501,31 @@ const file_v1_management_proto_rawDesc = "" +
 	"\x17GuestRunCommandResponse\x12\x1e\n" +
 	"\x06stdout\x18\x01 \x01(\fB\x06\xbaH\x03\xc8\x01\x00R\x06stdout\x12\x1e\n" +
 	"\x06stderr\x18\x02 \x01(\fB\x06\xbaH\x03\xc8\x01\x00R\x06stderr\x12#\n" +
-	"\texit_code\x18\x03 \x01(\x05B\x06\xbaH\x03\xc8\x01\x01R\bexitCode2\x91\x02\n" +
-	"\x16GuestManagementService\x12N\n" +
-	"\rGuestTimeSync\x12\x1d.runm.v1.GuestTimeSyncRequest\x1a\x1e.runm.v1.GuestTimeSyncResponse\x12Q\n" +
-	"\x0eGuestReadiness\x12\x1e.runm.v1.GuestReadinessRequest\x1a\x1f.runm.v1.GuestReadinessResponse\x12T\n" +
-	"\x0fGuestRunCommand\x12\x1f.runm.v1.GuestRunCommandRequest\x1a .runm.v1.GuestRunCommandResponseB\x8d\x01\n" +
-	"\vcom.runm.v1B\x0fManagementProtoP\x01Z&github.com/walteh/runm/proto/v1;runmv1\xa2\x02\x03RXX\xaa\x02\aRunm.V1\xca\x02\aRunm\\V1\xe2\x02\x13Runm\\V1\\GPBMetadata\xea\x02\bRunm::V1\x92\x03\a\xd2>\x02\x10\x03\b\x02b\beditionsp\xe8\a"
+	"\texit_code\x18\x03 \x01(\x05B\x06\xbaH\x03\xc8\x01\x01R\bexitCode2\xa9\x02\n" +
+	"\x16GuestManagementService\x12V\n" +
+	"\rGuestTimeSync\x12!.runm.vmm.v1.GuestTimeSyncRequest\x1a\".runm.vmm.v1.GuestTimeSyncResponse\x12Y\n" +
+	"\x0eGuestReadiness\x12\".runm.vmm.v1.GuestReadinessRequest\x1a#.runm.vmm.v1.GuestReadinessResponse\x12\\\n" +
+	"\x0fGuestRunCommand\x12#.runm.vmm.v1.GuestRunCommandRequest\x1a$.runm.vmm.v1.GuestRunCommandResponseB\xaa\x01\n" +
+	"\x0fcom.runm.vmm.v1B\x14GuestManagementProtoP\x01Z)github.com/walteh/runm/proto/vmm/v1;vmmv1\xa2\x02\x03RVX\xaa\x02\vRunm.Vmm.V1\xca\x02\vRunm\\Vmm\\V1\xe2\x02\x17Runm\\Vmm\\V1\\GPBMetadata\xea\x02\rRunm::Vmm::V1\x92\x03\a\xd2>\x02\x10\x03\b\x02b\beditionsp\xe8\a"
 
-var file_v1_management_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
-var file_v1_management_proto_goTypes = []any{
-	(*GuestTimeSyncRequest)(nil),    // 0: runm.v1.GuestTimeSyncRequest
-	(*GuestTimeSyncResponse)(nil),   // 1: runm.v1.GuestTimeSyncResponse
-	(*GuestReadinessRequest)(nil),   // 2: runm.v1.GuestReadinessRequest
-	(*GuestReadinessResponse)(nil),  // 3: runm.v1.GuestReadinessResponse
-	(*GuestRunCommandRequest)(nil),  // 4: runm.v1.GuestRunCommandRequest
-	(*GuestRunCommandResponse)(nil), // 5: runm.v1.GuestRunCommandResponse
-	nil,                             // 6: runm.v1.GuestRunCommandRequest.EnvVarsEntry
+var file_vmm_v1_guest_management_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_vmm_v1_guest_management_proto_goTypes = []any{
+	(*GuestTimeSyncRequest)(nil),    // 0: runm.vmm.v1.GuestTimeSyncRequest
+	(*GuestTimeSyncResponse)(nil),   // 1: runm.vmm.v1.GuestTimeSyncResponse
+	(*GuestReadinessRequest)(nil),   // 2: runm.vmm.v1.GuestReadinessRequest
+	(*GuestReadinessResponse)(nil),  // 3: runm.vmm.v1.GuestReadinessResponse
+	(*GuestRunCommandRequest)(nil),  // 4: runm.vmm.v1.GuestRunCommandRequest
+	(*GuestRunCommandResponse)(nil), // 5: runm.vmm.v1.GuestRunCommandResponse
+	nil,                             // 6: runm.vmm.v1.GuestRunCommandRequest.EnvVarsEntry
 }
-var file_v1_management_proto_depIdxs = []int32{
-	6, // 0: runm.v1.GuestRunCommandRequest.env_vars:type_name -> runm.v1.GuestRunCommandRequest.EnvVarsEntry
-	0, // 1: runm.v1.GuestManagementService.GuestTimeSync:input_type -> runm.v1.GuestTimeSyncRequest
-	2, // 2: runm.v1.GuestManagementService.GuestReadiness:input_type -> runm.v1.GuestReadinessRequest
-	4, // 3: runm.v1.GuestManagementService.GuestRunCommand:input_type -> runm.v1.GuestRunCommandRequest
-	1, // 4: runm.v1.GuestManagementService.GuestTimeSync:output_type -> runm.v1.GuestTimeSyncResponse
-	3, // 5: runm.v1.GuestManagementService.GuestReadiness:output_type -> runm.v1.GuestReadinessResponse
-	5, // 6: runm.v1.GuestManagementService.GuestRunCommand:output_type -> runm.v1.GuestRunCommandResponse
+var file_vmm_v1_guest_management_proto_depIdxs = []int32{
+	6, // 0: runm.vmm.v1.GuestRunCommandRequest.env_vars:type_name -> runm.vmm.v1.GuestRunCommandRequest.EnvVarsEntry
+	0, // 1: runm.vmm.v1.GuestManagementService.GuestTimeSync:input_type -> runm.vmm.v1.GuestTimeSyncRequest
+	2, // 2: runm.vmm.v1.GuestManagementService.GuestReadiness:input_type -> runm.vmm.v1.GuestReadinessRequest
+	4, // 3: runm.vmm.v1.GuestManagementService.GuestRunCommand:input_type -> runm.vmm.v1.GuestRunCommandRequest
+	1, // 4: runm.vmm.v1.GuestManagementService.GuestTimeSync:output_type -> runm.vmm.v1.GuestTimeSyncResponse
+	3, // 5: runm.vmm.v1.GuestManagementService.GuestReadiness:output_type -> runm.vmm.v1.GuestReadinessResponse
+	5, // 6: runm.vmm.v1.GuestManagementService.GuestRunCommand:output_type -> runm.vmm.v1.GuestRunCommandResponse
 	4, // [4:7] is the sub-list for method output_type
 	1, // [1:4] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name
@@ -533,26 +533,26 @@ var file_v1_management_proto_depIdxs = []int32{
 	0, // [0:1] is the sub-list for field type_name
 }
 
-func init() { file_v1_management_proto_init() }
-func file_v1_management_proto_init() {
-	if File_v1_management_proto != nil {
+func init() { file_vmm_v1_guest_management_proto_init() }
+func file_vmm_v1_guest_management_proto_init() {
+	if File_vmm_v1_guest_management_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_management_proto_rawDesc), len(file_v1_management_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_vmm_v1_guest_management_proto_rawDesc), len(file_vmm_v1_guest_management_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_v1_management_proto_goTypes,
-		DependencyIndexes: file_v1_management_proto_depIdxs,
-		MessageInfos:      file_v1_management_proto_msgTypes,
+		GoTypes:           file_vmm_v1_guest_management_proto_goTypes,
+		DependencyIndexes: file_vmm_v1_guest_management_proto_depIdxs,
+		MessageInfos:      file_vmm_v1_guest_management_proto_msgTypes,
 	}.Build()
-	File_v1_management_proto = out.File
-	file_v1_management_proto_goTypes = nil
-	file_v1_management_proto_depIdxs = nil
+	File_vmm_v1_guest_management_proto = out.File
+	file_vmm_v1_guest_management_proto_goTypes = nil
+	file_vmm_v1_guest_management_proto_depIdxs = nil
 }

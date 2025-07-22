@@ -22,11 +22,10 @@ import (
 )
 
 var (
-	_ runtime.Runtime         = (*RunmVMRuntime[vmm.VirtualMachine])(nil)
-	_ runtime.RuntimeExtras   = (*RunmVMRuntime[vmm.VirtualMachine])(nil)
-	_ runtime.CgroupAdapter   = (*RunmVMRuntime[vmm.VirtualMachine])(nil)
-	_ runtime.EventHandler    = (*RunmVMRuntime[vmm.VirtualMachine])(nil)
-	_ runtime.GuestManagement = (*RunmVMRuntime[vmm.VirtualMachine])(nil)
+	_ runtime.Runtime       = (*RunmVMRuntime[vmm.VirtualMachine])(nil)
+	_ runtime.RuntimeExtras = (*RunmVMRuntime[vmm.VirtualMachine])(nil)
+	_ runtime.CgroupAdapter = (*RunmVMRuntime[vmm.VirtualMachine])(nil)
+	_ runtime.EventHandler  = (*RunmVMRuntime[vmm.VirtualMachine])(nil)
 	// _ run.Runnable            = (*RunmVMRuntime[vmm.VirtualMachine])(nil)
 )
 
@@ -35,7 +34,6 @@ type RunmVMRuntime[VM vmm.VirtualMachine] struct {
 	runtime.RuntimeExtras
 	runtime.CgroupAdapter
 	runtime.EventHandler
-	runtime.GuestManagement
 
 	grpcConn       *grpc.ClientConn
 	spec           *specs.Spec
@@ -113,15 +111,14 @@ func NewRunmVMRuntime[VM vmm.VirtualMachine](
 	})
 
 	return &RunmVMRuntime[VM]{
-		vm:              vm,
-		spec:            cfg.Spec,
-		Runtime:         rsrv,
-		RuntimeExtras:   rsrv,
-		CgroupAdapter:   rsrv,
-		EventHandler:    rsrv,
-		closers:         closers,
-		GuestManagement: rsrv,
-		eventPublisher:  opts.Publisher,
+		vm:             vm,
+		spec:           cfg.Spec,
+		Runtime:        rsrv,
+		RuntimeExtras:  rsrv,
+		CgroupAdapter:  rsrv,
+		EventHandler:   rsrv,
+		closers:        closers,
+		eventPublisher: opts.Publisher,
 	}, nil
 }
 

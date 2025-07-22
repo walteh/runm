@@ -8,10 +8,10 @@ import (
 	"log/slog"
 	"os/exec"
 
-	runmv1 "github.com/walteh/runm/proto/v1"
+	vmmv1 "github.com/walteh/runm/proto/vmm/v1"
 )
 
-func (rvm *RunningVM[VM]) ForkExecProxy(ctx context.Context, r *runmv1.ForkExecProxyRequest) (*runmv1.ForkExecProxyResponse, error) {
+func (rvm *RunningVM[VM]) ForkExecProxy(ctx context.Context, r *vmmv1.ForkExecProxyRequest) (*vmmv1.ForkExecProxyResponse, error) {
 	slog.InfoContext(ctx, "forking exec proxy", "argc", r.GetArgc(), "argv", r.GetArgv())
 
 	stdoutz := bytes.NewBuffer(nil)
@@ -22,7 +22,7 @@ func (rvm *RunningVM[VM]) ForkExecProxy(ctx context.Context, r *runmv1.ForkExecP
 	cmd.Stdin = bytes.NewBuffer(r.GetStdin())
 	cmd.Env = r.GetEnv()
 
-	resp := &runmv1.ForkExecProxyResponse{}
+	resp := &vmmv1.ForkExecProxyResponse{}
 
 	if err := cmd.Run(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {

@@ -1,13 +1,8 @@
 package main
 
 import (
-	_ "net/http/pprof"
-
-	"github.com/containerd/containerd/v2/client"
 	_ "github.com/containerd/containerd/v2/cmd/containerd/builtins"
-	"github.com/moby/buildkit/frontend/gateway/grpcclient"
-	"github.com/moby/buildkit/session"
-	"google.golang.org/grpc"
+	_ "net/http/pprof"
 
 	"context"
 	"flag"
@@ -24,11 +19,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/containerd/command"
 	"github.com/containerd/containerd/v2/cmd/containerd/server"
 	"github.com/containerd/log"
+	"github.com/moby/buildkit/frontend/gateway/grpcclient"
+	"github.com/moby/buildkit/session"
 	"github.com/sirupsen/logrus"
 	"gitlab.com/tozd/go/errors"
+	"google.golang.org/grpc"
 
 	containerdclient "github.com/containerd/containerd/v2/client"
 	slogctx "github.com/veqryn/slog-context"

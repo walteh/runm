@@ -1,6 +1,6 @@
 edition = "2023";
 
-package runm.v1;
+package runm.vmm.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/go_features.proto";
