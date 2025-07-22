@@ -50,13 +50,13 @@ require (
 	github.com/creack/pty v1.1.24
 	github.com/fatih/color v1.18.0
 	github.com/goforj/godump v1.5.0
-	github.com/google/gopacket v1.1.19
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/hashicorp/go-plugin v1.6.3
 	github.com/kr/pty v1.1.8
 	github.com/lima-vm/go-qcow2reader v0.6.0
 	github.com/mholt/archives v0.1.3
 	github.com/moby/buildkit v0.0.0-00010101000000-000000000000
+	github.com/moby/sys/mount v0.3.4
 	github.com/moby/sys/reexec v0.1.0
 	github.com/moby/sys/signal v0.7.1
 	github.com/moby/sys/user v0.4.0
@@ -72,8 +72,6 @@ require (
 	github.com/rs/xid v1.6.0
 	github.com/samber/slog-multi v1.4.1
 	github.com/soheilhy/cmux v0.1.5
-	github.com/songgao/packets v0.0.0-20160404182456-549a10cd4091
-	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.10.0
@@ -188,6 +186,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/btree v1.1.3 // indirect
+	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/pprof v0.0.0-20250403155104-27863c87afa6 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
@@ -232,7 +231,6 @@ require (
 	github.com/moby/spdystream v0.5.0 // indirect
 	github.com/moby/sys/atomicwriter v0.1.0 // indirect
 	github.com/moby/sys/capability v0.4.0 // indirect
-	github.com/moby/sys/mount v0.3.4 // indirect
 	github.com/moby/sys/sequential v0.6.0 // indirect
 	github.com/moby/sys/symlink v0.3.0 // indirect
 	github.com/moby/term v0.5.2 // indirect
@@ -358,7 +356,7 @@ require (
 	github.com/moby/sys/mountinfo v0.7.2 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
-	github.com/pkg/errors v0.9.1
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/sirupsen/logrus v1.9.4-0.20230606125235-dd1b4c2e81af
 	github.com/stoewer/go-strcase v1.3.0 // indirect
 	go.opencensus.io v0.24.0 // indirect

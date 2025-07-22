@@ -96,6 +96,8 @@ func init() {
 	// flag.StringVar(&rootfsBindSource, "rootfs-bind-source", "", "the rootfs bind source")
 	// flag.StringVar(&rootfsBindType, "rootfs-bind-type", "", "the rootfs bind type")
 
+	_ = flag.String("init-mbin-name", "", "the init mbin name")
+
 	flag.Parse()
 
 	mshareDirBinds = make(map[string]string)

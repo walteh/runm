@@ -249,7 +249,7 @@ func (v *vmfuseInit) performMount(ctx context.Context) error {
 			return errors.Errorf("creating work directory: %w", err)
 		}
 
-		opts := fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s", lower, upper, work)
+		opts := fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s,index=on,nfs_export=on", lower, upper, work)
 
 		slog.InfoContext(ctx, "performing overlay mount",
 			"lower", lower, "upper", upper, "work", work, "target", mountTarget)
@@ -263,38 +263,40 @@ func (v *vmfuseInit) performMount(ctx context.Context) error {
 
 func (v *vmfuseInit) setupNFS(ctx context.Context) error {
 	// Create NFS export directory
-	if err := os.MkdirAll(exportPath, 0755); err != nil {
-		return errors.Errorf("creating export path: %w", err)
+	// if err := os.MkdirAll(exportPath, 0755); err != nil {
+	// 	return errors.Errorf("creating export path: %w", err)
+	// }
+
+	// // // Create /etc/exports
+	// if err := os.MkdirAll("/etc", 0755); err != nil {
+	// 	return errors.Errorf("creating /etc directory: %w", err)
+	// }
+
+	// exportsContent := fmt.Sprintf("%s *(rw,sync,no_subtree_check,no_root_squash,fsid=0)\n", mountTarget)
+	// if err := os.WriteFile("/etc/exports", []byte(exportsContent), 0644); err != nil {
+	// 	return errors.Errorf("writing /etc/exports: %w", err)
+	// }
+
+	// slog.InfoContext(ctx, "created NFS exports", "content", exportsContent)
+
+	// // Start NFS kernel server
+	// go func() {
+	// 	// if err := ExecCmdForwardingStdio(ctx, "nfsd", "8"); err != nil {
+	// 	// 	slog.ErrorContext(ctx, "failed to start NFS server", "error", err)
+	// 	// }
+	// 	if err := startNFS(ctx, 8); err != nil {
+	// 		slog.ErrorContext(ctx, "failed to start NFS server", "error", err)
+	// 	}
+	// }()
+
+	if err := exportNfsDir(ctx, mountTarget, 8); err != nil {
+		return errors.Errorf("exporting path: %w", err)
 	}
-
-	// Create /etc/exports
-	if err := os.MkdirAll("/etc", 0755); err != nil {
-		return errors.Errorf("creating /etc directory: %w", err)
-	}
-
-	exportsContent := fmt.Sprintf("%s *(rw,sync,no_subtree_check,no_root_squash,fsid=0)\n", mountTarget)
-	if err := os.WriteFile("/etc/exports", []byte(exportsContent), 0644); err != nil {
-		return errors.Errorf("writing /etc/exports: %w", err)
-	}
-
-	slog.InfoContext(ctx, "created NFS exports", "content", exportsContent)
-
-	// Start rpcbind (required for NFS)
-	if err := ExecCmdForwardingStdio(ctx, "rpcbind", "-f"); err != nil {
-		slog.WarnContext(ctx, "failed to start rpcbind (may not be available)", "error", err)
-	}
-
-	// Start NFS kernel server
-	go func() {
-		if err := ExecCmdForwardingStdio(ctx, "nfsd", "8"); err != nil {
-			slog.ErrorContext(ctx, "failed to start NFS server", "error", err)
-		}
-	}()
 
 	// Export filesystems
-	if err := ExecCmdForwardingStdio(ctx, "exportfs", "-ra"); err != nil {
-		return errors.Errorf("running exportfs: %w", err)
-	}
+	// if err := ExecCmdForwardingStdio(ctx, "exportfs", "-ra"); err != nil {
+	// 	return errors.Errorf("running exportfs: %w", err)
+	// }
 
 	slog.InfoContext(ctx, "NFS server started", "export_path", mountTarget)
 

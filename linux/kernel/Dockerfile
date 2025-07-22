@@ -50,14 +50,14 @@ COPY ${TARGETARCH}.fragment.config ./
 # 3. Merge them into a working .config
 RUN scripts/kconfig/merge_config.sh -m base.config ${TARGETARCH}.fragment.config
 
-RUN grep CONFIG_SQUASHFS .config
+RUN grep CONFIG_NFSD .config
 
 
 # RUN make ARCH=${TARGETARCH} \
 # 	KCONFIG_ALLCONFIG=.config \
 # 	alldefconfig
 
-RUN grep CONFIG_SQUASHFS .config
+RUN grep CONFIG_NFSD .config
 
 # 4. Update new symbols to defaults—but read YOUR .config!
 # RUN make ARCH=${TARGETARCH} \
@@ -65,7 +65,7 @@ RUN grep CONFIG_SQUASHFS .config
 # 	olddefconfig
 
 # 5. (Optional) Verify that squashfs stuck around
-# RUN grep CONFIG_SQUASHFS .config
+# RUN grep CONFIG_NFSD .config
 # 4) Apply defaults for any new options
 # RUN make ARCH=${TARGETARCH} olddefconfig
 RUN <<EOF
@@ -87,7 +87,7 @@ fi
 EOF
 
 RUN grep CONFIG_EXFAT_FS .config
-RUN grep CONFIG_SQUASHFS .config
+RUN grep CONFIG_NFSD .config
 
 ########################################################
 # export stage

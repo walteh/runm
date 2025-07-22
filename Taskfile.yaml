@@ -597,6 +597,22 @@ tasks:
                     --output=type=local,dest={{.TEST_BIN_DIR}} \
                     ./linux/initramfs
 
+    build:ganesha:
+        desc: builds the ganesha binary
+        run: once
+        sources:
+          - ./linux/initramfs/*
+        generates:
+          - '{{.TEST_BIN_DIR}}/ganesha/*'
+        cmds:
+          - cmd: |-
+                docker buildx build \
+                    --platform=linux/arm64 \
+                    --progress=plain \
+                    --target=ganesha-export \
+                    --output=type=local,dest={{.TEST_BIN_DIR}}/ganesha \
+                    ./linux/initramfs
+
     build:all-test-binaries:
         run: once
         deps:
@@ -958,6 +974,7 @@ tasks:
           - task: dev:kill-process:containerd-shim-runm-v2-test
           - task: dev:kill-process:containerd-shim-runc-v2
           - task: dev:kill-process:nerdctl-test
+          - task: dev:kill-process:com.apple.Virtualization.VirtualMachine
 
     dev:cleanup-containerd-processes:
         desc: kills all running containers
