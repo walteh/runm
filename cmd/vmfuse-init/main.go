@@ -259,6 +259,11 @@ func (v *vmfuseInit) run(ctx context.Context) error {
 		return errors.Errorf("performing mount: %w", err)
 	}
 
+	// ls -la the mount target
+	if err := ExecCmdForwardingStdio(ctx, "ls", "-lahrs", mountTarget); err != nil {
+		return errors.Errorf("listing mount target: %w", err)
+	}
+
 	// Setup and start Ganesha NFS server
 	if err := v.setupGaneshaNFS(ctx); err != nil {
 		return errors.Errorf("setting up Ganesha NFS: %w", err)
@@ -476,6 +481,31 @@ func (v *vmfuseInit) runGrpcVsockServer(ctx context.Context, server *grpc.Server
 }
 
 func (v *vmfuseInit) createGaneshaDirectories(ctx context.Context) error {
+
+	// untar the ganesha plugins
+	if err := os.MkdirAll("/ganesha-plugins", 0755); err != nil {
+		return errors.Errorf("creating ganesha plugins directory: %w", err)
+	}
+	if err := ExecCmdForwardingStdio(ctx, "tar", "-xzf", "/mbin/ganesha-plugins.tar.gz", "-C", "/ganesha-plugins"); err != nil {
+		return errors.Errorf("untaring ganesha plugins: %w", err)
+	}
+
+	// ls the plugins
+	if err := ExecCmdForwardingStdio(ctx, "ls", "-lahrs", "/ganesha-plugins/ganesha-plugins"); err != nil {
+		return errors.Errorf("listing ganesha plugins: %w", err)
+	}
+
+	// make the /usr/lib/ganesha directory
+	if err := os.MkdirAll("/usr/lib/ganesha", 0755); err != nil {
+		return errors.Errorf("creating ganesha directory: %w", err)
+	}
+
+	// symlink the /usr/lib/ganesha to /ganesha-plugins
+	if err := os.Symlink("/ganesha-plugins/ganesha-plugins/libfsalvfs.so", "/usr/lib/ganesha/libfsalvfs.so"); err != nil {
+		return errors.Errorf("symlinking ganesha plugins: %w", err)
+	}
+
+	// untar the ganesha plugins
 	// Create Ganesha configuration directory
 	if err := os.MkdirAll("/etc/ganesha", 0755); err != nil {
 		return errors.Errorf("creating ganesha config directory: %w", err)
@@ -551,7 +581,6 @@ EXPORT {
 	Transports = TCP;
 	FSAL {
 		Name = VFS;
-		FSAL_Shared_Library = "$STATICX_BUNDLE_DIR/libfsalvfs.so";
 	}
 }
 `, mountTarget)

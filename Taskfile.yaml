@@ -837,6 +837,7 @@ tasks:
         run: once
         sources:
           - '{{.TEST_BIN_DIR}}/vmfuse-init'
+          - '{{.TEST_BIN_DIR}}/ganesha*'
         generates:
           - '{{.LINUX_RUNTIME_DIR}}/mbin-vmfuse.squashfs'
         vars:
@@ -846,6 +847,7 @@ tasks:
                 map:
                     vmfuse-init: '{{.TEST_BIN_DIR}}/vmfuse-init'
                     ganesha: '{{.TEST_BIN_DIR}}/ganesha'
+                    ganesha-plugins.tar.gz: '{{.TEST_BIN_DIR}}/ganesha-plugins.tar.gz'
         cmds:
           - defer: rm -rf {{.TMP_DIR}}
           - cmd: mkdir -p {{.TMP_DIR}}/wrk {{.LINUX_RUNTIME_DIR}}

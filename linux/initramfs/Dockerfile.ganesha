@@ -272,5 +272,12 @@ RUN /output/venv/bin/sx-extract /ganesha-static /ganesha-static-extracted
 
 RUN ls -lahrs /ganesha-static-extracted
 
+# copy the two libs to a dir to tar them into a single file
+RUN mkdir -p /ganesha-plugins
+RUN cp /usr/lib/ganesha/libfsalvfs.so /ganesha-plugins/
+RUN cp /usr/lib/libganesha_nfsd.so.6.5 /ganesha-plugins/
+RUN cd /ganesha-plugins && tar -czvf /ganesha-plugins.tar.gz .
+
 FROM scratch AS ganesha-staticx-export
 COPY --from=ganesha-staticx-builder /ganesha-static /ganesha
+COPY --from=ganesha-staticx-builder /ganesha-plugins.tar.gz /ganesha-plugins.tar.gz
