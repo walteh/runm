@@ -26,8 +26,9 @@ func newTaskGroupOpts(
 	o.logTaskPanic = true
 	o.callerSkip = 1
 	o.enableTicker = false
-	o.tickerInterval, _ = time.ParseDuration("30s")
-	o.tickerFrequency = 5
+	o.tickerInterval, _ = time.ParseDuration("15s")
+	o.tickerFrequency = 15
+	o.tickerStartBurst = 5
 	o.keepTaskHistory = true
 	o.maxTaskHistory = 1000
 	o.enablePprof = true
@@ -98,6 +99,10 @@ func WithTickerFrequency(opt int) TaskGroupOpt {
 	return func(o *TaskGroupOpts) { o.tickerFrequency = opt }
 }
 
+func WithTickerStartBurst(opt int) TaskGroupOpt {
+	return func(o *TaskGroupOpts) { o.tickerStartBurst = opt }
+}
+
 func WithKeepTaskHistory(opt bool) TaskGroupOpt {
 	return func(o *TaskGroupOpts) { o.keepTaskHistory = opt }
 }
@@ -149,6 +154,8 @@ func (o TaskGroupOpts) EnableTicker() bool { return o.enableTicker }
 func (o TaskGroupOpts) TickerInterval() time.Duration { return o.tickerInterval }
 
 func (o TaskGroupOpts) TickerFrequency() int { return o.tickerFrequency }
+
+func (o TaskGroupOpts) TickerStartBurst() int { return o.tickerStartBurst }
 
 func (o TaskGroupOpts) KeepTaskHistory() bool { return o.keepTaskHistory }
 

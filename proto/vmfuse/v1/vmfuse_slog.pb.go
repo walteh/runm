@@ -38,7 +38,7 @@ func (x *VmConfig) LogValue() slog.Value {
 		return slog.AnyValue(nil)
 	}
 	attrs := make([]slog.Attr, 0, 3)
-	attrs = append(attrs, slog.String("memory", x.GetMemory()))
+	attrs = append(attrs, slog.Uint64("memory_mib", x.GetMemoryMib()))
 	attrs = append(attrs, slog.Uint64("cpus", uint64(x.GetCpus())))
 	attrs = append(attrs, slog.Uint64("timeout_seconds", uint64(x.GetTimeoutSeconds())))
 	return slog.GroupValue(attrs...)

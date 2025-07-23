@@ -200,7 +200,7 @@ func (b0 MountRequest_builder) Build() *MountRequest {
 
 type VmConfig struct {
 	state                     protoimpl.MessageState `protogen:"opaque.v1"`
-	xxx_hidden_Memory         string                 `protobuf:"bytes,1,opt,name=memory"`
+	xxx_hidden_MemoryMib      uint64                 `protobuf:"varint,1,opt,name=memory_mib,json=memoryMib"`
 	xxx_hidden_Cpus           uint32                 `protobuf:"varint,2,opt,name=cpus"`
 	xxx_hidden_TimeoutSeconds uint32                 `protobuf:"varint,3,opt,name=timeout_seconds,json=timeoutSeconds"`
 	unknownFields             protoimpl.UnknownFields
@@ -232,11 +232,11 @@ func (x *VmConfig) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-func (x *VmConfig) GetMemory() string {
+func (x *VmConfig) GetMemoryMib() uint64 {
 	if x != nil {
-		return x.xxx_hidden_Memory
+		return x.xxx_hidden_MemoryMib
 	}
-	return ""
+	return 0
 }
 
 func (x *VmConfig) GetCpus() uint32 {
@@ -253,8 +253,8 @@ func (x *VmConfig) GetTimeoutSeconds() uint32 {
 	return 0
 }
 
-func (x *VmConfig) SetMemory(v string) {
-	x.xxx_hidden_Memory = v
+func (x *VmConfig) SetMemoryMib(v uint64) {
+	x.xxx_hidden_MemoryMib = v
 }
 
 func (x *VmConfig) SetCpus(v uint32) {
@@ -269,7 +269,7 @@ type VmConfig_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
 	// Memory allocation for VM (e.g. "512M", "1G")
-	Memory string
+	MemoryMib uint64
 	// Number of CPUs for VM
 	Cpus uint32
 	// Timeout for VM operations in seconds
@@ -280,7 +280,7 @@ func (b0 VmConfig_builder) Build() *VmConfig {
 	m0 := &VmConfig{}
 	b, x := &b0, m0
 	_, _ = b, x
-	x.xxx_hidden_Memory = b.Memory
+	x.xxx_hidden_MemoryMib = b.MemoryMib
 	x.xxx_hidden_Cpus = b.Cpus
 	x.xxx_hidden_TimeoutSeconds = b.TimeoutSeconds
 	return m0
@@ -925,9 +925,10 @@ const file_vmfuse_v1_vmfuse_proto_rawDesc = "" +
 	"mount_type\x18\x01 \x01(\tB\x14\xbaH\x11r\x0fR\x04bindR\aoverlayR\tmountType\x12\"\n" +
 	"\asources\x18\x02 \x03(\tB\b\xbaH\x05\x92\x01\x02\b\x01R\asources\x12\x1f\n" +
 	"\x06target\x18\x03 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x06target\x12M\n" +
-	"\tvm_config\x18\x04 \x01(\v20.github.com.walteh.runm.proto.vmfuse.v1.VmConfigR\bvmConfig\"|\n" +
-	"\bVmConfig\x12\x1f\n" +
-	"\x06memory\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x06memory\x12\x1d\n" +
+	"\tvm_config\x18\x04 \x01(\v20.github.com.walteh.runm.proto.vmfuse.v1.VmConfigR\bvmConfig\"z\n" +
+	"\bVmConfig\x12\x1d\n" +
+	"\n" +
+	"memory_mib\x18\x01 \x01(\x04R\tmemoryMib\x12\x1d\n" +
 	"\x04cpus\x18\x02 \x01(\rB\t\xbaH\x06*\x04\x18\x10(\x01R\x04cpus\x120\n" +
 	"\x0ftimeout_seconds\x18\x03 \x01(\rB\a\xbaH\x04*\x02(\x1eR\x0etimeoutSeconds\"\xa4\x01\n" +
 	"\rMountResponse\x12\x19\n" +

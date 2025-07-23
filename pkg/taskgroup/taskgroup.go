@@ -22,25 +22,26 @@ import (
 
 //go:opts
 type TaskGroupOpts struct {
-	name            string     `default:"taskgroup"`
-	logLevel        slog.Level `default:"-4"`
-	logStart        bool       `default:"true"`
-	logEnd          bool       `default:"true"`
-	logTaskStart    bool       `default:"true"`
-	logTaskEnd      bool       `default:"true"`
-	logTaskPanic    bool       `default:"true"`
-	timeout         time.Duration
-	callerSkip      int `default:"1"`
-	slogBaseContext context.Context
-	attrFunc        func() []slog.Attr
-	maxConcurrent   int           // 0 means unlimited
-	enableTicker    bool          `default:"false"`
-	tickerInterval  time.Duration `default:"30s"`
-	tickerFrequency int           `default:"5"`
-	keepTaskHistory bool          `default:"true"`
-	maxTaskHistory  int           `default:"1000"`
-	enablePprof     bool          `default:"true"`
-	pprofLabels     map[string]string
+	name             string     `default:"taskgroup"`
+	logLevel         slog.Level `default:"-4"`
+	logStart         bool       `default:"true"`
+	logEnd           bool       `default:"true"`
+	logTaskStart     bool       `default:"true"`
+	logTaskEnd       bool       `default:"true"`
+	logTaskPanic     bool       `default:"true"`
+	timeout          time.Duration
+	callerSkip       int `default:"1"`
+	slogBaseContext  context.Context
+	attrFunc         func() []slog.Attr
+	maxConcurrent    int           // 0 means unlimited
+	enableTicker     bool          `default:"false"`
+	tickerInterval   time.Duration `default:"15s"`
+	tickerFrequency  int           `default:"15"`
+	tickerStartBurst int           `default:"5"`
+	keepTaskHistory  bool          `default:"true"`
+	maxTaskHistory   int           `default:"1000"`
+	enablePprof      bool          `default:"true"`
+	pprofLabels      map[string]string
 }
 
 type TaskRegistry interface {
@@ -126,14 +127,25 @@ func NewTaskGroup(ctx context.Context, opts ...TaskGroupOpt) *TaskGroup {
 			ticker.WithLogLevel(options.logLevel),
 			ticker.WithInterval(options.tickerInterval),
 			ticker.WithFrequency(options.tickerFrequency),
-			ticker.WithStartBurst(2),
+			ticker.WithStartBurst(options.tickerStartBurst),
 			ticker.WithAttrFunc(func() []slog.Attr {
-				return tg.getStatusAttrs()
+				attrs := tg.getStatusAttrs()
+				if options.attrFunc != nil {
+					attrs = append(attrs, options.attrFunc()...)
+				}
+				return attrs
 			}),
 		)
 	}
 
 	return tg
+}
+
+func (tg *TaskGroup) TickerRunAsDefer() func() {
+	if tg.statusTicker != nil {
+		return tg.statusTicker.RunAsDefer()
+	}
+	return func() {}
 }
 
 func (tg *TaskGroup) getStatusAttrs() []slog.Attr {

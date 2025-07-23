@@ -87,6 +87,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 -   Embed `slog.Logger` into `context.Context` early: `slog.NewContext(parentCtx, logger)`
 -   Retrieve with `slog.FromContext(ctx)` or pass ctx to `slog.InfoContext(ctx, ...)`
 -   All functions that log should take `context.Context` as first argument
+-   Always use single lines for logging, do not worry about readability. Turn values into slog.LogValuer's if needed and append common values using slogctx.
 
 ### Error Handling
 

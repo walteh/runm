@@ -51,7 +51,6 @@ import (
 	"github.com/walteh/runm/pkg/logging/otel"
 	"github.com/walteh/runm/pkg/netdiag"
 	"github.com/walteh/runm/pkg/taskgroup"
-	"github.com/walteh/runm/pkg/ticker"
 
 	goruncruntime "github.com/walteh/runm/core/runc/runtime/gorunc"
 	runtimemock "github.com/walteh/runm/gen/mocks/core/runc/runtime"
@@ -196,21 +195,6 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 		return errors.Errorf("problem setting up signals: %w", err)
 	}
 
-	defer ticker.NewTicker(
-		ticker.WithMessage("RUNM:INIT[RUNNING]"),
-		ticker.WithDoneMessage("RUNM:INIT[DONE]"),
-		ticker.WithSlogBaseContext(ctx),
-		ticker.WithLogLevel(slog.LevelDebug),
-		ticker.WithFrequency(15),
-		ticker.WithStartBurst(5),
-		ticker.WithAttrFunc(func() []slog.Attr {
-			return []slog.Attr{
-				slog.Int("pid", os.Getpid()),
-				slog.String("gomaxprocs", strconv.Itoa(goruntime.GOMAXPROCS(0))),
-			}
-		}),
-	).RunAsDefer()()
-
 	ctx, cancel := context.WithCancel(ctx)
 	go handleExitSignals(ctx, cancel)
 
@@ -218,18 +202,22 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 	// Create TaskGroup with pprof enabled and custom labels
 	taskgroupz := taskgroup.NewTaskGroup(ctx,
 		taskgroup.WithName("runm-linux-init"),
-		taskgroup.WithEnablePprof(true),
 		taskgroup.WithPprofLabels(map[string]string{
 			"service":      serviceName,
 			"container-id": containerId,
 			"runm-mode":    runmMode,
 		}),
-		taskgroup.WithLogStart(true),
-		taskgroup.WithLogEnd(true),
-		taskgroup.WithLogTaskStart(false),
-		taskgroup.WithLogTaskEnd(false),
+		taskgroup.WithAttrFunc(func() []slog.Attr {
+			return []slog.Attr{
+				slog.Int("pid", os.Getpid()),
+				slog.String("gomaxprocs", strconv.Itoa(goruntime.GOMAXPROCS(0))),
+			}
+		}),
 		taskgroup.WithSlogBaseContext(ctx),
+		taskgroup.WithEnableTicker(true),
 	)
+
+	// defer taskgroupz.TickerRunAsDefer()()
 
 	// Check network interface status before diagnostic
 	if err := ExecCmdForwardingStdio(ctx, "ip", "link", "show"); err != nil {

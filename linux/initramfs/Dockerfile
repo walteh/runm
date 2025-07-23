@@ -428,6 +428,8 @@ COPY --from=initramfs-files / /rootfs
 
 RUN chroot /rootfs /bin/busybox ln -s /runm-linux-mounter /init
 
+RUN cat /rootfs/init
+
 RUN mkdir -p /dist \
 	&& (cd /rootfs && find . -print0 | cpio --null -ov --format=newc > /dist/initramfs.cpio) \
 	&& gzip -1 /dist/initramfs.cpio

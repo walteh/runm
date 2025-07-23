@@ -509,7 +509,7 @@ tasks:
         cmds:
           - task: build:go:runm-linux-mounter:linux:arm64
             vars:
-                DEBUG: '1'
+                DEBUG: '0'
                 STATIC: '1'
                 BIN_DIR: '{{.TEST_BIN_DIR}}'
 
@@ -882,8 +882,11 @@ tasks:
           - cmd: mkdir -p {{.TMP_DIR}}/initramfs {{.LINUX_RUNTIME_DIR}}
           - for: {var: FS}
             cmd: mkdir -p $(dirname {{.TMP_DIR}}/initramfs/{{.KEY}}) && cp {{.ITEM}} {{.TMP_DIR}}/initramfs/{{.KEY}}
-          - cmd: ln -sf {{.INIT_SYMLINK}} {{.TMP_DIR}}/initramfs/init
+          - cmd: cd {{.TMP_DIR}}/initramfs && ln -sf {{.INIT_SYMLINK}} init
+          - cmd: ls -lahsr {{.TMP_DIR}}/initramfs
+            #   - cmd: echo -e "#!/bin/busybox\nls -lahsr /\n" > {{.TMP_DIR}}/initramfs/init
           - cmd: cd {{.TMP_DIR}}/initramfs && find . -print0 | cpio --null -o --format=newc > {{.TMP_DIR}}/initramfs.cpio
+            #   - cmd: chmod +x {{.TMP_DIR}}/initramfs/init
           - cmd: gzip -1 -q {{.TMP_DIR}}/initramfs.cpio
           - cmd: cp {{.TMP_DIR}}/initramfs.cpio.gz {{.LINUX_RUNTIME_DIR}}/initramfs.cpio.gz
 
@@ -1248,11 +1251,12 @@ tasks:
                 sh: echo "{{.TMP_DIR}}/vmfused.sock"
         env:
             LINUX_RUNTIME_BUILD_DIR: '{{.LINUX_RUNTIME_DIR}}'
+            VMFUSED_ADDRESS: 'unix://{{.VMFUSED_SOCK}}'
         cmds:
           - defer: |-
                 echo "Cleaning up vmfuse test..."
                 pkill -f vmfused || true
-                {{.TEST_BIN_DIR}}/vmfusectl -server unix://{{.VMFUSED_SOCK}} list || true
+                {{.TEST_BIN_DIR}}/vmfusectl  list || true
                 sleep 2
                 rm -rf {{.TMP_DIR}} || true
           - cmd: |-
@@ -1261,18 +1265,18 @@ tasks:
                 echo "This is a bind mount test via Linux VM and NFS" >> {{.TEST_DIR}}/test-file.txt
                 ls -la {{.TEST_DIR}}
           - cmd: |-
-                {{.TEST_BIN_DIR}}/vmfused -listen unix://{{.VMFUSED_SOCK}} &
+                {{.TEST_BIN_DIR}}/vmfused  &
                 VMFUSED_PID=$!
                 sleep 3
           - cmd: |-
-                {{.TEST_BIN_DIR}}/vmfusectl -server unix://{{.VMFUSED_SOCK}} mount -t bind {{.TEST_DIR}} {{.MOUNT_TARGET}}
+                {{.TEST_BIN_DIR}}/vmfusectl  mount -t bind {{.TEST_DIR}} {{.MOUNT_TARGET}}
           - cmd: |-
-                {{.TEST_BIN_DIR}}/vmfusectl -server unix://{{.VMFUSED_SOCK}} status {{.MOUNT_TARGET}}
+                {{.TEST_BIN_DIR}}/vmfusectl  status {{.MOUNT_TARGET}}
           - cmd: |-
-                {{.TEST_BIN_DIR}}/vmfusectl -server unix://{{.VMFUSED_SOCK}} list
+                {{.TEST_BIN_DIR}}/vmfusectl  list
           - cmd: |-
                 for i in {1..15}; do
-                    # {{.TEST_BIN_DIR}}/vmfusectl -server unix://{{.VMFUSED_SOCK}} status {{.MOUNT_TARGET}}
+                    # {{.TEST_BIN_DIR}}/vmfusectl  status {{.MOUNT_TARGET}}
                     sleep 1
                 done
           - cmd: |-
@@ -1293,11 +1297,11 @@ tasks:
                 fi
           - cmd: |-
                 echo "Unmounting..."
-                {{.TEST_BIN_DIR}}/vmfusectl -server unix://{{.VMFUSED_SOCK}} umount {{.MOUNT_TARGET}}
+                {{.TEST_BIN_DIR}}/vmfusectl  umount {{.MOUNT_TARGET}}
                 sleep 2
           - cmd: |-
                 echo "Final status check..."
-                {{.TEST_BIN_DIR}}/vmfusectl -server unix://{{.VMFUSED_SOCK}} list
+                {{.TEST_BIN_DIR}}/vmfusectl  list
                 echo "vmfuse test completed!"
 
     #endregion dev

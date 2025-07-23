@@ -99,10 +99,6 @@ func (p *gvproxy) Wait(ctx context.Context) error {
 	// Create taskgroup for managing all gvproxy tasks
 	tg := taskgroup.NewTaskGroup(ctx,
 		taskgroup.WithName("gvproxy"),
-		taskgroup.WithLogStart(true),
-		taskgroup.WithLogEnd(true),
-		taskgroup.WithLogTaskStart(true),
-		taskgroup.WithLogTaskEnd(true),
 		taskgroup.WithSlogBaseContext(ctx),
 	)
 

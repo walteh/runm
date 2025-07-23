@@ -3,7 +3,68 @@
 		{
 			"name": "runm",
 			"path": "."
+		},
+		{
+			// so the buf and proto lsps work
+			"name": "proto",
+			"path": "./proto"
+		},
+		// {
+		// 	"name": "gvisor-tap-vsock",
+		// 	"path": "../gvisor-tap-vsock"
+		// },
+		{
+			"name": "runc",
+			"path": "../runc"
+		},
+		{
+			"name": "go-runc",
+			"path": "../go-runc"
+		},
+		{
+			"name": "console",
+			"path": "../console"
+		},
+		{
+			"name": "containerd",
+			"path": "../containerd"
+		},
+		{
+			"name": "nerdctl",
+			"path": "../nerdctl"
+		},
+		{
+			"name": "buildkit",
+			"path": "../buildkit"
+		},
+		// {
+		// 	"name": "ec1",
+		// 	"path": "../ec1"
+		// },
+		// {
+		// 	"name": "ttrpc",
+		// 	"path": "../ttrpc"
+		// },
+		{
+			"name": "vz",
+			"path": "../vz"
+		},
+		{
+			"name": "task",
+			"path": "../task"
+		},
+		{
+			"name": "fsutil",
+			"path": "../fsutil"
 		}
+		// {
+		// 	"name": "sys",
+		// 	"path": "../sys"
+		// },
+		// {
+		// 	"name": "go-errors",
+		// 	"path": "../go-errors"
+		// }
 	],
 	"extensions": {
 		"recommendations": [

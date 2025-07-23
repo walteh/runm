@@ -14,15 +14,22 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	slogctx "github.com/veqryn/slog-context"
+	"github.com/walteh/runm/pkg/grpcerr"
+	"github.com/walteh/runm/pkg/logging"
+	"github.com/walteh/runm/pkg/logging/otel"
 	vmfusev1 "github.com/walteh/runm/proto/vmfuse/v1"
 )
 
 var (
-	serverAddr = flag.String("server", "unix:///var/run/vmfused.sock", "vmfused server address")
-	help       = flag.Bool("help", false, "show help")
+	serverAddr string
+	help       bool
 )
 
 func init() {
+	flag.StringVar(&serverAddr, "address", "", "vmfused server address")
+	flag.BoolVar(&help, "help", false, "show help")
+
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [options] [arguments]\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "\nCommands:\n")
@@ -47,33 +54,76 @@ func init() {
 		fmt.Fprintf(os.Stderr, "\nOptions:\n")
 		flag.PrintDefaults()
 	}
+
+	flag.Parse()
+}
+
+func init() {
+	if serverAddr == "" {
+		serverAddr = os.Getenv("VMFUSED_ADDRESS")
+	}
 }
 
 func main() {
-	flag.Parse()
+	exitCode := 0
+	defer func() {
+		os.Exit(exitCode)
+	}()
 
-	if *help {
+	if help {
 		flag.Usage()
-		os.Exit(0)
+		exitCode = 0
+		return
+	}
+
+	if serverAddr == "" {
+		fmt.Fprintf(os.Stderr, "Error: server address is required\n\n")
+		flag.Usage()
+		exitCode = 1
+		return
 	}
 
 	args := flag.Args()
 	if len(args) == 0 {
 		fmt.Fprintf(os.Stderr, "Error: command required\n\n")
 		flag.Usage()
-		os.Exit(1)
+		exitCode = 1
+		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	logger := logging.NewDefaultDevLogger("vmfusectl", os.Stdout)
+	ctx := slogctx.NewCtx(context.Background(), logger)
 
-	// Connect to vmfused
-	client, conn, err := connectToVmfused(ctx)
+	// ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	// defer cancel()
+
+	addr := serverAddr
+	if strings.HasPrefix(addr, "unix://") {
+		addr = strings.TrimPrefix(addr, "unix://")
+		addr = "unix:" + addr
+	}
+
+	conn, err := grpc.NewClient(addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpcerr.GetGrpcClientOptsCtx(ctx),
+		otel.GetGrpcClientOpts(),
+	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error connecting to vmfused: %v\n", err)
-		fmt.Fprintf(os.Stderr, "Make sure vmfused is running: vmfused -listen %s\n", *serverAddr)
-		os.Exit(1)
+		exitCode = 1
+		return
 	}
+
+	client := vmfusev1.NewVmfuseServiceClient(conn)
+
+	// // Connect to vmfused
+	// client, conn, err := connectToVmfused(ctx)
+	// if err != nil {
+	// 	fmt.Fprintf(os.Stderr, "Error connecting to vmfused: %v\n", err)
+	// 	fmt.Fprintf(os.Stderr, "Make sure vmfused is running: vmfused -listen %s\n", *serverAddr)
+	// 	exitCode = 1
+	// 	return
+	// }
 	defer conn.Close()
 
 	cmd := args[0]
@@ -90,46 +140,48 @@ func main() {
 	default:
 		fmt.Fprintf(os.Stderr, "Error: unknown command '%s'\n\n", cmd)
 		flag.Usage()
-		os.Exit(1)
+		exitCode = 1
+		return
 	}
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		exitCode = 1
+		return
 	}
 }
 
-func connectToVmfused(ctx context.Context) (vmfusev1.VmfuseServiceClient, *grpc.ClientConn, error) {
-	// Handle different address formats
-	dialAddr := *serverAddr
-	if strings.HasPrefix(*serverAddr, "unix://") {
-		dialAddr = strings.TrimPrefix(*serverAddr, "unix://")
-		// For Unix sockets, need to use the unix dialer
-		conn, err := grpc.DialContext(ctx, "unix:"+dialAddr,
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-		)
-		if err != nil {
-			return nil, nil, err
-		}
-		return vmfusev1.NewVmfuseServiceClient(conn), conn, nil
-	}
+// func connectToVmfused(ctx context.Context) (vmfusev1.VmfuseServiceClient, *grpc.ClientConn, error) {
+// 	// Handle different address formats
+// 	dialAddr := *serverAddr
+// 	if strings.HasPrefix(*serverAddr, "unix://") {
+// 		dialAddr = strings.TrimPrefix(*serverAddr, "unix://")
+// 		// For Unix sockets, need to use the unix dialer
+// 		conn, err := grpc.DialContext(ctx, "unix:"+dialAddr,
+// 			grpc.WithTransportCredentials(insecure.NewCredentials()),
+// 		)
+// 		if err != nil {
+// 			return nil, nil, err
+// 		}
+// 		return vmfusev1.NewVmfuseServiceClient(conn), conn, nil
+// 	}
 
-	// TCP connection
-	conn, err := grpc.DialContext(ctx, dialAddr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-	return vmfusev1.NewVmfuseServiceClient(conn), conn, nil
-}
+// 	// TCP connection
+// 	conn, err := grpc.DialContext(ctx, dialAddr,
+// 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+// 	)
+// 	if err != nil {
+// 		return nil, nil, err
+// 	}
+// 	return vmfusev1.NewVmfuseServiceClient(conn), conn, nil
+// }
 
 func handleMount(ctx context.Context, client vmfusev1.VmfuseServiceClient, args []string) error {
 	// Parse mount arguments
 	var mountType string = "bind" // default
 	var sources string
 	var target string
-	var memory string = "512M"
+	var memoryMib uint64 = 128
 	var cpus uint32 = 2
 
 	// Simple argument parsing for mount command
@@ -145,7 +197,11 @@ func handleMount(ctx context.Context, client vmfusev1.VmfuseServiceClient, args 
 			if i+1 >= len(args) {
 				return fmt.Errorf("--memory requires value")
 			}
-			memory = args[i+1]
+			var memoryMibVal int
+			if _, err := fmt.Sscanf(args[i+1], "%d", &memoryMibVal); err != nil {
+				return fmt.Errorf("invalid --memory value: %v", err)
+			}
+			memoryMib = uint64(memoryMibVal)
 			i++ // skip next arg
 		case "--cpus":
 			if i+1 >= len(args) {
@@ -180,7 +236,7 @@ func handleMount(ctx context.Context, client vmfusev1.VmfuseServiceClient, args 
 		Sources:   sourceList,
 		Target:    target,
 		VmConfig: vmfusev1.NewVmConfig(&vmfusev1.VmConfig_builder{
-			Memory:         memory,
+			MemoryMib:      memoryMib,
 			Cpus:           cpus,
 			TimeoutSeconds: 300, // 5 minutes
 		}),

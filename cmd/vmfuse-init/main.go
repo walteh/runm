@@ -214,10 +214,6 @@ func (v *vmfuseInit) run(ctx context.Context) error {
 			"service":   serviceName,
 			"runm-mode": "vmfuse",
 		}),
-		taskgroup.WithLogStart(true),
-		taskgroup.WithLogEnd(true),
-		taskgroup.WithLogTaskStart(false),
-		taskgroup.WithLogTaskEnd(false),
 		taskgroup.WithSlogBaseContext(ctx),
 	)
 

@@ -56,9 +56,7 @@ message MountRequest {
 
 message VmConfig {
 	// Memory allocation for VM (e.g. "512M", "1G")
-	string memory = 1 [
-		(buf.validate.field).string.min_len = 1
-	];
+	uint64 memory_mib = 1;
 
 	// Number of CPUs for VM
 	uint32 cpus = 2 [
