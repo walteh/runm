@@ -98,35 +98,6 @@ func setupLogging() func() {
 
 	}
 
-	// if dialConn != nil && rawConn != nil {
-	// 	dfd, err := hack.GetFdFromUnixConn(dialConn)
-	// 	if err != nil {
-	// 		slog.Error("DEBUG: problem getting dialConn file", "err", err)
-	// 	}
-	// 	rfd, err := hack.GetFdFromUnixConn(rawConn)
-	// 	if err != nil {
-	// 		slog.Error("DEBUG: problem getting rawConn file", "err", err)
-	// 	}
-	// 	slog.Info("DEBUG: connection file descriptors created", "dialConn", dialConn.RemoteAddr(), "rawConn", rawConn.RemoteAddr(), "dfd", dfd, "rfd", rfd)
-
-	// }
-
-	// ticker := time.NewTicker(10 * time.Millisecond)
-	// ticks := 0
-	// closers = append(closers, func() {
-	// 	ticker.Stop()
-	// })
-
-	// go func() {
-	// 	for tick := range ticker.C {
-
-	// 		ticks++
-	// 		if ticks < 1000 || ticks%100 == 0 {
-	// 			slog.Info("still running in runc-test[init], waiting to be killed", "tick", tick)
-	// 		}
-	// 	}
-	// }()
-
 	return func() {
 		for _, closer := range closers {
 			closer()

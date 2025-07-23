@@ -1304,6 +1304,31 @@ tasks:
                 {{.TEST_BIN_DIR}}/vmfusectl  list
                 echo "vmfuse test completed!"
 
+    dev:vmfuse:2025-07-23:01:
+        desc: vmfuse POC end-to-end test - mount directory via Linux VM and NFS
+        deps: ['linux:runtime:all', 'build:all-test-binaries']
+        interactive: true
+        vars:
+            TMP_DIR:
+                sh: mktemp -d
+            TEST_DIR:
+                sh: echo "{{.TMP_DIR}}/test-source"
+            MOUNT_TARGET:
+                sh: echo "{{.TMP_DIR}}/test-mount"
+            VMFUSED_SOCK:
+                sh: echo "{{.TMP_DIR}}/vmfused.sock"
+        env:
+            LINUX_RUNTIME_BUILD_DIR:
+                sh: realpath '{{.LINUX_RUNTIME_DIR}}'
+            VMFUSED_ADDRESS: 'unix://{{.VMFUSED_SOCK}}'
+            VMFUSED_BIN:
+                sh: realpath '{{.TEST_BIN_DIR}}/vmfused'
+            VMFUSECTL_BIN:
+                sh: realpath '{{.TEST_BIN_DIR}}/vmfusectl'
+        cmds:
+          - cmd: |-
+                go run ./test/integration/vmfuse/cmd/vmfuse_t1
+
     #endregion dev
 
     end-of-file:

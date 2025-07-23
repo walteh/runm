@@ -6,6 +6,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log/slog"
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -19,15 +21,20 @@ import (
 	"github.com/walteh/runm/pkg/logging"
 	"github.com/walteh/runm/pkg/logging/otel"
 	vmfusev1 "github.com/walteh/runm/proto/vmfuse/v1"
+	"github.com/walteh/runm/test/integration/env"
 )
 
 var (
-	serverAddr string
-	help       bool
+	serverAddr        string
+	logAddr           string
+	enableTestLogging bool
+	help              bool
 )
 
 func init() {
 	flag.StringVar(&serverAddr, "address", "", "vmfused server address")
+	flag.StringVar(&logAddr, "log-address", "", "log address")
+	flag.BoolVar(&enableTestLogging, "enable-test-logging", false, "enable test logging")
 	flag.BoolVar(&help, "help", false, "show help")
 
 	flag.Usage = func() {
@@ -62,6 +69,9 @@ func init() {
 	if serverAddr == "" {
 		serverAddr = os.Getenv("VMFUSED_ADDRESS")
 	}
+	if !enableTestLogging {
+		enableTestLogging = os.Getenv("ENABLE_TEST_LOGGING") == "1"
+	}
 }
 
 func main() {
@@ -77,7 +87,7 @@ func main() {
 	}
 
 	if serverAddr == "" {
-		fmt.Fprintf(os.Stderr, "Error: server address is required\n\n")
+		fmt.Fprintf(os.Stderr, "[vmfusectl] ERROR: server address is required\n\n")
 		flag.Usage()
 		exitCode = 1
 		return
@@ -85,31 +95,61 @@ func main() {
 
 	args := flag.Args()
 	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "Error: command required\n\n")
+		fmt.Fprintf(os.Stderr, "[vmfusectl] ERROR: command required\n\n")
 		flag.Usage()
 		exitCode = 1
 		return
 	}
 
-	logger := logging.NewDefaultDevLogger("vmfusectl", os.Stdout)
-	ctx := slogctx.NewCtx(context.Background(), logger)
+	ctx := context.Background()
+
+	fmt.Fprintf(os.Stderr, "[vmfusectl] INFO: enableTestLogging: %v\n", enableTestLogging)
+
+	if enableTestLogging {
+
+		logger, cleanup, err := env.SetupLogForwardingToContainerd(ctx, "vmfusectl", false)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[vmfusectl] ERROR: setting up log forwarding: %v\n", err)
+			exitCode = 1
+			return
+		}
+		defer cleanup()
+
+		ctx = slogctx.NewCtx(ctx, logger)
+
+		slog.InfoContext(ctx, "vmfusectl test logging enabled")
+	} else {
+		logger := logging.NewDefaultDevLogger("vmfusectl", os.Stdout)
+		ctx = slogctx.NewCtx(ctx, logger)
+	}
 
 	// ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	// defer cancel()
+	var dialFunc func(ctx context.Context, addr string) (net.Conn, error)
 
-	addr := serverAddr
-	if strings.HasPrefix(addr, "unix://") {
-		addr = strings.TrimPrefix(addr, "unix://")
-		addr = "unix:" + addr
+	grpcAddr := serverAddr
+	if strings.HasPrefix(grpcAddr, "unix://") {
+
+		dialFunc = func(ctx context.Context, addr string) (net.Conn, error) {
+			unixAddr, err := net.ResolveUnixAddr("unix", strings.TrimPrefix(serverAddr, "unix://"))
+			if err != nil {
+				return nil, err
+			}
+			return net.DialUnix("unix", nil, unixAddr)
+		}
+		grpcAddr = "passthrough:target"
+
+		slog.InfoContext(ctx, "using passthrough dialer", "grpcAddr", grpcAddr, "unixAddr", strings.TrimPrefix(serverAddr, "unix://"))
 	}
 
-	conn, err := grpc.NewClient(addr,
+	conn, err := grpc.NewClient(grpcAddr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpcerr.GetGrpcClientOptsCtx(ctx),
 		otel.GetGrpcClientOpts(),
+		grpc.WithContextDialer(dialFunc),
 	)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error connecting to vmfused: %v\n", err)
+		fmt.Fprintf(os.Stderr, "[vmfusectl] ERROR: connecting to vmfused: %v\n", err)
 		exitCode = 1
 		return
 	}
@@ -138,43 +178,43 @@ func main() {
 	case "status":
 		err = handleStatus(ctx, client, args[1:])
 	default:
-		fmt.Fprintf(os.Stderr, "Error: unknown command '%s'\n\n", cmd)
+		fmt.Fprintf(os.Stderr, "[vmfusectl] ERROR: unknown command '%s'\n\n", cmd)
 		flag.Usage()
 		exitCode = 1
 		return
 	}
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "[vmfusectl] ERROR: %v\n", err)
 		exitCode = 1
 		return
 	}
 }
 
-// func connectToVmfused(ctx context.Context) (vmfusev1.VmfuseServiceClient, *grpc.ClientConn, error) {
-// 	// Handle different address formats
-// 	dialAddr := *serverAddr
-// 	if strings.HasPrefix(*serverAddr, "unix://") {
-// 		dialAddr = strings.TrimPrefix(*serverAddr, "unix://")
-// 		// For Unix sockets, need to use the unix dialer
-// 		conn, err := grpc.DialContext(ctx, "unix:"+dialAddr,
-// 			grpc.WithTransportCredentials(insecure.NewCredentials()),
-// 		)
-// 		if err != nil {
-// 			return nil, nil, err
-// 		}
-// 		return vmfusev1.NewVmfuseServiceClient(conn), conn, nil
-// 	}
+func connectToVmfused(ctx context.Context, serverAddr string) (vmfusev1.VmfuseServiceClient, *grpc.ClientConn, error) {
+	// Handle different address formats
+	dialAddr := serverAddr
+	if strings.HasPrefix(serverAddr, "unix://") {
+		dialAddr = strings.TrimPrefix(serverAddr, "unix://")
+		// For Unix sockets, need to use the unix dialer
+		conn, err := grpc.DialContext(ctx, "unix:"+dialAddr,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		return vmfusev1.NewVmfuseServiceClient(conn), conn, nil
+	}
 
-// 	// TCP connection
-// 	conn, err := grpc.DialContext(ctx, dialAddr,
-// 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-// 	)
-// 	if err != nil {
-// 		return nil, nil, err
-// 	}
-// 	return vmfusev1.NewVmfuseServiceClient(conn), conn, nil
-// }
+	// TCP connection
+	conn, err := grpc.DialContext(ctx, dialAddr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	return vmfusev1.NewVmfuseServiceClient(conn), conn, nil
+}
 
 func handleMount(ctx context.Context, client vmfusev1.VmfuseServiceClient, args []string) error {
 	// Parse mount arguments
@@ -213,6 +253,8 @@ func handleMount(ctx context.Context, client vmfusev1.VmfuseServiceClient, args 
 			}
 			cpus = uint32(cpusVal)
 			i++ // skip next arg
+		case "-enable-test-logging":
+			continue
 		default:
 			if sources == "" {
 				sources = args[i]

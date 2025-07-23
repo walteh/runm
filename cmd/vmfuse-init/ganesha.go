@@ -18,7 +18,7 @@ func (v *vmfuseInit) executeGaneshaWithDetails(ctx context.Context) error {
 	// Custom execution of Ganesha with detailed error tracking and logging
 	binary := "/mbin/ganesha"
 	// Try different argument combinations - the StaticX version might need different args
-	args := []string{"-f", "/etc/ganesha/ganesha.conf", "-N", "NIV_INFO", "-F"} // -F = foreground mode
+	args := []string{"-f", "/etc/ganesha/ganesha.conf", "-N", "NIV_DEBUG", "-F"} // -F = foreground mode
 
 	slog.InfoContext(ctx, "executing Ganesha with detailed monitoring",
 		"binary", binary,
@@ -225,6 +225,13 @@ func (v *vmfuseInit) createGaneshaDirectories(ctx context.Context) error {
 		return errors.Errorf("symlinking ganesha plugins: %w", err)
 	}
 
+	// symlink [ -e /etc/mtab ] || ln -s /proc/mounts /etc/mtab
+	if _, err := os.Stat("/etc/mtab"); os.IsNotExist(err) {
+		if err := os.Symlink("/proc/self/mounts", "/etc/mtab"); err != nil {
+			return errors.Errorf("symlinking mtab: %w", err)
+		}
+	}
+
 	// untar the ganesha plugins
 	// Create Ganesha configuration directory
 	if err := os.MkdirAll("/etc/ganesha", 0755); err != nil {
@@ -266,6 +273,12 @@ unix       tpi_cots_ord  -     loopback  -      -       -
 	return nil
 }
 
+// DIRECTORY_SERVICES {
+// 	DomainName = "localdomain";
+// 	idmapped_user_time_validity  = 600;
+// 	idmapped_group_time_validity = 600;
+//   }
+
 func (v *vmfuseInit) setupGaneshaNFS(ctx context.Context) error {
 	// Create all necessary directories for Ganesha
 	if err := v.createGaneshaDirectories(ctx); err != nil {
@@ -273,35 +286,22 @@ func (v *vmfuseInit) setupGaneshaNFS(ctx context.Context) error {
 	}
 
 	// Create Ganesha configuration file with only supported parameters
-	ganeshaConfig := fmt.Sprintf(`NFS_Core_Param {
-	NFS_Protocols = 4;
-	NFS_Port = 2049;
-	MNT_Port = 20048;
-	NLM_Port = 32803;
-	RQUOTA_Port = 875;
-	Enable_NLM = false;
-	Enable_RQUOTA = false;
-	NSM_Use_Caller_Name = true;
-}
-
-NFS_IP_Name {
-	Index_Size = 17;
-	Expiration_Time = 3600;
-}
-
-
+	ganeshaConfig := fmt.Sprintf(`
+NFS_Core_Param {  
+  NFS_Port = 2049;  
+  NFS_Protocols = 4;  
+} 
 
 EXPORT {
-	Export_Id = 1;
-	Path = "%s";
-	Pseudo = "/";
-	Access_Type = RW;
-	Squash = No_Root_Squash;
-	Protocols = 4;
-	Transports = TCP;
-	FSAL {
-		Name = VFS;
-	}
+    Export_Id = 1;
+    Path = %s;       # must exist
+    Pseudo = /export;
+    Access_Type = RW;
+    Squash = No_Root_Squash;
+    Protocols = 4;
+    Transports = TCP;
+    SecType = sys;
+    FSAL { Name = VFS; }
 }
 `, mountTarget)
 
@@ -352,16 +352,18 @@ EXPORT {
 			"config", "/etc/ganesha/ganesha.conf")
 
 		if err := v.executeGaneshaWithDetails(ctx); err != nil {
-			slog.ErrorContext(ctx, "Ganesha NFS server failed", "error", err)
+			// slog.ErrorContext(ctx, "Ganesha NFS server failed", "error", err)
 
-			// Try alternative arguments
-			slog.InfoContext(ctx, "trying alternative Ganesha arguments...")
-			if err2 := v.executeGaneshaAlternative(ctx); err2 != nil {
-				slog.ErrorContext(ctx, "Ganesha alternative execution also failed", "error", err2)
-			}
+			// // Try alternative arguments
+			// slog.InfoContext(ctx, "trying alternative Ganesha arguments...")
+			// if err2 := v.executeGaneshaAlternative(ctx); err2 != nil {
+			// 	slog.ErrorContext(ctx, "Ganesha alternative execution also failed", "error", err2)
+			// }
 
 			// Try to get more info about why it failed
-			v.diagnoseGaneshaFailure(ctx)
+			// v.diagnoseGaneshaFailure(ctx)
+
+			slog.ErrorContext(ctx, "Ganesha NFS server failed", "error", err)
 		} else {
 			slog.InfoContext(ctx, "Ganesha NFS server exited cleanly")
 		}
@@ -375,6 +377,11 @@ EXPORT {
 	// Wait for Ganesha to be ready by checking if port 2049 is listening
 	if err := v.waitForGaneshaReady(ctx); err != nil {
 		return errors.Errorf("waiting for Ganesha readiness: %w", err)
+	}
+
+	// Signal readiness
+	if err := v.signalReady(ctx); err != nil {
+		return errors.Errorf("signaling ready: %w", err)
 	}
 
 	// Log active ports for debugging
@@ -393,7 +400,7 @@ EXPORT {
 func (v *vmfuseInit) waitForGaneshaReady(ctx context.Context) error {
 	// Wait for Ganesha to be ready by checking if port 2049 is listening
 	for i := range 30 { // Try for up to 30 seconds
-		conn, err := net.DialTimeout("tcp", "localhost:2049", 500*time.Millisecond)
+		conn, err := net.DialTimeout("tcp", ":2049", 500*time.Millisecond)
 		if err == nil {
 			_ = conn.Close()
 			slog.InfoContext(ctx, "Ganesha NFS server is ready", "attempts", i+1)

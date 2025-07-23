@@ -264,11 +264,6 @@ func (v *vmfuseInit) run(ctx context.Context) error {
 		return errors.Errorf("setting up Ganesha NFS: %w", err)
 	}
 
-	// Signal readiness
-	if err := v.signalReady(ctx); err != nil {
-		return errors.Errorf("signaling ready: %w", err)
-	}
-
 	// Keep running to serve NFS
 	<-ctx.Done()
 	return ctx.Err()

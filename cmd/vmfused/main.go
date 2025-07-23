@@ -1,18 +1,22 @@
-//go:build !windows
+//go:build darwin
 
 package main
 
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"gitlab.com/tozd/go/errors"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	slogctx "github.com/veqryn/slog-context"
 
@@ -22,18 +26,24 @@ import (
 	"github.com/walteh/runm/pkg/logging"
 	"github.com/walteh/runm/pkg/logging/otel"
 	"github.com/walteh/runm/pkg/taskgroup"
+	"github.com/walteh/runm/test/integration/env"
 )
 
 var (
-	serverAddr string
+	serverAddr        string
+	enableTestLogging bool
 )
 
 func init() {
 	flag.StringVar(&serverAddr, "address", "", "address to listen on")
+	flag.BoolVar(&enableTestLogging, "enable-test-logging", false, "enable test logging")
 	flag.Parse()
 
 	if serverAddr == "" {
 		serverAddr = os.Getenv("VMFUSED_ADDRESS")
+	}
+	if !enableTestLogging {
+		enableTestLogging = os.Getenv("ENABLE_TEST_LOGGING") == "1"
 	}
 }
 
@@ -43,8 +53,23 @@ func main() {
 		os.Exit(exitCode)
 	}()
 
-	logger := logging.NewDefaultDevLogger("vmfused", os.Stdout)
-	ctx := slogctx.NewCtx(context.Background(), logger)
+	ctx := context.Background()
+
+	if enableTestLogging {
+
+		logger, cleanup, err := env.SetupLogForwardingToContainerd(ctx, "vmfused", false)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[vmfused] ERROR: setting up log forwarding: %v\n", err)
+			exitCode = 1
+			return
+		}
+		defer cleanup()
+
+		ctx = slogctx.NewCtx(ctx, logger)
+	} else {
+		logger := logging.NewDefaultDevLogger("vmfused", os.Stdout)
+		ctx = slogctx.NewCtx(ctx, logger)
+	}
 
 	if err := runMain(ctx); err != nil {
 		slog.ErrorContext(ctx, "vmfused failed", "error", err)
@@ -66,17 +91,23 @@ func runMain(ctx context.Context) error {
 		taskgroup.WithEnableTicker(true),
 	)
 
+	// defer taskGroup.TickerRunAsDefer()()
+
 	// Setup gRPC server
 
 	grpcServer := grpc.NewServer(
+		// insecure
+		grpc.Creds(insecure.NewCredentials()),
 		grpcerr.GetGrpcServerOptsCtx(ctx),
 		otel.GetGrpcServerOpts(),
 	)
 
-	// Setup listener
-	listener, err := vmfused.CreateListener(serverAddr)
+	// listen on unix socket
+
+	sockAddr := strings.TrimPrefix(serverAddr, "unix://")
+	listener, err := net.Listen("unix", sockAddr)
 	if err != nil {
-		return errors.Errorf("creating listener: %w", err)
+		return errors.Errorf("listening on unix socket: %w", err)
 	}
 	defer listener.Close()
 
@@ -93,6 +124,7 @@ func runMain(ctx context.Context) error {
 	})
 
 	taskGroup.RegisterCleanup(func(ctx context.Context) error {
+		slog.InfoContext(ctx, "cleaning up vmfused server", "address", serverAddr)
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 

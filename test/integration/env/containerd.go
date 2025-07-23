@@ -202,11 +202,17 @@ func (s *DevContainerdServer) isReady(ctx context.Context) bool {
 }
 
 func SetupContainerdLogReceiver(ctx context.Context) error {
+	return SetupTestLogReceiver(ctx, ShimDelimitedWriterSockPath(), ShimRawWriterSockPath())
+}
 
-	proxySock, err := net.Listen("unix", ShimRawWriterSockPath())
+func SetupTestLogReceiver(ctx context.Context, delimSockPath string, rawSockPath string) error {
+	// clean up the sockets
+	os.Remove(rawSockPath)
+	os.Remove(delimSockPath)
+
+	proxySock, err := net.Listen("unix", rawSockPath)
 	if err != nil {
-		slog.Error("Failed to create log proxy socket", "error", err, "path", ShimRawWriterSockPath())
-		os.Exit(1)
+		return errors.Errorf("failed to create log proxy socket: %w", err)
 	}
 
 	// fwd logs from the proxy socket to stdout
@@ -222,10 +228,9 @@ func SetupContainerdLogReceiver(ctx context.Context) error {
 		}
 	}()
 
-	proxySockDelim, err := net.Listen("unix", ShimDelimitedWriterSockPath())
+	proxySockDelim, err := net.Listen("unix", delimSockPath)
 	if err != nil {
-		slog.Error("Failed to create log proxy socket", "error", err, "path", ShimDelimitedWriterSockPath())
-		os.Exit(1)
+		return errors.Errorf("failed to create log proxy socket: %w", err)
 	}
 
 	go func() {
@@ -246,8 +251,8 @@ func SetupContainerdLogReceiver(ctx context.Context) error {
 	}()
 
 	// drop the privileges of the two sockets
-	os.Chmod(ShimRawWriterSockPath(), 0666)
-	os.Chmod(ShimDelimitedWriterSockPath(), 0666)
+	os.Chmod(rawSockPath, 0666)
+	os.Chmod(delimSockPath, 0666)
 
 	return nil
 }
