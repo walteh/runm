@@ -2,6 +2,9 @@ package gvnet
 
 import (
 	"context"
+	"encoding/binary"
+	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"path/filepath"
@@ -24,10 +27,12 @@ type GvproxyConfig struct {
 	EnableMagicSSHForwarding   bool   // enable ssh forwarding
 	EnableMagicHTTPForwarding  bool   // enable http forwarding
 	EnableMagicHTTPSForwarding bool   // enable https forwarding
+	EnableMagicNFSForwarding   bool   // enable nfs forwarding
 
 	MTU int // set the MTU, default is 1500
 
-	WorkingDir string // working directory
+	WorkingDir                      string            // working directory
+	ExtraHostToGuestTCPPortMappings map[uint16]uint16 // extra port mappings to forward
 }
 
 func GvproxyVersion() string {
@@ -36,7 +41,6 @@ func GvproxyVersion() string {
 
 type gvproxy struct {
 	netdev    *virtio.VirtioNet
-	taskGroup *taskgroup.TaskGroup
 	forwarder *tapsock.VirtualNetworkRunner
 	stack     *stack.Stack
 	magic     *MagicHostPort
@@ -165,6 +169,15 @@ func (cfg *GvproxyConfig) buildConfiguration(ctx context.Context) (*types.Config
 		slog.WarnContext(ctx, "searching domains", "error", err)
 	}
 
+	extraPortMappings := make(map[string]string)
+	if cfg.ExtraHostToGuestTCPPortMappings != nil {
+		for k, v := range cfg.ExtraHostToGuestTCPPortMappings {
+			extraPortMappings[fmt.Sprintf("%s:%d", LOCAL_HOST_IP, k)] = fmt.Sprintf("%s:%d", VIRTUAL_GUEST_IP, v)
+		}
+	}
+
+	slog.InfoContext(ctx, "extra port mappings", "extraPortMappings", extraPortMappings)
+
 	config := types.Configuration{
 		Debug:             cfg.EnableDebug,
 		CaptureFile:       captureFile(cfg),
@@ -205,7 +218,7 @@ func (cfg *GvproxyConfig) buildConfiguration(ctx context.Context) (*types.Config
 			},
 		},
 		DNSSearchDomains: dnss,
-		// Forwards:         virtualPortMap,
+		Forwards:         extraPortMappings,
 		// RawForwards: virtualPortMap,
 		NAT: map[string]string{
 			VIRUTAL_HOST_IP: LOCAL_HOST_IP,
@@ -251,11 +264,54 @@ func (p *gvproxy) setupMagicForwarding(tg *taskgroup.TaskGroup, ctx context.Cont
 		}
 	}
 
-	// route everything else to port 80
+	if p.cfg.EnableMagicNFSForwarding {
+		// NFS traffic gets everything else (must be last specific matcher before Any())
+		err = m.ForwardCMUXMatchToGuestPort(ctx, stack, 2049, NFSMatcher())
+		if err != nil {
+			return nil, errors.Errorf("forwarding cmux nfs to guest port: %w", err)
+		}
+	}
+
+	// route everything else to port 80 (only if NFS forwarding is disabled)
 	err = m.ForwardCMUXMatchToGuestPort(ctx, stack, 80, cmux.Any())
 	if err != nil {
 		return nil, errors.Errorf("forwarding cmux match to guest port: %w", err)
 	}
 
 	return m, nil
+}
+
+const (
+	rpcMsgTypeCall = 0
+	rpcVersion     = 2
+	nfsProg        = 100003
+)
+
+// NFS returns a cmux.Matcher that matches NFS (any version) ONC RPC calls.
+func NFSMatcher() cmux.Matcher {
+	return func(r io.Reader) bool {
+		var rm [4]byte
+		if _, err := io.ReadFull(r, rm[:]); err != nil {
+			return false
+		}
+		fragLen := binary.BigEndian.Uint32(rm[:]) & 0x7FFFFFFF
+		if fragLen < 24 { // xid(4)+type(4)+rpcver(4)+prog(4)+vers(4)+proc(4) = 24
+			return false
+		}
+
+		hdr := make([]byte, 24)
+		if _, err := io.ReadFull(r, hdr); err != nil {
+			return false
+		}
+
+		msgType := binary.BigEndian.Uint32(hdr[4:8])
+		if msgType != rpcMsgTypeCall {
+			return false
+		}
+		if binary.BigEndian.Uint32(hdr[8:12]) != rpcVersion {
+			return false
+		}
+		prog := binary.BigEndian.Uint32(hdr[12:16])
+		return prog == nfsProg
+	}
 }

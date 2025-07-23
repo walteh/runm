@@ -129,7 +129,7 @@ message MountInfo {
 	MountStatus status = 6;
 
 	// VM IP address (for debugging)
-	string vm_ip = 7;
+	uint32 nfs_host_port = 7;
 
 	// Creation timestamp (unix nano)
 	int64 created_at = 8;

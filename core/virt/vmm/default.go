@@ -50,7 +50,7 @@ func (me *DefaultVMConfig) StartTimeUnixNanoString() string {
 	return strconv.FormatInt(me.StartTime.UnixNano(), 10)
 }
 
-func newDefaultLinuxVM(ctx context.Context, vmid string, mbinFile string, mshareFiles map[string]any, mshareDirs []string, mshareSocks []string) (*DefaultVMConfig, error) {
+func newDefaultLinuxVM(ctx context.Context, vmid string, mbinFile string, mshareFiles map[string]any, mshareDirs []string, mshareSocks []string, extraPortMappings map[uint16]uint16) (*DefaultVMConfig, error) {
 	start := time.Now()
 
 	workingDir, err := host.EmphiricalVMCacheDir(ctx, vmid)
@@ -85,7 +85,7 @@ func newDefaultLinuxVM(ctx context.Context, vmid string, mbinFile string, mshare
 		Append: false,
 	}
 
-	netdev, hostIPPort, err := PrepareVirtualNetwork(ctx)
+	netdev, hostIPPort, err := PrepareVirtualNetwork(ctx, extraPortMappings)
 	if err != nil {
 		return nil, errors.Errorf("creating net device: %w", err)
 	}

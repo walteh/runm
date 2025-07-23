@@ -15,6 +15,7 @@ import (
 
 	"github.com/walteh/runm/core/virt/virtio"
 	"github.com/walteh/runm/linux/constants"
+	"github.com/walteh/runm/pkg/port"
 	"github.com/walteh/runm/pkg/units"
 )
 
@@ -38,7 +39,7 @@ func NewVMFuseVirtualMachine[VM VirtualMachine](
 	hpv Hypervisor[VM],
 	config VMFuseVMConfig,
 	devices ...virtio.VirtioDevice,
-) (*RunningVM[VM], error) {
+) (*RunningVM[VM], uint16, error) {
 
 	vmid := config.ID
 
@@ -47,9 +48,9 @@ func NewVMFuseVirtualMachine[VM VirtualMachine](
 	startTime := time.Now()
 
 	// Create default devices for vmfuse VM
-	defaults, err := newDefaultLinuxVMForVMFuse(ctx, vmid, config)
+	defaults, nfsPort, err := newDefaultLinuxVMForVMFuse(ctx, vmid, config)
 	if err != nil {
-		return nil, errors.Errorf("getting VM defaults: %w", err)
+		return nil, 0, errors.Errorf("getting VM defaults: %w", err)
 	}
 
 	slog.InfoContext(ctx, "about to set up vmfuse VM",
@@ -88,7 +89,7 @@ func NewVMFuseVirtualMachine[VM VirtualMachine](
 			KernelCmdLine: strings.Join(cfgs, " "),
 		}
 	default:
-		return nil, errors.Errorf("unsupported OS: %s", config.Platform.OS())
+		return nil, 0, errors.Errorf("unsupported OS: %s", config.Platform.OS())
 	}
 
 	opts := NewVMOptions{
@@ -102,7 +103,7 @@ func NewVMFuseVirtualMachine[VM VirtualMachine](
 
 	vm, err := hpv.NewVirtualMachine(ctx, vmid, &opts, bootloader)
 	if err != nil {
-		return nil, errors.Errorf("creating virtual machine: %w", err)
+		return nil, 0, errors.Errorf("creating virtual machine: %w", err)
 	}
 
 	runner := &RunningVM[VM]{
@@ -120,11 +121,11 @@ func NewVMFuseVirtualMachine[VM VirtualMachine](
 
 	slog.InfoContext(ctx, "created vmfuse vm", "id", config.ID)
 
-	return runner, nil
+	return runner, nfsPort, nil
 }
 
 // newDefaultLinuxVMForVMFuse creates default VM configuration for vmfuse
-func newDefaultLinuxVMForVMFuse(ctx context.Context, vmid string, config VMFuseVMConfig) (*DefaultVMConfig, error) {
+func newDefaultLinuxVMForVMFuse(ctx context.Context, vmid string, config VMFuseVMConfig) (*DefaultVMConfig, uint16, error) {
 	// Create virtio devices for source directory sharing
 	shareDevices := make([]virtio.VirtioDevice, 0, len(config.Sources))
 	mshareDirs := make([]string, 0, len(config.Sources))
@@ -133,22 +134,28 @@ func newDefaultLinuxVMForVMFuse(ctx context.Context, vmid string, config VMFuseV
 		shareTag := generateShareTag(source, i)
 		shareDevice, err := virtio.VirtioFsNew(source, shareTag)
 		if err != nil {
-			return nil, errors.Errorf("creating virtio-fs device for %s: %w", source, err)
+			return nil, 0, errors.Errorf("creating virtio-fs device for %s: %w", source, err)
 		}
 		shareDevices = append(shareDevices, shareDevice)
 		mshareDirs = append(mshareDirs, source)
 	}
 
-	// Use the existing newDefaultLinuxVM but customize for vmfuse
-	defaults, err := newDefaultLinuxVM(ctx, vmid, constants.MbinVMFUSEFileName, map[string]any{}, mshareDirs, []string{})
+	//reserve a new port for the vmfuse server
+	port, err := port.ReservePort(ctx)
 	if err != nil {
-		return nil, errors.Errorf("creating default linux VM: %w", err)
+		return nil, 0, errors.Errorf("reserving port: %w", err)
+	}
+
+	// Use the existing newDefaultLinuxVM but customize for vmfuse
+	defaults, err := newDefaultLinuxVM(ctx, vmid, constants.MbinVMFUSEFileName, map[string]any{}, mshareDirs, []string{}, map[uint16]uint16{port: 2049})
+	if err != nil {
+		return nil, 0, errors.Errorf("creating default linux VM: %w", err)
 	}
 
 	// Add our custom virtio-fs devices
 	defaults.Devices = append(defaults.Devices, shareDevices...)
 
-	return defaults, nil
+	return defaults, port, nil
 }
 
 // generateShareTag creates a consistent tag for virtio-fs sharing

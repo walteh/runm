@@ -125,10 +125,10 @@ type MountState struct {
 	Error     string
 
 	// VM management fields
-	vm       *vmm.RunningVM[*vf.VirtualMachine]
-	cancelVM context.CancelFunc
-	vmCtx    context.Context
-	vmIP     string
+	vm          *vmm.RunningVM[*vf.VirtualMachine]
+	cancelVM    context.CancelFunc
+	vmCtx       context.Context
+	nfsHostPort uint16
 }
 
 type vmfusedServer struct {
@@ -266,7 +266,7 @@ func (s *vmfusedServer) mountStateToInfo(state *MountState) *vmfusev1.MountInfo 
 		Status:       state.Status,
 		CreatedAt:    state.CreatedAt.UnixNano(),
 		ErrorMessage: state.Error,
-		VmIp:         state.vmIP,
+		NfsHostPort:  uint32(state.nfsHostPort),
 	})
 }
 
@@ -416,7 +416,7 @@ func (s *vmfusedServer) createAndStartVM(ctx context.Context, mountState *MountS
 	}
 
 	// Create virtual machine using the new vmfuse function
-	runningVM, err := vmm.NewVMFuseVirtualMachine(vmCtx, s.hypervisor, vmfuseConfig)
+	runningVM, nfsPort, err := vmm.NewVMFuseVirtualMachine(vmCtx, s.hypervisor, vmfuseConfig)
 	if err != nil {
 		cancel()
 		return errors.Errorf("creating vmfuse virtual machine: %w", err)
@@ -434,11 +434,12 @@ func (s *vmfusedServer) createAndStartVM(ctx context.Context, mountState *MountS
 	slog.InfoContext(ctx, "VM started successfully",
 		"mount_id", mountState.ID,
 		"vm_id", mountState.VMID,
+		"nfs_host_port", nfsPort,
 		"vm_state", runningVM.VM().CurrentState())
 
 	// Get VM network information
 	// For now, use a default IP - in real implementation we'd get this from the VM
-	mountState.vmIP = "192.168.127.2"
+	mountState.nfsHostPort = nfsPort
 
 	return nil
 }
@@ -472,25 +473,27 @@ func (s *vmfusedServer) waitForNFS(ctx context.Context, mountState *MountState) 
 				}
 			}
 
-			// In a real implementation, we would check for the ready file through VirtioFS
-			// or use VSock communication to query the guest
-			// For now, we'll use a simple timeout-based approach
 			slog.DebugContext(ctx, "polling for NFS readiness",
 				"mount_id", mountState.ID,
 				"ready_file", readyFile)
 
-			// TODO: Implement actual ready file checking or VSock communication
-			// This could be done by:
-			// 1. Using VSock to connect to guest and query status
-			// 2. Checking for ready file via shared VirtioFS mount
-			// 3. Attempting to connect to NFS port on VM IP
-
-			// For now, simulate readiness after a short delay
-			if time.Since(mountState.CreatedAt) > 5*time.Second {
-				slog.InfoContext(ctx, "NFS server ready (simulated)",
+			// Check if NFS server is ready by attempting to connect to port 2049
+			if mountState.nfsHostPort != 0 {
+				conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", mountState.nfsHostPort), 2*time.Second)
+				if err == nil {
+					_ = conn.Close()
+					slog.InfoContext(ctx, "NFS server is ready",
+						"mount_id", mountState.ID,
+						"nfs_host_port", mountState.nfsHostPort)
+					return nil
+				}
+				slog.DebugContext(ctx, "NFS server not yet ready",
 					"mount_id", mountState.ID,
-					"vm_ip", mountState.vmIP)
-				return nil
+					"nfs_host_port", mountState.nfsHostPort,
+					"error", err)
+			} else {
+				slog.DebugContext(ctx, "VM IP not yet available",
+					"mount_id", mountState.ID)
 			}
 		}
 	}
@@ -498,12 +501,12 @@ func (s *vmfusedServer) waitForNFS(ctx context.Context, mountState *MountState) 
 
 func (s *vmfusedServer) mountNFS(ctx context.Context, mountState *MountState) error {
 	target := mountState.Config.GetTarget()
-	vmIP := mountState.vmIP
-	nfsExport := "/mnt/target" // This is the mount target inside the VM that gets exported via NFS
+	nfsHostPort := mountState.nfsHostPort
+	nfsExport := "/" // This is the mount target inside the VM that gets exported via NFS
 
 	slog.InfoContext(ctx, "mounting NFS from VM to host",
 		"mount_id", mountState.ID,
-		"vm_ip", vmIP,
+		"nfs_host_port", nfsHostPort,
 		"nfs_export", nfsExport,
 		"target", target)
 
@@ -513,11 +516,12 @@ func (s *vmfusedServer) mountNFS(ctx context.Context, mountState *MountState) er
 	}
 
 	// Build NFS mount command
-	// Format: mount_nfs -o nfsvers=3,tcp,intr <vm_ip>:<export_path> <target>
-	nfsSource := fmt.Sprintf("%s:%s", vmIP, nfsExport)
+	// Format: mount_nfs -o nfsvers=4,tcp,port=<port> <vm_ip>:<export_path> <target>
+	nfsSource := fmt.Sprintf("127.0.0.1:%s", nfsExport)
+	mountOpts := fmt.Sprintf("nfsvers=4,tcp,port=%d,intr,rsize=65536,wsize=65536,timeo=14,soft", nfsHostPort)
 
 	cmd := exec.CommandContext(ctx, "mount_nfs",
-		"-o", "nfsvers=3,tcp,intr,rsize=65536,wsize=65536,timeo=14,soft",
+		"-o", mountOpts,
 		nfsSource,
 		target)
 

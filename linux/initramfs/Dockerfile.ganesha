@@ -241,13 +241,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=ganesha-base /git-repo /git-repo
 
-# Build dynamic binary (your working recipe)
+# Build dynamic binary with FSAL libraries
 RUN mkdir /build && cd /build && \
     cmake /git-repo/src -G Ninja \
       -DCMAKE_BUILD_TYPE=Release \
       -DUSE_FSAL_VFS=ON \
       -DUSE_GSS=OFF -DUSE_DBUS=OFF -DUSE_MONITORING=OFF && \
-    ninja ganesha.nfsd 
+    ninja ganesha.nfsd && \
+    ninja install 
 
 RUN mkdir /output
 WORKDIR /output
@@ -260,9 +261,16 @@ RUN . /output/venv/bin/activate
 # install staticx
 RUN /output/venv/bin/pip install wheel
 RUN /output/venv/bin/pip install staticx
-# Bundle everything into single static-like executable
-RUN /output/venv/bin/staticx /build/ganesha.nfsd /ganesha-static
+# Bundle everything into single static-like executable including FSAL libraries
+# The files are installed to /usr/lib/ganesha/ and /usr/bin/, not /usr/local/
+RUN /output/venv/bin/staticx \
+    -l /usr/lib/ganesha/libfsalvfs.so \
+    -l /usr/lib/libganesha_nfsd.so.6.5 \
+    /usr/bin/ganesha.nfsd /ganesha-static
 
+RUN /output/venv/bin/sx-extract /ganesha-static /ganesha-static-extracted
+
+RUN ls -lahrs /ganesha-static-extracted
 
 FROM scratch AS ganesha-staticx-export
 COPY --from=ganesha-staticx-builder /ganesha-static /ganesha

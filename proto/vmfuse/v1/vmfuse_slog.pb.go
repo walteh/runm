@@ -131,7 +131,7 @@ func (x *MountInfo) LogValue() slog.Value {
 	}
 	attrs = append(attrs, slog.String("target", x.GetTarget()))
 	attrs = append(attrs, slog.String("status", x.GetStatus().String()))
-	attrs = append(attrs, slog.String("vm_ip", x.GetVmIp()))
+	attrs = append(attrs, slog.Uint64("nfs_host_port", uint64(x.GetNfsHostPort())))
 	attrs = append(attrs, slog.Int64("created_at", x.GetCreatedAt()))
 	attrs = append(attrs, slog.String("error_message", x.GetErrorMessage()))
 	return slog.GroupValue(attrs...)

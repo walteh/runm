@@ -95,7 +95,7 @@ func NewKernelCommandVM[VM VirtualMachine](
 
 	// add vsock and memory devices
 
-	netdev, hostIPPort, err := PrepareVirtualNetwork(ctx)
+	netdev, hostIPPort, err := PrepareVirtualNetwork(ctx, nil)
 	if err != nil {
 		return nil, errors.Errorf("creating net device: %w", err)
 	}

@@ -747,7 +747,7 @@ type MountInfo struct {
 	xxx_hidden_Sources      []string               `protobuf:"bytes,4,rep,name=sources"`
 	xxx_hidden_Target       string                 `protobuf:"bytes,5,opt,name=target"`
 	xxx_hidden_Status       MountStatus            `protobuf:"varint,6,opt,name=status,enum=github.com.walteh.runm.proto.vmfuse.v1.MountStatus"`
-	xxx_hidden_VmIp         string                 `protobuf:"bytes,7,opt,name=vm_ip,json=vmIp"`
+	xxx_hidden_NfsHostPort  uint32                 `protobuf:"varint,7,opt,name=nfs_host_port,json=nfsHostPort"`
 	xxx_hidden_CreatedAt    int64                  `protobuf:"varint,8,opt,name=created_at,json=createdAt"`
 	xxx_hidden_ErrorMessage string                 `protobuf:"bytes,9,opt,name=error_message,json=errorMessage"`
 	unknownFields           protoimpl.UnknownFields
@@ -821,11 +821,11 @@ func (x *MountInfo) GetStatus() MountStatus {
 	return MountStatus_MOUNT_STATUS_UNKNOWN
 }
 
-func (x *MountInfo) GetVmIp() string {
+func (x *MountInfo) GetNfsHostPort() uint32 {
 	if x != nil {
-		return x.xxx_hidden_VmIp
+		return x.xxx_hidden_NfsHostPort
 	}
-	return ""
+	return 0
 }
 
 func (x *MountInfo) GetCreatedAt() int64 {
@@ -866,8 +866,8 @@ func (x *MountInfo) SetStatus(v MountStatus) {
 	x.xxx_hidden_Status = v
 }
 
-func (x *MountInfo) SetVmIp(v string) {
-	x.xxx_hidden_VmIp = v
+func (x *MountInfo) SetNfsHostPort(v uint32) {
+	x.xxx_hidden_NfsHostPort = v
 }
 
 func (x *MountInfo) SetCreatedAt(v int64) {
@@ -892,7 +892,7 @@ type MountInfo_builder struct {
 	// Status information
 	Status MountStatus
 	// VM IP address (for debugging)
-	VmIp string
+	NfsHostPort uint32
 	// Creation timestamp (unix nano)
 	CreatedAt int64
 	// Error message if status is ERROR
@@ -909,7 +909,7 @@ func (b0 MountInfo_builder) Build() *MountInfo {
 	x.xxx_hidden_Sources = b.Sources
 	x.xxx_hidden_Target = b.Target
 	x.xxx_hidden_Status = b.Status
-	x.xxx_hidden_VmIp = b.VmIp
+	x.xxx_hidden_NfsHostPort = b.NfsHostPort
 	x.xxx_hidden_CreatedAt = b.CreatedAt
 	x.xxx_hidden_ErrorMessage = b.ErrorMessage
 	return m0
@@ -946,7 +946,7 @@ const file_vmfuse_v1_vmfuse_proto_rawDesc = "" +
 	"identifier\"b\n" +
 	"\x0eStatusResponse\x12P\n" +
 	"\n" +
-	"mount_info\x18\x01 \x01(\v21.github.com.walteh.runm.proto.vmfuse.v1.MountInfoR\tmountInfo\"\xb2\x02\n" +
+	"mount_info\x18\x01 \x01(\v21.github.com.walteh.runm.proto.vmfuse.v1.MountInfoR\tmountInfo\"\xc1\x02\n" +
 	"\tMountInfo\x12\x19\n" +
 	"\bmount_id\x18\x01 \x01(\tR\amountId\x12\x13\n" +
 	"\x05vm_id\x18\x02 \x01(\tR\x04vmId\x12\x1d\n" +
@@ -954,8 +954,8 @@ const file_vmfuse_v1_vmfuse_proto_rawDesc = "" +
 	"mount_type\x18\x03 \x01(\tR\tmountType\x12\x18\n" +
 	"\asources\x18\x04 \x03(\tR\asources\x12\x16\n" +
 	"\x06target\x18\x05 \x01(\tR\x06target\x12K\n" +
-	"\x06status\x18\x06 \x01(\x0e23.github.com.walteh.runm.proto.vmfuse.v1.MountStatusR\x06status\x12\x13\n" +
-	"\x05vm_ip\x18\a \x01(\tR\x04vmIp\x12\x1d\n" +
+	"\x06status\x18\x06 \x01(\x0e23.github.com.walteh.runm.proto.vmfuse.v1.MountStatusR\x06status\x12\"\n" +
+	"\rnfs_host_port\x18\a \x01(\rR\vnfsHostPort\x12\x1d\n" +
 	"\n" +
 	"created_at\x18\b \x01(\x03R\tcreatedAt\x12#\n" +
 	"\rerror_message\x18\t \x01(\tR\ferrorMessage*\xef\x01\n" +

@@ -281,8 +281,8 @@ func handleStatus(ctx context.Context, client vmfusev1.VmfuseServiceClient, args
 	fmt.Printf("  Status: %s\n", mount.GetStatus().String())
 	fmt.Printf("  Mount ID: %s\n", mount.GetMountId())
 	fmt.Printf("  VM ID: %s\n", mount.GetVmId())
-	if mount.GetVmIp() != "" {
-		fmt.Printf("  VM IP: %s\n", mount.GetVmIp())
+	if mount.GetNfsHostPort() != 0 {
+		fmt.Printf("  NFS Host Port: %d\n", mount.GetNfsHostPort())
 	}
 	if mount.GetErrorMessage() != "" {
 		fmt.Printf("  Error: %s\n", mount.GetErrorMessage())
