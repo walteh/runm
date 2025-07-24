@@ -2,7 +2,9 @@
 # args
 ########################################################
 
-ARG LINUX_KERNEL_VERSION=6.15-rc7
+ARG LINUX_KERNEL_VERSION=6.15.8
+
+ARG CONFIG_VAR_TO_VALIDATE=CONFIG_OVERLAY_FS
 
 ########################################################
 # builder
@@ -36,6 +38,7 @@ RUN mkdir -p ${SRC_DIR} ${DIST_DIR} \
 WORKDIR ${LINUX_DIR}
 
 ARG TARGETARCH
+ARG CONFIG_VAR_TO_VALIDATE
 
 # 1. Set the build target
 ENV ARCH=${TARGETARCH}
@@ -47,27 +50,12 @@ COPY ${TARGETARCH}.fragment.config ./
 
 # RUN make ARCH=${TARGETARCH} defconfig
 
+
 # 3. Merge them into a working .config
 RUN scripts/kconfig/merge_config.sh -m base.config ${TARGETARCH}.fragment.config
 
-RUN grep CONFIG_NFSD .config
+RUN grep ${CONFIG_VAR_TO_VALIDATE} .config
 
-
-# RUN make ARCH=${TARGETARCH} \
-# 	KCONFIG_ALLCONFIG=.config \
-# 	alldefconfig
-
-RUN grep CONFIG_NFSD .config
-
-# 4. Update new symbols to defaults—but read YOUR .config!
-# RUN make ARCH=${TARGETARCH} \
-# 	KCONFIG_CONFIG=.config \
-# 	olddefconfig
-
-# 5. (Optional) Verify that squashfs stuck around
-# RUN grep CONFIG_NFSD .config
-# 4) Apply defaults for any new options
-# RUN make ARCH=${TARGETARCH} olddefconfig
 RUN <<EOF
 if [ "${TARGETARCH}" = "arm64" ]; then
 	make ARCH=${TARGETARCH} LOCALVERSION= -j$(nproc) Image
@@ -75,6 +63,8 @@ else
 	make ARCH=${TARGETARCH} LOCALVERSION= -j$(nproc) bzImage
 fi
 EOF
+
+RUN grep ${CONFIG_VAR_TO_VALIDATE} .config
 
 RUN <<EOF
 if [ "${TARGETARCH}" = "arm64" ]; then
@@ -86,8 +76,7 @@ else
 fi
 EOF
 
-RUN grep CONFIG_EXFAT_FS .config
-RUN grep CONFIG_NFSD .config
+RUN grep ${CONFIG_VAR_TO_VALIDATE} .config
 
 ########################################################
 # export stage

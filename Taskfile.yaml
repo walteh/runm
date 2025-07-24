@@ -105,6 +105,7 @@ vars:
 
 env:
     COMPOSE_BAKE: true
+    CLICOLOR: 1
     GOPROXY: 'https://proxy.golang.org'
     GOSUMDB: sum.golang.org
     GOPRIVATE: github.com/walteh
@@ -334,8 +335,9 @@ tasks:
             SYMLINK: '{{.SYMLINK | default ""}}'
             EXTLDFLAGS: '{{.STATIC | eq "1" | ternary "-static" ""}} {{.EXTLDFLAGS}}'
             TAGS: '{{.TAGS}}'
-            CMD_DIR:
+            CMD_DIR_GUESS:
                 sh: test -d ./cmd/{{.NAME}} && echo "./cmd" || echo "./test/integration/cmd"
+            CMD_DIR: '{{.CMD_DIR | default .CMD_DIR_GUESS}}'
             LD_FLAGS: |-
                 -extldflags={{.EXTLDFLAGS}} {{.DEBUG | eq "1" | ternary "-compressdwarf=false" "-s -w"}} {{.LD_FLAGS}}
             GC_FLAGS: '{{.DEBUG | eq "1" | ternary "all=-N -l" ""}}'
@@ -527,6 +529,7 @@ tasks:
                 DEBUG: '1'
                 STATIC: '1'
                 BIN_DIR: '{{.TEST_BIN_DIR}}'
+                CMD_DIR: './test/experiments/vmfuse/cmd'
 
     build:vmfused:
         desc: builds the vmfused daemon (macOS host)
@@ -543,6 +546,7 @@ tasks:
                 CGO_ENABLED: '1'
                 CODESIGN: '1'
                 BIN_DIR: '{{.TEST_BIN_DIR}}'
+                CMD_DIR: './test/experiments/vmfuse/cmd'
 
     build:vmfusectl:
         desc: builds the vmfusectl CLI client (macOS host)
@@ -557,6 +561,7 @@ tasks:
             vars:
                 DEBUG: '1'
                 BIN_DIR: '{{.TEST_BIN_DIR}}'
+                CMD_DIR: './test/experiments/vmfuse/cmd'
 
     build:runc-test:
         desc: builds the runc binary
@@ -596,12 +601,13 @@ tasks:
                     --target=busybox-export \
                     --output=type=local,dest={{.TEST_BIN_DIR}} \
                     ./linux/initramfs
+            silent: true
 
     build:ganesha:
-        desc: builds the ganesha binary
+        desc: builds the ganesha binary and plugins
         run: once
         sources:
-          - ./linux/initramfs/*
+          - ./linux/extras/*
         generates:
           - '{{.TEST_BIN_DIR}}/ganesha/*'
         cmds:
@@ -609,12 +615,13 @@ tasks:
                 docker buildx build \
                     --platform=linux/arm64 \
                     --progress=plain \
-                    --file=linux/initramfs/Dockerfile.ganesha \
-                    --target=ganesha-staticx-export \
+                    --file=linux/extras/Dockerfile.ganesha \
+                    --target=ganesha-export \
                     --output=type=local,dest={{.TEST_BIN_DIR}} \
-                    ./linux/initramfs
+                    ./linux/extras
+            silent: true
 
-    build:all-test-binaries:
+    build:runm-test-binaries:
         run: once
         deps:
           - build:containerd-test
@@ -624,13 +631,21 @@ tasks:
           - build:runm-linux-init
           - build:runm-linux-host-fork-exec-proxy
           - build:runm-linux-mounter
-          - build:vmfuse-init
-          - build:vmfused
-          - build:vmfusectl
           - build:busybox
           - build:buildkitd-test
           - build:buildctl-test
         desc: builds all test binaries
+
+    build:vmfuse-experiment:
+        run: once
+        deps:
+          - build:vmfuse-init
+          - build:vmfused
+          - build:vmfusectl
+          - build:ganesha
+          - build:busybox
+          - build:runm-linux-mounter
+          - build:runm-linux-host-fork-exec-proxy
 
     #endregion
 
@@ -644,8 +659,8 @@ tasks:
     run:containerd-test:
         desc: runs the shim for 2025-07-01
         deps:
-          - linux:runtime:all
-          - build:all-test-binaries
+          - linux:runtime:runm
+          - build:runm-test-binaries
 
         env:
             SHIM_BINARY_PATH:
@@ -661,8 +676,8 @@ tasks:
     run:buildkitd-test:
         desc: runs the buildkitd test
         deps:
-          - linux:runtime:all
-          - build:all-test-binaries
+          - linux:runtime:runm
+          - build:runm-test-binaries
         cmds:
           - cmd: |-
                 {{.SUDO_CMD}} {{.TEST_BIN_DIR}}/buildkitd-test
@@ -670,8 +685,8 @@ tasks:
     run:containerd-test:pipe-to-file:
         desc: runs the shim for 2025-07-01
         deps:
-          - linux:runtime:all
-          - build:all-test-binaries
+          - linux:runtime:runm
+          - build:runm-test-binaries
         env:
             SHIM_BINARY_PATH:
                 sh: echo $(pwd)/{{.TEST_BIN_DIR}}/containerd-shim-runm-v2-test
@@ -798,13 +813,23 @@ tasks:
     #region LINUX:RUNTIME
     #=================================================================================
 
-    linux:runtime:all:
+    linux:runtime:runm:
         desc: builds the linux runtime
-        deps: ['linux:runtime:kernel', 'linux:runtime:initramfs', 'linux:runtime:mbins', 'linux:runtime:mbins:vmfuse']
+        deps:
+          - linux:runtime:kernel
+          - linux:runtime:initramfs
+          - linux:runtime:mbin.squashfs
 
-    linux:runtime:mbins:
+    linux:runtime:vmfuse:
+        desc: builds the linux runtime
+        deps:
+          - linux:runtime:kernel
+          - linux:runtime:initramfs
+          - linux:runtime:mbin-vmfuse.squashfs
+
+    linux:runtime:mbin.squashfs:
         desc: builds the mbin squashfs
-        deps: ['build:all-test-binaries']
+        deps: ['build:runm-test-binaries']
         run: once
         sources:
           - '{{.TEST_BIN_DIR}}/runm-linux-init'
@@ -822,7 +847,9 @@ tasks:
                     runc-test: '{{.TEST_BIN_DIR}}/runc-test'
         cmds:
           - defer: rm -rf {{.TMP_DIR}}
+            silent: true
           - cmd: mkdir -p {{.TMP_DIR}}/wrk {{.LINUX_RUNTIME_DIR}}
+            silent: true
           - for: {var: FS}
             cmd: mkdir -p $(dirname {{.TMP_DIR}}/wrk/{{.KEY}}) && cp {{.ITEM}} {{.TMP_DIR}}/wrk/{{.KEY}}
             silent: true
@@ -831,9 +858,9 @@ tasks:
           - cmd: cp {{.TMP_DIR}}/mbin.squashfs {{.LINUX_RUNTIME_DIR}}/mbin.squashfs
             silent: true
 
-    linux:runtime:mbins:vmfuse:
+    linux:runtime:mbin-vmfuse.squashfs:
         desc: builds the mbin squashfs
-        deps: ['build:all-test-binaries']
+        deps: ['build:runm-test-binaries']
         run: once
         sources:
           - '{{.TEST_BIN_DIR}}/vmfuse-init'
@@ -850,7 +877,9 @@ tasks:
                     ganesha-plugins.tar.gz: '{{.TEST_BIN_DIR}}/ganesha-plugins.tar.gz'
         cmds:
           - defer: rm -rf {{.TMP_DIR}}
+            silent: true
           - cmd: mkdir -p {{.TMP_DIR}}/wrk {{.LINUX_RUNTIME_DIR}}
+            silent: true
           - for: {var: FS}
             cmd: mkdir -p $(dirname {{.TMP_DIR}}/wrk/{{.KEY}}) && cp {{.ITEM}} {{.TMP_DIR}}/wrk/{{.KEY}}
             silent: true
@@ -862,7 +891,7 @@ tasks:
     linux:runtime:initramfs:
         desc: builds the initramfs
         run: once
-        deps: ['build:all-test-binaries']
+        deps: ['build:runm-test-binaries']
         sources:
           - '{{.TEST_BIN_DIR}}/busybox'
           - '{{.TEST_BIN_DIR}}/runm-linux-mounter'
@@ -880,15 +909,20 @@ tasks:
           - defer: 'rm -rf {{.TMP_DIR}}'
             silent: true
           - cmd: mkdir -p {{.TMP_DIR}}/initramfs {{.LINUX_RUNTIME_DIR}}
+            silent: true
           - for: {var: FS}
             cmd: mkdir -p $(dirname {{.TMP_DIR}}/initramfs/{{.KEY}}) && cp {{.ITEM}} {{.TMP_DIR}}/initramfs/{{.KEY}}
+            silent: true
           - cmd: cd {{.TMP_DIR}}/initramfs && ln -sf {{.INIT_SYMLINK}} init
-          - cmd: ls -lahsr {{.TMP_DIR}}/initramfs
-            #   - cmd: echo -e "#!/bin/busybox\nls -lahsr /\n" > {{.TMP_DIR}}/initramfs/init
+            silent: true
+          - cmd: cd {{.TMP_DIR}} && tree -lahsRpDF --du initramfs
+            silent: true
           - cmd: cd {{.TMP_DIR}}/initramfs && find . -print0 | cpio --null -o --format=newc > {{.TMP_DIR}}/initramfs.cpio
-            #   - cmd: chmod +x {{.TMP_DIR}}/initramfs/init
+            silent: true
           - cmd: gzip -1 -q {{.TMP_DIR}}/initramfs.cpio
+            silent: true
           - cmd: cp {{.TMP_DIR}}/initramfs.cpio.gz {{.LINUX_RUNTIME_DIR}}/initramfs.cpio.gz
+            silent: true
 
     linux:runtime:kernel:
         desc: builds the kernel
@@ -994,7 +1028,7 @@ tasks:
 
     dev:2025-06-18:01:
         desc: runs the shim for 2025-06-18 - bun version from entrypoint
-        deps: ['linux:runtime:all']
+        deps: ['linux:runtime:runm']
         vars:
             TEST_SCENARIO_DIR:
                 sh: realpath ./test/integration/scenarios/2025-07-02
@@ -1009,7 +1043,7 @@ tasks:
 
     dev:2025-07-12:01:
         desc: runs the nerd fonts patcher
-        deps: ['linux:runtime:all', 'build:all-test-binaries']
+        deps: ['linux:runtime:runm', 'build:runm-test-binaries']
         interactive: true
         vars:
             TMP_DIR:
@@ -1042,7 +1076,7 @@ tasks:
 
     dev:compare-nerdctl-docker:single:
         desc: compares the nerdctl and docker commands
-        deps: ['linux:runtime:all', 'build:all-test-binaries']
+        deps: ['linux:runtime:runm', 'build:runm-test-binaries']
         requires: {vars: [CMD, VOLUME_FLAGS, IMAGE]}
         interactive: true
         vars:
@@ -1074,7 +1108,7 @@ tasks:
 
     dev:compare-nerdctl-docker:nerd-fonts-patcher:
         desc: runs the nerd fonts patcher
-        deps: ['linux:runtime:all', 'build:all-test-binaries']
+        deps: ['linux:runtime:runm', 'build:runm-test-binaries']
         vars:
             COMMANDS:
               - cmd: |-
@@ -1103,7 +1137,7 @@ tasks:
     dev:pty-resize-test:
         desc: Test PTY resize functionality using custom PTY environment
         aliases: [pty-resize-test]
-        deps: ['linux:runtime:all', 'build:all-test-binaries']
+        deps: ['linux:runtime:runm', 'build:runm-test-binaries']
 
         vars:
             CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
@@ -1127,7 +1161,7 @@ tasks:
 
     dev:2025-07-02:01:
         desc: runs the shim for 2025-07-02 - complex TypeScript compilation and execution
-        deps: ['linux:runtime:all']
+        deps: ['linux:runtime:runm']
         vars:
             TEST_SCENARIO_DIR:
                 sh: realpath ./test/integration/scenarios/2025-07-02
@@ -1146,7 +1180,7 @@ tasks:
 
     dev:2025-07-05:01:
         desc: runs the shim for 2025-07-05 - detached mode
-        deps: ['linux:runtime:all', 'build:all-test-binaries']
+        deps: ['linux:runtime:runm', 'build:runm-test-binaries']
         # interactive: true
         vars:
             TMP_DIR:
@@ -1192,7 +1226,7 @@ tasks:
 
     dev:2025-07-17:01:
         desc: runs the shim for 2025-07-17 - runm-linux-mounter
-        deps: ['linux:runtime:all', 'build:all-test-binaries']
+        deps: ['linux:runtime:runm', 'build:runm-test-binaries']
         vars:
             TEST_SCENARIO_DIR:
                 sh: realpath ./test/integration/scenarios/2025-07-17
@@ -1218,7 +1252,7 @@ tasks:
 
     dev:2025-07-20:01:
         desc: runs the shim for 2025-07-20
-        deps: ['linux:runtime:all', 'build:all-test-binaries']
+        deps: ['linux:runtime:runm', 'build:runm-test-binaries']
         vars:
             TEST_SCENARIO_DIR:
                 sh: realpath ./test/integration/scenarios/2025-07-20
@@ -1236,77 +1270,9 @@ tasks:
                     --output=type=local,dest={{.TEST_BIN_DIR}}/buildtest \
                     {{.TEST_SCENARIO_DIR}}
 
-    dev:vmfuse:2025-07-21:01:
-        desc: vmfuse POC end-to-end test - mount directory via Linux VM and NFS
-        deps: ['linux:runtime:all', 'build:all-test-binaries']
-        interactive: true
-        vars:
-            TMP_DIR:
-                sh: mktemp -d
-            TEST_DIR:
-                sh: echo "{{.TMP_DIR}}/test-source"
-            MOUNT_TARGET:
-                sh: echo "{{.TMP_DIR}}/test-mount"
-            VMFUSED_SOCK:
-                sh: echo "{{.TMP_DIR}}/vmfused.sock"
-        env:
-            LINUX_RUNTIME_BUILD_DIR: '{{.LINUX_RUNTIME_DIR}}'
-            VMFUSED_ADDRESS: 'unix://{{.VMFUSED_SOCK}}'
-        cmds:
-          - defer: |-
-                echo "Cleaning up vmfuse test..."
-                pkill -f vmfused || true
-                {{.TEST_BIN_DIR}}/vmfusectl  list || true
-                sleep 2
-                rm -rf {{.TMP_DIR}} || true
-          - cmd: |-
-                mkdir -p {{.TEST_DIR}} {{.MOUNT_TARGET}}
-                echo "Hello from vmfuse test!" > {{.TEST_DIR}}/test-file.txt
-                echo "This is a bind mount test via Linux VM and NFS" >> {{.TEST_DIR}}/test-file.txt
-                ls -la {{.TEST_DIR}}
-          - cmd: |-
-                {{.TEST_BIN_DIR}}/vmfused  &
-                VMFUSED_PID=$!
-                sleep 3
-          - cmd: |-
-                {{.TEST_BIN_DIR}}/vmfusectl  mount -t bind {{.TEST_DIR}} {{.MOUNT_TARGET}}
-          - cmd: |-
-                {{.TEST_BIN_DIR}}/vmfusectl  status {{.MOUNT_TARGET}}
-          - cmd: |-
-                {{.TEST_BIN_DIR}}/vmfusectl  list
-          - cmd: |-
-                for i in {1..15}; do
-                    # {{.TEST_BIN_DIR}}/vmfusectl  status {{.MOUNT_TARGET}}
-                    sleep 1
-                done
-          - cmd: |-
-                echo "Testing mounted directory access..."
-                if [ -d "{{.MOUNT_TARGET}}" ]; then
-                    echo "Mount target exists"
-                    if [ -f "{{.MOUNT_TARGET}}/test-file.txt" ]; then
-                        echo "SUCCESS: Test file accessible through vmfuse mount!"
-                        echo "File contents:"
-                        cat "{{.MOUNT_TARGET}}/test-file.txt"
-                    else
-                        echo "FAIL: Test file not found in mount target"
-                        echo "Mount target contents:"
-                        ls -la "{{.MOUNT_TARGET}}" || echo "Cannot list mount target"
-                    fi
-                else
-                    echo "FAIL: Mount target directory not accessible"
-                fi
-          - cmd: |-
-                echo "Unmounting..."
-                {{.TEST_BIN_DIR}}/vmfusectl  umount {{.MOUNT_TARGET}}
-                sleep 2
-          - cmd: |-
-                echo "Final status check..."
-                {{.TEST_BIN_DIR}}/vmfusectl  list
-                echo "vmfuse test completed!"
-
     dev:vmfuse:2025-07-23:01:
         desc: vmfuse POC end-to-end test - mount directory via Linux VM and NFS
-        deps: ['linux:runtime:all', 'build:all-test-binaries']
+        deps: ['linux:runtime:vmfuse', 'build:vmfuse-experiment-binaries']
         interactive: true
         vars:
             TMP_DIR:
@@ -1327,7 +1293,7 @@ tasks:
                 sh: realpath '{{.TEST_BIN_DIR}}/vmfusectl'
         cmds:
           - cmd: |-
-                go run ./test/integration/vmfuse/cmd/vmfuse_t1
+                go run ./test/experiments/vmfuse/cmd/vmfuse_t1
 
     #endregion dev
 

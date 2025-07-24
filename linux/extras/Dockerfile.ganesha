@@ -1,0 +1,113 @@
+########################################################
+# args
+########################################################
+
+ARG BUSYBOX_VERSION=1.36.1
+ARG GO_VERSION=1.25rc1
+ARG ALPINE_VERSION=3.22
+ARG ALPINE_BUSYBOX_VERSION=3.21
+ARG DEBIAN_CODENAME=bookworm
+ARG SOCAT_VERSION=1.8.0.3
+ARG TZDATA_VERSION=2025b
+ARG GANESHA_VERSION=V6.5
+
+FROM alpine:${ALPINE_VERSION} AS alpine-ref
+FROM alpine:${ALPINE_BUSYBOX_VERSION} AS alpine-busybox-ref
+FROM debian:${DEBIAN_CODENAME}-slim AS debian-ref
+FROM golang:${GO_VERSION}-alpine${ALPINE_VERSION} AS alpine-golang-ref
+FROM golang:${GO_VERSION}-${DEBIAN_CODENAME} AS debian-golang-ref
+
+########################################################
+# debian-based builder
+########################################################
+
+FROM debian-ref AS debian-base
+
+ENV DEBIAN_FRONTEND=noninteractive \
+	DEBCONF_NONINTERACTIVE_SEEN=true \
+	LC_ALL=C.UTF-8 \
+	LANG=C.UTF-8
+
+RUN apt-get update \
+	&& apt-get install -y \
+		build-essential \
+		autoconf \
+		libtool \
+		git \
+		bison \
+		flex \
+		wget \
+	&& rm -rf /var/lib/apt/lists/*
+
+########################################################
+# ganesha base
+########################################################
+
+FROM alpine-ref AS ganesha-base
+
+RUN apk add --no-cache git
+
+ARG GANESHA_VERSION
+
+RUN git clone --depth 1 --branch ${GANESHA_VERSION} https://github.com/nfs-ganesha/nfs-ganesha.git /git-repo
+
+WORKDIR /git-repo
+
+RUN git submodule update --init --recursive
+	
+########################################################
+# ganesha debian static (attempt 4)
+########################################################
+
+FROM debian-ref AS ganesha-staticx-builder
+
+# Build your working dynamic NFS-Ganesha (your Attempt 3)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates git build-essential cmake ninja-build bison flex \
+    libtirpc-dev liburcu-dev libnsl-dev libcap-dev libacl1-dev \
+    zlib1g-dev libssl-dev e2fsprogs patchelf zstd \
+	pkg-config python3 python3-pip python3-venv python3-dev scons && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY --from=ganesha-base /git-repo /git-repo
+
+# Build dynamic binary with FSAL libraries
+RUN mkdir /build && cd /build && \
+    cmake /git-repo/src -G Ninja \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DUSE_FSAL_VFS=ON \
+      -DUSE_GSS=OFF -DUSE_DBUS=OFF -DUSE_MONITORING=OFF && \
+    ninja ganesha.nfsd && \
+    ninja install 
+
+RUN mkdir /output
+WORKDIR /output
+
+# Install StaticX
+# create a virtual environment
+RUN python3 -m venv /output/venv
+# activate the virtual environment
+RUN . /output/venv/bin/activate
+# install staticx
+RUN /output/venv/bin/pip install wheel
+RUN /output/venv/bin/pip install staticx
+# Bundle everything into single static-like executable including FSAL libraries
+# The files are installed to /usr/lib/ganesha/ and /usr/bin/, not /usr/local/
+RUN /output/venv/bin/staticx \
+    -l /usr/lib/ganesha/libfsalvfs.so \
+    -l /usr/lib/libganesha_nfsd.so.6.5 \
+    /usr/bin/ganesha.nfsd /ganesha-static
+
+RUN /output/venv/bin/sx-extract /ganesha-static /ganesha-static-extracted
+
+RUN ls -lahrs /ganesha-static-extracted
+
+# copy the two libs to a dir to tar them into a single file
+RUN mkdir -p /ganesha-plugins
+RUN cp /usr/lib/ganesha/libfsalvfs.so /ganesha-plugins/
+RUN cp /usr/lib/libganesha_nfsd.so.6.5 /ganesha-plugins/
+RUN cd /ganesha-plugins && tar -czvf /ganesha-plugins.tar.gz .
+
+FROM scratch AS ganesha-export
+COPY --from=ganesha-staticx-builder /ganesha-static /ganesha
+COPY --from=ganesha-staticx-builder /ganesha-plugins.tar.gz /ganesha-plugins.tar.gz
