@@ -16,9 +16,9 @@ import (
 	"github.com/moby/buildkit/frontend/gateway/grpcclient"
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/util/bklog"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
-	"gitlab.com/tozd/go/errors"
 	"google.golang.org/grpc"
 
 	containerdclient "github.com/containerd/containerd/v2/client"
@@ -95,12 +95,7 @@ func main() {
 	preBefore := app.Before
 
 	exitErrHandler := func(c *cli.Context, err error) {
-		logger.Error("buildkitd failed", "error", errors.Errorf("buildkitd failed: %w", err))
-		if debugDeferred != nil {
-			debugDeferred()
-		}
-		exitCode = 1
-		return
+		// doing nothing here lets our main app handler handle the error
 	}
 
 	app.ExitErrHandler = exitErrHandler
@@ -134,7 +129,7 @@ func main() {
 	}
 
 	if err := app.Run(os.Args); err != nil {
-		logger.Error("buildkitd failed", "error", err)
+		logger.Error("buildkitd failed", "error", errors.Errorf("running buildkitd: %w", err))
 		if debugDeferred != nil {
 			debugDeferred()
 		}

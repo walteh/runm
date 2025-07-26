@@ -241,13 +241,7 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 		slog.DebugContext(ctx, "EXECPROCESS:START[E]", "id", e.id, "pid", e.pid.pid)
 		opts.ConsoleSocket = socket
 	}
-	slog.DebugContext(ctx, "EXECPROCESS:START[F]", "id", e.id, "pid", e.pid.pid)
-	// todo: the prob is that this is never returinging
-	// gorunc:call Exec
-	if err := e.parent.runtime.Exec(ctx, e.parent.id, e.spec, opts); err != nil {
-		close(e.waitBlock)
-		return errors.Errorf("OCI runtime exec failed: %w", err)
-	}
+	// ========= should run before not after ==============
 	slog.DebugContext(ctx, "EXECPROCESS:START[G]", "id", e.id, "pid", e.pid.pid)
 	if e.stdio.Stdin != "" {
 		if err := e.openStdin(e.stdio.Stdin); err != nil {
@@ -275,6 +269,16 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 		}
 	}
 	slog.DebugContext(ctx, "EXECPROCESS:START[M]", "id", e.id, "pid", e.pid.pid)
+	// ========= should run before not after ==============
+	slog.DebugContext(ctx, "EXECPROCESS:START[F]", "id", e.id, "pid", e.pid.pid)
+
+	// todo: the prob is that this is never returinging
+	// gorunc:call Exec
+	if err := e.parent.runtime.Exec(ctx, e.parent.id, e.spec, opts); err != nil {
+		close(e.waitBlock)
+		return errors.Errorf("OCI runtime exec failed: %w", err)
+	}
+
 	pid, err := e.parent.runtime.ReadPidFile(ctx, pidFile.Path())
 	if err != nil {
 		return errors.Errorf("failed to retrieve OCI runtime exec pid: %w", err)

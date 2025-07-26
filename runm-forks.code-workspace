@@ -56,15 +56,15 @@
 		{
 			"name": "fsutil",
 			"path": "../fsutil"
-		}
+		},
 		// {
 		// 	"name": "sys",
 		// 	"path": "../sys"
 		// },
-		// {
-		// 	"name": "go-errors",
-		// 	"path": "../go-errors"
-		// }
+		{
+			"name": "go-errors",
+			"path": "../go-errors"
+		}
 	],
 	"extensions": {
 		"recommendations": [

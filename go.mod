@@ -24,6 +24,8 @@ replace (
 
 replace gvisor.dev/gvisor => gvisor.dev/gvisor v0.0.0-20250611222258-0fe9a4bf489c
 
+replace github.com/pkg/errors => ../go-errors-2
+
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.6-20250717185734-6c6e0d3c608e.1
 	buf.build/go/protovalidate v0.14.0
@@ -356,7 +358,7 @@ require (
 	github.com/moby/sys/mountinfo v0.7.2 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.4-0.20230606125235-dd1b4c2e81af
 	github.com/stoewer/go-strcase v1.3.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
