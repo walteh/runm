@@ -58,6 +58,10 @@ func WithDoneMessage(opt string) TickerOpt {
 	return func(o *TickerOpts) { o.doneMessage = opt }
 }
 
+func WithStartMessage(opt string) TickerOpt {
+	return func(o *TickerOpts) { o.startMessage = opt }
+}
+
 func WithCallerSkip(opt int) TickerOpt {
 	return func(o *TickerOpts) { o.callerSkip = opt }
 }
@@ -93,6 +97,8 @@ func (o TickerOpts) Message() string { return o.message }
 func (o TickerOpts) AttrFunc() func() []slog.Attr { return o.attrFunc }
 
 func (o TickerOpts) DoneMessage() string { return o.doneMessage }
+
+func (o TickerOpts) StartMessage() string { return o.startMessage }
 
 func (o TickerOpts) CallerSkip() int { return o.callerSkip }
 

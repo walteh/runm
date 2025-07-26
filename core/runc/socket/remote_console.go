@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"reflect"
 	"sync"
 
 	"github.com/containerd/console"
@@ -44,6 +45,16 @@ func NewRemotePTYConsoleAdapter(ctx context.Context, wrcon io.ReadWriteCloser, r
 		return nil, errors.Errorf("failed to create console: %w", err)
 	}
 
+	creator, err := newConsoleCreator()
+	if err != nil {
+		return nil, errors.Errorf("failed to create console creator: %w", err)
+	}
+
+	// localKqueueConsole, err := creator(consoleInstance)
+	// if err != nil {
+	// 	return nil, errors.Errorf("failed to add console to kqueue: %w", err)
+	// }
+
 	adapter := &RemoteConsole{
 		conn:        wrcon,
 		ttyFile:     ttyFile,
@@ -55,10 +66,12 @@ func NewRemotePTYConsoleAdapter(ctx context.Context, wrcon io.ReadWriteCloser, r
 		creationCtx: ctx,
 	}
 
-	kqueueConsole, err := newConsole(adapter)
+	networkKqueueConsole, err := creator(adapter)
 	if err != nil {
 		return nil, errors.Errorf("failed to add console to kqueue: %w", err)
 	}
+
+	// networkKqueueConsole.DisableEcho()
 
 	// WARNING: leaving this here for debugging purposes, but when we enable it we break the
 	// entire forward of the terminal output
@@ -74,19 +87,28 @@ func NewRemotePTYConsoleAdapter(ctx context.Context, wrcon io.ReadWriteCloser, r
 
 	adapter.wg.Add(2)
 
-	// Network -> PTY (stdin from network to container)
+	// Network -> PTY (guest pty stderr/stdout -> host pty)
 	go func() {
 		defer adapter.wg.Done()
-		<-conn.DebugCopy(ctx, "network(read)->kqueue(write)", kqueueConsole, adapter.conn)
-		// adapter.ptyFile.Close()
+		<-conn.DebugCopy(ctx, "network(read)->kqueue(write)", networkKqueueConsole, adapter.conn)
+		adapter.conn.Close()
 		// adapter.ptyFile.Close() // Signal EOF to container
 	}()
 
 	// PTY -> Network (stdout/stderr from container to network)
 	go func() {
 		defer adapter.wg.Done()
-		<-conn.DebugCopy(ctx, "kqueue(read)->network(write)", adapter.conn, kqueueConsole)
+		<-conn.DebugCopy(ctx, "kqueue(read)->network(write)", adapter.conn, networkKqueueConsole)
+		adapter.conn.Close()
+		// adapter.ptyFile.Close() // Signal EOF to container
 	}()
+
+	// go func() {
+	// 	adapter.wg.Wait()
+	// 	adapter.conn.Close()
+	// 	adapter.console.Close()
+	// }()
+
 	return adapter, nil
 }
 
@@ -133,7 +155,9 @@ func (r *RemoteConsole) Name() string {
 
 // Read implements runtime.RuntimeConsole.
 func (r *RemoteConsole) Read(p []byte) (n int, err error) {
-	return r.console.Read(p)
+	n, err = r.console.Read(p)
+	slog.DebugContext(r.creationCtx, "REMOTE_CONSOLE_ADAPTER:READ", "data", string(p[:n]), "err", err, "console_type", reflect.TypeOf(r.console))
+	return n, err
 }
 
 // Reset implements runtime.RuntimeConsole.
@@ -175,5 +199,7 @@ func (r *RemoteConsole) Size() (console.WinSize, error) {
 
 // Write implements runtime.RuntimeConsole.
 func (r *RemoteConsole) Write(p []byte) (n int, err error) {
-	return r.console.Write(p)
+	n, err = r.console.Write(p)
+	slog.DebugContext(r.creationCtx, "REMOTE_CONSOLE_ADAPTER:WRITE", "data", string(p[:n]), "err", err, "console_type", reflect.TypeOf(r.console))
+	return n, err
 }

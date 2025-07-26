@@ -49,6 +49,7 @@ func DebugCopyWithBuffer(ctx context.Context, name string, w io.Writer, r io.Rea
 		defer ticker.NewTicker(
 			ticker.WithLogLevel(slog.LevelDebug),
 			ticker.WithFrequency(15),
+			ticker.WithStartMessage(fmt.Sprintf("%s[START]", id)),
 			ticker.WithSlogBaseContext(ctx),
 			ticker.WithAttrFunc(func() []slog.Attr {
 				return []slog.Attr{

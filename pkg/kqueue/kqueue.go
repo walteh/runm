@@ -196,18 +196,18 @@ func (ec *KqueueConsole) Read(p []byte) (n int, err error) {
 		read, err = ec.Console.Read(p[n:])
 		n += read
 		if err != nil {
-			var hangup bool
-			if perr, ok := err.(*os.PathError); ok {
-				hangup = (perr.Err == unix.EAGAIN || perr.Err == unix.EIO)
-			} else {
-				hangup = (err == unix.EAGAIN || err == unix.EIO)
-			}
+			hangup := isHangupError(err)
 			// if the other end disappear, assume this is temporary and wait for the
 			// signal to continue again. Unless we didnt read anything and the
 			// console is already marked as closed then we should exit
-			if hangup && !(n == 0 && len(p) > 0 && ec.closed) {
+			shouldWait := !(n == 0 && len(p) > 0 && ec.closed)
+			// slog.Debug("hangup read error", "err", err, "hangup", hangup, "n", n, "p", strings.TrimRight(string(p), "\x00"), "closed", ec.closed, "shouldWait", shouldWait)
+			if hangup && shouldWait {
 				ec.readc.Wait()
 				continue
+			}
+			if hangup && !shouldWait {
+				err = errors.Errorf("kqueue console already closed")
 			}
 		}
 		break
@@ -236,12 +236,7 @@ func (ec *KqueueConsole) Write(p []byte) (n int, err error) {
 		written, err = ec.Console.Write(p[n:])
 		n += written
 		if err != nil {
-			var hangup bool
-			if perr, ok := err.(*os.PathError); ok {
-				hangup = (perr.Err == unix.EAGAIN || perr.Err == unix.EIO)
-			} else {
-				hangup = (err == unix.EAGAIN || err == unix.EIO)
-			}
+			hangup := isHangupError(err)
 			// if the other end disappears, assume this is temporary and wait for the
 			// signal to continue again.
 			if hangup {
@@ -290,4 +285,16 @@ func (ec *KqueueConsole) signalWrite() {
 	ec.writec.L.Lock()
 	ec.writec.Signal()
 	ec.writec.L.Unlock()
+}
+
+func isHangupError(err error) bool {
+	if perr, ok := err.(*os.PathError); ok {
+		err = perr.Err
+	}
+	switch err {
+	case unix.EIO, unix.EWOULDBLOCK:
+		return true
+	}
+	slog.Debug("non hangup error", "err", err)
+	return false
 }

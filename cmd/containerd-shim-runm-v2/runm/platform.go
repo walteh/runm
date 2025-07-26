@@ -20,6 +20,7 @@ package runm
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/url"
@@ -111,7 +112,7 @@ func (p *platform[T]) CopyConsole(ctx context.Context, console console.Console, 
 
 	// ctx = slogctx.Append(ctx, "id", id)
 
-	slog.DebugContext(ctx, "COPYCONSOLE[A] copying console to binary", "id", id, "stdout", stdout)
+	slog.DebugContext(ctx, "COPYCONSOLE[A] copying console to binary", "id", id, "stdout", stdout, "uri", uri, "uri_scheme", uri.Scheme)
 
 	switch uri.Scheme {
 	case "binary":
@@ -218,8 +219,8 @@ func (p *platform[T]) CopyConsole(ctx context.Context, console console.Console, 
 			cwg.Done()
 			buf := bufPool.Get().(*[]byte)
 			defer bufPool.Put(buf)
-			slog.DebugContext(ctx, "COPYCONSOLE[L] copying console to fifo")
-			<-conn.DebugCopyWithBuffer(ctx, "kqueue(read)->stdout(write)", outw, kqueueConsole, *buf)
+			slog.DebugContext(ctx, "COPYCONSOLE[L] copying console to fifo", "kqueueConsoleType", fmt.Sprintf("%T", kqueueConsole))
+			<-conn.DebugCopyWithBuffer(ctx, "kqueue[adapter](read)->stdout(write)", outw, kqueueConsole, *buf)
 			slog.DebugContext(ctx, "COPYCONSOLE[N] copied console to fifo")
 
 			outw.Close()

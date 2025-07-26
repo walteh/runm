@@ -17,6 +17,7 @@ type TickerOpts struct {
 	message         string        `default:"ticker running"`
 	attrFunc        func() []slog.Attr
 	doneMessage     string
+	startMessage    string
 	callerSkip      int `default:"1"`
 	callerUintptr   uintptr
 	slogBaseContext context.Context
@@ -101,6 +102,16 @@ func (t *Ticker) RunAsDefer() func() {
 }
 
 func (t *Ticker) run() {
+
+	if t.opts.startMessage != "" {
+		attrs := []slog.Attr{}
+		if t.opts.attrFunc != nil {
+			attrs = t.opts.attrFunc()
+		}
+		attrs = append(attrs, slog.Any("tick", t.ticks))
+		attrs = append(attrs, slog.Any("ctx_err", t.context.Err()))
+		logAttrs(t.context, t.opts.logLevel, t.opts.startMessage, t.caller, attrs...)
+	}
 
 	for range t.ticker.C {
 		// if ctx.Err() != nil {
