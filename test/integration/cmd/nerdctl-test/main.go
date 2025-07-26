@@ -81,15 +81,6 @@ var (
 	Bold = color.New(color.Bold).SprintfFunc()
 )
 
-func main() {
-
-	if err := xmain(); err != nil {
-		slog.InfoContext(context.Background(), "AHHHHHHHH", "error", err)
-		errutil.HandleExitCoder(err)
-		log.L.Fatal(err)
-	}
-}
-
 // usage was derived from https://github.com/spf13/cobra/blob/v1.2.1/command.go#L491-L514
 func usage(c *cobra.Command) error {
 	s := "Usage: "
@@ -158,12 +149,26 @@ func usage(c *cobra.Command) error {
 
 var goodStdLogger *logrus.Logger
 
-func xmain() error {
+func main() {
 	if len(os.Args) == 3 && os.Args[1] == logging.MagicArgv1 {
 		// containerd runtime v2 logging plugin mode.
 		// "binary://BIN?KEY=VALUE" URI is parsed into Args {BIN, KEY, VALUE}.
-		return logging.Main(os.Args[2])
+		err := logging.Main(os.Args[2])
+		if err != nil {
+			log.L.Fatal(err)
+		}
+		return
 	}
+
+	exitCode := 0
+	exitCoderError := error(nil)
+	defer func() {
+		if exitCoderError != nil {
+			errutil.HandleExitCoder(exitCoderError)
+		}
+
+		os.Exit(exitCode)
+	}()
 
 	clientopts := []grpc.DialOption{
 		otel.GetGrpcClientOpts(),
@@ -177,7 +182,9 @@ func xmain() error {
 	// nerdctl CLI mode
 	app, err := newApp()
 	if err != nil {
-		return err
+		fmt.Fprintln(os.Stderr, "error creating app:", err)
+		exitCode = 1
+		return
 	}
 
 	prevPreRun := app.PersistentPreRunE
@@ -231,11 +238,15 @@ func xmain() error {
 		return nil
 	}
 
-	if err := app.ExecuteContext(context.Background()); err != nil {
-		return err
+	ctx := context.Background()
+
+	if err := app.ExecuteContext(ctx); err != nil {
+		slog.InfoContext(ctx, "error while running nerdctl", "error", err)
+		exitCode = 1
+		exitCoderError = err
+		return
 	}
 
-	return nil
 }
 
 func initRootCmdFlags(rootCmd *cobra.Command, tomlPath string) (*pflag.FlagSet, error) {

@@ -64,7 +64,11 @@
 		{
 			"name": "go-errors",
 			"path": "../go-errors"
-		}
+		},
+		{
+			"name": "stargz-snapshotter",
+			"path": "../stargz-snapshotter"
+		},
 	],
 	"extensions": {
 		"recommendations": [

@@ -49,7 +49,7 @@ func NewDevContainerdServer(ctx context.Context, app *cli.App, debug bool) (*Dev
 		return nil, errors.Errorf("setting up directories: %w", err)
 	}
 
-	if err := server.createRuncConfig(ctx); err != nil {
+	if err := server.createContainerdConfig(ctx); err != nil {
 		return nil, errors.Errorf("creating config: %w", err)
 	}
 

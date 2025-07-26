@@ -109,7 +109,7 @@ experimental   = true
 	return nil
 } //s////////////////////////////////
 
-func (s *DevContainerdServer) createRuncConfig(ctx context.Context) error {
+func (s *DevContainerdServer) createContainerdConfig(ctx context.Context) error {
 	logLevel := "info"
 	if s.debug {
 		logLevel = "debug"
@@ -155,6 +155,8 @@ startup_delay = "10s"
 [plugins."io.containerd.metadata.v1.bolt"]
 content_sharing_policy = "shared"
 
+
+
 ## Register harpoon runtime for CRI
 #[plugins."io.containerd.cri.v1.runtime".containerd]
 #  default_runtime_name = "%[5]s"
@@ -177,79 +179,22 @@ content_sharing_policy = "shared"
 		ContainerdOverlayfsSnapshotsDir(), // %[10]s
 	)
 
-	if err := os.WriteFile(ContainerdConfigTomlPath(), []byte(configContent), 0644); err != nil {
-		return errors.Errorf("writing containerd config: %w", err)
+	if EnableStargzSnapshotter() {
+		configContent += fmt.Sprintf(`
+# Enable stargz snapshotter for CRI
+[plugins."io.containerd.grpc.v1.cri".containerd]
+  snapshotter = "stargz"
+  disable_snapshot_annotations = false
+
+# Plug stargz snapshotter into containerd
+[proxy_plugins]
+  [proxy_plugins.stargz]
+    type = "snapshot"
+    address = "%[1]s"
+  [proxy_plugins.stargz.exports]
+    root = "%[2]s"
+`, StargzSocketPath(), StargzExportsDirPath())
 	}
-
-	slog.InfoContext(ctx, "Created containerd config", "path", ContainerdConfigTomlPath())
-	return nil
-}
-
-func (s *DevContainerdServer) createCustomConfig(ctx context.Context) error {
-	logLevel := "info"
-	if s.debug {
-		logLevel = "debug"
-	}
-
-	configContent := fmt.Sprintf(`
-version = 3
-root   = "%[1]s"
-state  = "%[2]s"
-
-[grpc]
-  address = "%[3]s"
-
-[ttrpc]
-  address = "%[3]s.ttrpc"
-
-[debug]
-  level = "%[4]s"
-
-[plugins."io.containerd.runtime.v1.linux"]
-  shim_debug = true
-
-# Register harpoon runtime for CRI
-[plugins."io.containerd.cri.v1.runtime".containerd]
-  default_runtime_name = "%[5]s"
-
-  [plugins."io.containerd.cri.v1.runtime".containerd.runtimes]
-    [plugins."io.containerd.cri.v1.runtime".containerd.runtimes."%[5]s"]
-      runtime_type = "%[5]s"
-      [plugins."io.containerd.cri.v1.runtime".containerd.runtimes."%[5]s".options]
-        binary_name = "%[6]s"
-
-# Snapshotter config
-[plugins."io.containerd.snapshotter.v1.overlayfs"]
-  root_path = "%[7]s/overlayfs"
-
-[plugins."io.containerd.snapshotter.v1.native"]
-  root_path = "%[7]s/native"
-
-# Content store config
-[plugins."io.containerd.content.v1.content"]
-  path = "%[8]s"
-
-# Garbage collection settings - delay GC to prevent race conditions during testing
-[plugins."io.containerd.gc.v1.scheduler"]
-  pause_threshold = 0.02
-  deletion_threshold = 0
-  mutation_threshold = 100
-  schedule_delay = "0s"
-  startup_delay = "10s"
-
-# Metadata settings for content sharing
-[plugins."io.containerd.metadata.v1.bolt"]
-  content_sharing_policy = "shared"
-`,
-		ContainerdRootDir(),      // %[1]s
-		ContainerdStateDir(),     // %[2]s
-		ContainerdAddress(),      // %[3]s
-		logLevel,                 // %[4]s
-		shimRuntimeID,            // %[5]s
-		ShimSimlinkPath(),        // %[6]s
-		ContainerdSnapshotsDir(), // %[7]s
-		filepath.Join(ContainerdRootDir(), "io.containerd.content.v1.content"), // %[8]s
-	)
 
 	if err := os.WriteFile(ContainerdConfigTomlPath(), []byte(configContent), 0644); err != nil {
 		return errors.Errorf("writing containerd config: %w", err)

@@ -42,14 +42,15 @@ var (
 	globalPersistentWorkDir = "/tmp/tcontainerd-persistent"
 	globalFsEnvDir          = "/tmp/tcontainerd-fs-env"
 
-	namespace        = "default"
-	shimRuntimeID    = "io.containerd.runc.v2"
-	shimName         = "containerd-shim-runc-v2"
-	timeout          = 10 * time.Second
-	pullPolicy       = "missing"
-	snapshotter      = "native"
-	defaultDebugPort = 12346
-	underDlvEnvVar   = "UNDER_DLV"
+	namespace               = "default"
+	shimRuntimeID           = "io.containerd.runc.v2"
+	shimName                = "containerd-shim-runc-v2"
+	timeout                 = 10 * time.Second
+	pullPolicy              = "missing"
+	snapshotter             = "native"
+	defaultDebugPort        = 12346
+	underDlvEnvVar          = "UNDER_DLV"
+	enableStargzSnapshotter = false
 )
 
 func WorkDir() string                  { return globalWorkDir }
@@ -88,8 +89,23 @@ func CDISpecDir() string                      { return filepath.Join(PersistentW
 func BuildkitdOtelSocketPath() string {
 	return filepath.Join(PersistentWorkDir(), "buildkitd-otel.sock")
 }
-func PullPolicy() string  { return pullPolicy }
-func Snapshotter() string { return snapshotter }
+func PullPolicy() string { return pullPolicy }
+func Snapshotter() string {
+	if enableStargzSnapshotter {
+		return "stargz"
+	}
+	return snapshotter
+}
+
+func EnableStargzSnapshotter() bool { return enableStargzSnapshotter }
+
+func StargzSocketPath() string {
+	return filepath.Join(PersistentWorkDir(), "containerd-stargz-grpc.sock")
+}
+
+func StargzExportsDirPath() string {
+	return filepath.Join(PersistentWorkDir(), "containerd-stargz-grpc-exports")
+}
 
 func MagicHostOtlpGRPCPort() uint32 {
 	return 4317
