@@ -1,8 +1,9 @@
-go 1.25
+go 1.25rc2
 
 toolchain go1.25rc2
 
 use (
 	.
 	./tools
+	./exp/k8s
 )

@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"name": "runm",
+			"path": ".."
+		}
+	],
+	"extensions": {
+		"recommendations": ["golang.go"]
+	},
+	"settings": {
+		// "go.languageServerFlags": ["-mcp.listen=localhost:50051"]
+	}
+}

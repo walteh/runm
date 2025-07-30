@@ -6,6 +6,7 @@ exclude github.com/containerd/nerdctl/mod/tigron v0.0.0
 
 // forks
 replace (
+	k8s.io/kubernetes => ../kubernetes
 	github.com/Code-Hex/vz/v3 => ../vz
 	github.com/containerd/console => ../console
 	github.com/containerd/containerd/api => ../containerd/api
@@ -22,11 +23,9 @@ replace (
 	github.com/opencontainers/runc => ../runc
 	github.com/tonistiigi/fsutil => ../fsutil
 	gitlab.com/tozd/go/errors => ../go-errors
+	gvisor.dev/gvisor => gvisor.dev/gvisor v0.0.0-20250611222258-0fe9a4bf489c // this needs to be updated manually (because the 'go' branch is the only one that works)
+	github.com/pkg/errors => ../go-errors-2 // this is to avoid duplicate module errors
 )
-
-replace gvisor.dev/gvisor => gvisor.dev/gvisor v0.0.0-20250611222258-0fe9a4bf489c
-
-replace github.com/pkg/errors => ../go-errors-2
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.6-20250717185734-6c6e0d3c608e.1
