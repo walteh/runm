@@ -2,72 +2,72 @@
 	"folders": [
 		{
 			"name": "runm",
-			"path": "."
+			"path": "../"
 		},
 		{
 			// so the buf and proto lsps work
 			"name": "proto",
-			"path": "./proto"
+			"path": "../proto"
 		},
 		// {
 		// 	"name": "gvisor-tap-vsock",
-		// 	"path": "../gvisor-tap-vsock"
+		// 	"path": "../../gvisor-tap-vsock"
 		// },
 		{
 			"name": "runc",
-			"path": "../runc"
+			"path": "../../runc"
 		},
 		{
 			"name": "go-runc",
-			"path": "../go-runc"
+			"path": "../../go-runc"
 		},
 		{
 			"name": "console",
-			"path": "../console"
+			"path": "../../console"
 		},
 		{
 			"name": "containerd",
-			"path": "../containerd"
+			"path": "../../containerd"
 		},
 		{
 			"name": "nerdctl",
-			"path": "../nerdctl"
+			"path": "../../nerdctl"
 		},
 		{
 			"name": "buildkit",
-			"path": "../buildkit"
+			"path": "../../buildkit"
 		},
 		// {
 		// 	"name": "ec1",
-		// 	"path": "../ec1"
+		// 	"path": "../../ec1"
 		// },
 		// {
 		// 	"name": "ttrpc",
-		// 	"path": "../ttrpc"
+		// 	"path": "../../ttrpc"
 		// },
 		{
 			"name": "vz",
-			"path": "../vz"
+			"path": "../../vz"
 		},
 		{
 			"name": "task",
-			"path": "../task"
+			"path": "../../task"
 		},
 		{
 			"name": "fsutil",
-			"path": "../fsutil"
+			"path": "../../fsutil"
 		},
 		// {
 		// 	"name": "sys",
-		// 	"path": "../sys"
+		// 	"path": "../../sys"
 		// },
 		{
 			"name": "go-errors",
-			"path": "../go-errors"
+			"path": "../../go-errors"
 		},
 		{
 			"name": "stargz-snapshotter",
-			"path": "../stargz-snapshotter"
+			"path": "../../stargz-snapshotter"
 		}
 	],
 	"extensions": {

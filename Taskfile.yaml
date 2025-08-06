@@ -9,91 +9,84 @@ vars:
     SUPPORTED_ARCHS:
       - arm64
     FORKS:
-      # replace (
-      # 	github.com/Code-Hex/vz/v3 => ../vz
-      # 	github.com/containerd/console => ../console
-      # 	github.com/containerd/containerd/api => ../containerd/api
-      # 	github.com/containerd/containerd/v2 => ../containerd
-      # 	github.com/containerd/containerd/v2/pkg/sys => ../containerd/pkg/sys
-      # 	github.com/containerd/go-runc => ../go-runc
-      # 	github.com/containerd/nerdctl/mod/tigron => ../nerdctl/mod/tigron
-      # 	github.com/containerd/nerdctl/v2 => ../nerdctl
-      # 	github.com/containerd/ttrpc => ../ttrpc
-      # 	github.com/containers/gvisor-tap-vsock => ../gvisor-tap-vsock
-      # 	github.com/moby/buildkit => ../buildkit
-      # 	github.com/opencontainers/runc => ../runc
-      # 	github.com/tonistiigi/fsutil => ../fsutil
-      # 	gitlab.com/tozd/go/errors => ../go-errors
-      # )
-      - branch: main
-        repo: "github.com/Code-Hex/vz"
-        upstream: "github.com/Code-Hex/vz"
-        path: "../vz"
+        map:
+            vz:
+                branch: main
+                repo: "github.com/Code-Hex/vz"
+                upstream: "github.com/Code-Hex/vz"
+                path: "../vz"
 
-      - branch: main
-        repo: "github.com/walteh/ttrpc"
-        upstream: "github.com/containerd/ttrpc"
-        path: "../ttrpc"
+            ttrpc:
+                branch: main
+                repo: "github.com/walteh/ttrpc"
+                upstream: "github.com/containerd/ttrpc"
+                path: "../ttrpc"
 
-      - branch: main
-        repo: "github.com/walteh/containerd"
-        upstream: "github.com/containerd/containerd"
-        path: "../containerd"
+            containerd:
+                branch: main
+                repo: "github.com/walteh/containerd"
+                upstream: "github.com/containerd/containerd"
+                path: "../containerd"
 
-      - branch: main
-        repo: "github.com/walteh/nerdctl"
-        upstream: "github.com/containerd/nerdctl"
-        path: "../nerdctl"
+            nerdctl:
+                branch: main
+                repo: "github.com/walteh/nerdctl"
+                upstream: "github.com/containerd/nerdctl"
+                path: "../nerdctl"
 
-      - branch: main
-        repo: "github.com/walteh/runc"
-        upstream: "github.com/opencontainers/runc"
-        path: "../runc"
+            runc:
+                branch: main
+                repo: "github.com/walteh/runc"
+                upstream: "github.com/opencontainers/runc"
+                path: "../runc"
 
-      - branch: main
-        repo: "github.com/walteh/gvisor-tap-vsock"
-        upstream: "github.com/containers/gvisor-tap-vsock"
-        path: "../gvisor-tap-vsock"
+            gvisor-tap-vsock:
+                branch: main
+                repo: "github.com/walteh/gvisor-tap-vsock"
+                upstream: "github.com/containers/gvisor-tap-vsock"
+                path: "../gvisor-tap-vsock"
 
-      - branch: master
-        repo: "github.com/walteh/buildkit"
-        upstream: "github.com/moby/buildkit"
-        path: "../buildkit"
+            buildkit:
+                branch: master
+                repo: "github.com/walteh/buildkit"
+                upstream: "github.com/moby/buildkit"
+                path: "../buildkit"
 
-      - branch: main
-        repo: "github.com/walteh/ttrpc"
-        upstream: "github.com/containerd/ttrpc"
-        path: "../ttrpc"
+            console:
+                branch: main
+                repo: "github.com/walteh/console"
+                upstream: "github.com/containerd/console"
+                path: "../console"
 
-      - branch: main
-        repo: "github.com/walteh/console"
-        upstream: "github.com/containerd/console"
-        path: "../console"
+            go-runc:
+                branch: main
+                repo: "github.com/walteh/go-runc"
+                upstream: "github.com/containerd/go-runc"
+                path: "../go-runc"
 
-      - branch: main
-        repo: "github.com/walteh/go-runc"
-        upstream: "github.com/containerd/go-runc"
-        path: "../go-runc"
+            go-errors:
+                branch: main
+                repo: "github.com/walteh/go-errors"
+                upstream: "gitlab.com/tozd/go/errors"
+                path: "../go-errors"
 
-      - branch: main
-        repo: "github.com/walteh/go-errors"
-        upstream: "gitlab.com/tozd/go/errors"
-        path: "../go-errors"
+            fsutil:
+                branch: master
+                repo: "github.com/walteh/fsutil"
+                upstream: "github.com/tonistiigi/fsutil"
+                path: "../fsutil"
 
-      - branch: main
-        repo: "github.com/walteh/fsutil"
-        upstream: "github.com/tonistiigi/fsutil"
-        path: "../fsutil"
+            task:
+                branch: main
+                repo: "github.com/walteh/task"
+                upstream: "github.com/go-task/task"
+                path: "../task"
 
-      - branch: main
-        repo: "github.com/walteh/ttrpc"
-        upstream: "github.com/containerd/ttrpc"
-        path: "../ttrpc"
-
-      - branch: main
-        repo: "github.com/walteh/task"
-        upstream: "github.com/go-task/task"
-        path: "../task"
+            kubernetes:
+                branch: main
+                repo: "github.com/walteh/kubernetes"
+                upstream: "k8s.io/kubernetes"
+                path: "../kubernetes"
 
     BUILD_OUT_DIR: gen/build
     TEST_BIN_DIR: ./gen/build/test-bin
@@ -590,7 +583,7 @@ tasks:
         desc: builds the busybox binary
         run: once
         sources:
-          - ./linux/initramfs/*
+          - ./linux/busybox/*
         generates:
           - '{{.TEST_BIN_DIR}}/busybox'
         cmds:
@@ -598,9 +591,9 @@ tasks:
                 docker buildx build \
                     --platform=linux/arm64 \
                     --progress=plain \
-                    --target=busybox-export \
+                    --target=export \
                     --output=type=local,dest={{.TEST_BIN_DIR}} \
-                    ./linux/initramfs
+                    ./linux/busybox
             silent: true
 
     build:ganesha:
@@ -731,7 +724,7 @@ tasks:
         vars:
             TIMEOUT: '{{.TIMEOUT | empty | ternary "" "timeout {{.TIMEOUT}}"}}'
             IMAGE: '{{.IMAGE | default "docker.io/library/alpine:latest"}}'
-            ARGS: '{{.ARGS | default "echo ''hello world!''"}}'
+            ARGS: '{{.ARGS | default ""}}'
             FLAGS: '{{.FLAGS | default ""}}'
             STDOUT_FILE_PIPE: '{{.STDOUT_FILE | empty | ternary "" ">"}}'
             STATIC_FLAGS: '--platform=linux/arm64 --network=host --runtime=containerd.shim.runc.v2 --pull=missing'
@@ -956,33 +949,43 @@ tasks:
 
     fork:sync:*:
         desc: syncs the forks
-        dir: '{{.ITEM.path}}'
+        label: 'fork:sync:{{.NAME}}'
+        vars:
+            NAME: '{{index .MATCH 0}}'
+            ITEM_PATH: '{{get (index .FORKS .NAME) "path"}}'
+            ITEM_BRANCH: '{{get (index .FORKS .NAME) "branch"}}'
+            ITEM_REPO: '{{get (index .FORKS .NAME) "repo"}}'
+            ITEM_UPSTREAM: '{{get (index .FORKS .NAME) "upstream"}}'
+        dir: '{{.ITEM_PATH}}'
         cmds:
+          - cmd: cp -rf . /tmp/{{.NAME}}-backup
           # create the upstream remote if it doesn't exist
-          - cmd: git remote add upstream {{.ITEM.upstream}}
+          - cmd: git remote add upstream {{.ITEM_UPSTREAM}} || true
           - cmd: git fetch upstream
+          - cmd: git checkout -b upstream-mirror || git checkout upstream-mirror
+          - cmd: git reset --hard upstream/{{.ITEM_BRANCH}}
+          - cmd: git push origin upstream-mirror --force
+          - cmd: git checkout {{.ITEM_BRANCH}}
+          - cmd: git checkout -b backup/$(date +%Y-%m-%d) || git checkout backup/$(date +%Y-%m-%d)
+          - cmd: git reset --hard {{.ITEM_BRANCH}}
+          - cmd: git push origin backup/$(date +%Y-%m-%d) --force
+          - cmd: git checkout {{.ITEM_BRANCH}}
+          - cmd: git rebase upstream/{{.ITEM_BRANCH}} || (echo "manual rebase required for {{.ITEM_REPO}}" && exit 1)
+          - cmd: git push origin {{.ITEM_BRANCH}} --force
 
-          - cmd: git checkout {{.ITEM.branch}}
-          - cmd: git branch -b backup/$(date +%Y-%m-%d)
-          - cmd: git push
-          - cmd: git checkout {{.ITEM.branch}}
-          - cmd: git rebase upstream/{{.ITEM.branch}} || echo "manual rebase required for {{.ITEM.repo}}" && exit 1
-          - cmd: git push origin {{.ITEM.branch}} --force
-            # pull the branch
-
-    fork:sync:all:
-        desc: syncs the forks
-        cmds:
-          # first loop thorugh all and if any are dirty throw an error
-          - for: {var: FORKS}
-            cmd: |-
-                cd {{.DIR}} && git checkout {{.ITEM.branch}} && git status --porcelain | grep -q '^M' && echo "{{.DIR}} is dirty" && exit 1
-          - for: {var: FORKS}
-            task: fork:sync:{{.ITEM.repo}}
-            vars:
-                DIR: '{{.DIR}}'
-                BRANCH: '{{.ITEM.branch}}'
-                UPSTREAM: '{{.ITEM.upstream}}'
+    # fork:sync:all:
+    #     desc: syncs the forks
+    #     cmds:
+    #       # first loop thorugh all and if any are dirty throw an error
+    #       - for: {var: FORKS}
+    #         cmd: |-
+    #             cd {{.DIR}} && git checkout {{.ITEM.branch}} && git status --porcelain | grep -q '^M' && echo "{{.DIR}} is dirty" && exit 1
+    #       - for: {var: FORKS}
+    #         task: fork:sync:{{.ITEM.repo}}
+    #         vars:
+    #             DIR: '{{.DIR}}'
+    #             BRANCH: '{{.ITEM.branch}}'
+    #             UPSTREAM: '{{.ITEM.upstream}}'
 
     #endregion fork:sync
 
@@ -1294,7 +1297,7 @@ tasks:
         cmds:
           - cmd: |-
                 go run ./test/experiments/vmfuse/cmd/vmfuse_t1
-    
+
     dev:2025-07-26:01:
         desc: runs the shim for 2025-07-26 - detached mode
         deps: ['linux:runtime:runm', 'build:runm-test-binaries']
@@ -1322,7 +1325,8 @@ tasks:
                 STATUS: 'Up'
           - task: run:nerdctl-test:exec
             vars:
-                COMMAND: 'echo "dev:2025-07-26:01 - about to sleep (os:$(uname -o))" && sleep 1 && echo "dev:2025-07-26:01 - sleep finished (os:$(uname -o))"'
+                COMMAND: 'echo "dev:2025-07-26:01 - about to sleep (os:$(uname -o))" && sleep 1 && echo "dev:2025-07-26:01
+                    - sleep finished (os:$(uname -o))"'
                 CONTAINER_ID:
                     sh: cat {{.TMP_DIR}}/stdout.txt
                 FLAGS: '--tty'
@@ -1339,6 +1343,60 @@ tasks:
                     sh: cat {{.TMP_DIR}}/stdout.txt
 
           - task: run:nerdctl-test:ps
+
+    dev:2025-07-31:01:
+        desc: simulates server + topz pattern from book - server running with topz container for inspection
+        deps: ['linux:runtime:runm', 'build:runm-test-binaries']
+        vars:
+            TMP_DIR:
+                sh: mktemp -d -t runm-XXXXXX
+        cmds:
+          - defer: 'rm -rf {{.TMP_DIR}}'
+            silent: true
+          - task: run:nerdctl-test:rm-all-running-containers
+          # Step 1: Run server container in detached mode (simulating my-app-image)
+          - task: run:nerdctl-test:run
+            vars:
+                FLAGS: '-d'
+                IMAGE: 'docker.io/library/nginx:alpine'
+                STDOUT_FILE: '{{.TMP_DIR}}/server-container-id.txt'
+                ARGS: ''
+          - cmd: echo "Server container started with ID:"
+          - cmd: bat {{.TMP_DIR}}/server-container-id.txt
+            silent: true
+          - task: run:nerdctl-test:ps
+          - task: run:nerdctl-test:ps:ensure-container
+            vars:
+                CONTAINER_ID:
+                    sh: cat {{.TMP_DIR}}/server-container-id.txt
+                STATUS: 'Up'
+          # Step 2: Run topz container sharing PID namespace and exposing port 8080
+          - task: run:nerdctl-test:run
+            vars:
+                FLAGS: '--tty -d -p 19999:19999'
+                IMAGE: 'netdata/netdata'
+                STDOUT_FILE: '{{.TMP_DIR}}/topz-container-id.txt'
+                EXTRA_FLAGS:
+                    sh: echo "--pid=container:$(cat {{.TMP_DIR}}/server-container-id.txt)"
+                ARGS: ''
+
+          - cmd: echo "Topz container started with ID:"
+          - cmd: bat {{.TMP_DIR}}/topz-container-id.txt
+            silent: true
+          - task: run:nerdctl-test:ps
+          - task: run:nerdctl-test:ps:ensure-container
+            vars:
+                CONTAINER_ID:
+                    sh: cat {{.TMP_DIR}}/topz-container-id.txt
+                STATUS: 'Up'
+          - cmd: echo "Both containers are running. You can now:"
+          - cmd: echo "  - Access topz at http://localhost:8080"
+          - cmd: echo "  - Inspect containers with 'task run:nerdctl-test:ps'"
+          - cmd: echo "  - Server container ID:" && cat {{.TMP_DIR}}/server-container-id.txt
+          - cmd: echo "  - Topz container ID:" && cat {{.TMP_DIR}}/topz-container-id.txt
+          - cmd: 'echo "  - Remove with: task run:nerdctl-test:rm CONTAINER_ID=$(cat {{.TMP_DIR}}/server-container-id.txt)"'
+          - cmd: echo "Press Ctrl+C to stop this task (containers will remain running)"
+          - cmd: sleep 3600 # Hold for inspection (1 hour)
 
     #endregion dev
 

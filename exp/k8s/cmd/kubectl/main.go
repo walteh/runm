@@ -1,7 +1,13 @@
 package main
 
-import "k8s.io/kubectl/pkg/cmd"
+import (
+	"os"
+
+	"k8s.io/kubectl/pkg/cmd"
+)
 
 func main() {
-	cmd.NewDefaultKubectlCommand().Execute()
+	if err := cmd.NewDefaultKubectlCommand().Execute(); err != nil {
+		os.Exit(1)
+	}
 }

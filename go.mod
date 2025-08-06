@@ -6,9 +6,10 @@ exclude github.com/containerd/nerdctl/mod/tigron v0.0.0
 
 // forks
 replace (
-	k8s.io/kubernetes => ../kubernetes
+	// forks used for debugging
 	github.com/Code-Hex/vz/v3 => ../vz
 	github.com/containerd/console => ../console
+	// forks with required logical changes
 	github.com/containerd/containerd/api => ../containerd/api
 	github.com/containerd/containerd/v2 => ../containerd
 	github.com/containerd/containerd/v2/pkg/sys => ../containerd/pkg/sys
@@ -21,11 +22,12 @@ replace (
 	github.com/containers/gvisor-tap-vsock => ../gvisor-tap-vsock
 	github.com/moby/buildkit => ../buildkit
 	github.com/opencontainers/runc => ../runc
+	github.com/pkg/errors => ../go-errors-2 // this is to avoid duplicate module errors
 	github.com/tonistiigi/fsutil => ../fsutil
 	gitlab.com/tozd/go/errors => ../go-errors
-	gvisor.dev/gvisor => gvisor.dev/gvisor v0.0.0-20250611222258-0fe9a4bf489c // this needs to be updated manually (because the 'go' branch is the only one that works)
-	github.com/pkg/errors => ../go-errors-2 // this is to avoid duplicate module errors
 )
+
+replace gvisor.dev/gvisor => gvisor.dev/gvisor v0.0.0-20250611222258-0fe9a4bf489c // this needs to be updated manually (because the 'go' branch is the only one that works)
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.6-20250717185734-6c6e0d3c608e.1
@@ -37,7 +39,7 @@ require (
 	github.com/containerd/console v1.0.5
 	github.com/containerd/containerd v1.7.27
 	github.com/containerd/containerd/api v1.9.0
-	github.com/containerd/containerd/v2 v2.1.3
+	github.com/containerd/containerd/v2 v2.1.4
 	github.com/containerd/errdefs v1.0.0
 	github.com/containerd/errdefs/pkg v0.3.0
 	github.com/containerd/fifo v1.1.0
@@ -149,7 +151,7 @@ require (
 	github.com/charmbracelet/x/term v0.2.1 // indirect
 	github.com/checkpoint-restore/checkpointctl v1.3.0 // indirect
 	github.com/checkpoint-restore/go-criu/v7 v7.2.0 // indirect
-	github.com/compose-spec/compose-go/v2 v2.7.1 // indirect
+	github.com/compose-spec/compose-go/v2 v2.8.1 // indirect
 	github.com/containerd/accelerated-container-image v1.3.0 // indirect
 	github.com/containerd/btrfs/v2 v2.0.0 // indirect
 	github.com/containerd/fuse-overlayfs-snapshotter/v2 v2.1.6 // indirect
@@ -172,8 +174,8 @@ require (
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/djherbis/times v1.6.0 // indirect
-	github.com/docker/cli v28.3.2+incompatible // indirect
-	github.com/docker/docker v28.3.2+incompatible // indirect
+	github.com/docker/cli v28.3.3+incompatible // indirect
+	github.com/docker/docker v28.3.3+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.9.3 // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
@@ -188,7 +190,7 @@ require (
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
-	github.com/go-viper/mapstructure/v2 v2.3.0 // indirect
+	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
@@ -239,8 +241,8 @@ require (
 	github.com/moby/go-archive v0.1.0 // indirect
 	github.com/moby/locker v1.0.1 // indirect
 	github.com/moby/patternmatcher v0.6.0 // indirect
+	github.com/moby/profiles/seccomp v0.1.0 // indirect
 	github.com/moby/spdystream v0.5.0 // indirect
-	github.com/moby/sys/atomicwriter v0.1.0 // indirect
 	github.com/moby/sys/capability v0.4.0 // indirect
 	github.com/moby/sys/mount v0.3.4 // indirect
 	github.com/moby/sys/sequential v0.6.0 // indirect
@@ -271,9 +273,9 @@ require (
 	github.com/pkg/profile v1.7.0 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/client_golang v1.22.0 // indirect
+	github.com/prometheus/client_golang v1.23.0 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
-	github.com/prometheus/common v0.64.0 // indirect
+	github.com/prometheus/common v0.65.0 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
@@ -347,7 +349,7 @@ require (
 require (
 	cel.dev/expr v0.24.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/Microsoft/hcsshim v0.13.0 // indirect
+	github.com/Microsoft/hcsshim v0.13.1-0.20250728212919-1ee5fce7ed8f // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/cilium/ebpf v0.18.0 // indirect
 	github.com/containerd/continuity v0.4.5
