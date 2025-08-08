@@ -1,41 +1,180 @@
 # runm
 
-experimental vm adaptor for runc, run containers natively on macOS
+Experimental per-container VM adaptor for `runc` that runs Linux containers on macOS by delegating Linux-specific operations to a tiny guest VM.
 
 > [!WARNING]
-> These docs are in progress
+> These docs are largely under-construction. They serve primarily as a way to organize my own thoughts. If you are interested in learning more, please contact me directly.
 
-this project effectivly wraps the `containerd/go-runc` in a grpc service. the shim (running on macos) calls the grpc service (running on a linux vm) which directly invokes runc.
+## High-level notes
 
-instead of creating containers directly on the host, we use a hypervisor to create a guest vm and run the container inside it.
+-   This project exploring how far a native macOS `containerd` stack can go by offloading Linux-only behavior to a guest VM.
+-   Think of runm as “`runc` over vsock”: the Linux-only bits run inside a tiny VM - everything else remains standard `containerd` plumbing on the host.
+-   The design mirrors industry patterns (Kata Containers; Apple’s Containerization) while integrating with `containerd` and `nerdctl` natively on macOS.
 
-the core functionality provided here is effectivly a modified version of the `cmd/containerd-shim-runc-v2` binary from the `containerd` project.
+## Current status and limitations
 
-to work around the linux requirements of the shim, we proxy all linux dependencies to the guest vm where we run `runc` unmodified (aside from extra debug).
+-   `nerdctl run/exec` support is solid and is by far the most well-tested
+-   `containerd`'s `native-snapshotter` currently requires a FUSE workaround via `bindfs`.
+-   BuildKit and multi-container/pod semantics are not implemented here yet (e.g., a K8s “pod” would require grouping multiple containers into one VM, Kata-style).
 
-## supported `nerdctl run/exec` features
+### Commands / Frontend
+
+-   ✅ `nerdctl run` and `nerdctl exec`
+-   ✅ `nerdctl` container management
+-   ⚠️ `nerdctl build`: buildkit integration works, not much else
+-   🚧 `ctr`: untested
+-   🚧 `kubectl`: untested, needs pod support
+
+### Linux-only binaries running on macOS
+
+-   ✅ `containerd`
+-   ✅ `nerdctl`
+-   ✅ `buildctl`
+-   🚧 `buildkitd`: it runs and functions; I haven't completed a successful test yet
+
+#### `nerdctl run/exec` specifics
 
 -   [x] exit status returned to the host
 -   [x] bind mounts
 -   [x] read-only mounts (via `ro=true`)
 -   [x] `-d` detached mode
--   [x] internal internet access (ability to see google.com)
+-   [x] internet access (e.g., reach google.com)
 -   [x] `-it` interactive mode
 -   [x] `-e` environment variables
 -   [x] `-w` working directory
 -   [x] `-v` volumes
 -   [x] `-p` ports
+-   [x] `--tty` pty passthrough
 -   [] `-u` user
 
-## Linux
+## Quickstart (example)
 
-Runm offloads all required linux operations to a lightweight VM using the virtualization framework.
+#### Prereqs
 
-The linux kernel used is custom and entiely configured in `./linux/kernel`
+-   `macFUSE` (kext)
+-   `bindfs`
+-   `Virtualization.framework`
+-   `docker`
+-   `go`
+-   `iTerm2` (Terminal.app also works, but all logs are enhanced for iTerm)
 
-Additionaly, a static `busybox` binary is also used. It is entiely built and configured in `./linux/busybox`.
+#### steps
 
-Below is the structure of the linux file systems (excluding )
+This will run a scenario that creates a container via `nerdctl run -d`, then runs a command via `nerdctl exec` that streams stdio back to the host at 1s intervals.
+
+> [!NOTE]
+> your password may be required to clean up any processes that have leaked.
+
+-   Clone this repo
+-   install all required forks to `../` (`go tool task fork:install:all`)
+-   Open two panes in iTerm2
+-   In the first pane, run `go tool task dev:containerd`
+-   Take a break, it will take a while on the first run to build the kernel
+-   Wait until `containerd` starts and the logs stop
+-   In the second pane, run `go tool task dev:2025-07-05:01`
+-   The second pane will show user-facing logs streaming from the demo container
+
+## Forks and diffs
+
+There are many forks that are required to run this project in its current state. The changes are a mix of required logical changes and (mostly) debugging. Until I have some time to put more TLC into them, I will lay out the important logical changes and what they enable.
+
+> [!NOTE]
+> current nerdctl and BuildKit logic indirectly assume their binaries are built on the same OS as the container runtime. The "[bug]" notes below refer to this assumption—even though it's not truly an upstream bug.
+
+Last upstream sync: `2025-08-06`
+
+1. `containerd` ([diff](https://github.com/containerd/containerd/compare/main...walteh:main))
+
+    - **[bind mounts]** add `darwin` build support for the `core/mount` package by invoking `bindfs` via `exec.Cmd`
+
+    - **[rootless]** ignore `EPERM` from `Lchown`/`Chown`
+
+1. `nerdctl` ([diff](https://github.com/containerd/nerdctl/compare/main...walteh:main))
+
+    - **[bug]** on `darwin/arm64`, use `oci.WithDefaultSpecForPlatform("linux/arm64")` when creating the OCI spec to prevent various "not supported" errors
+
+    - **[bug]** refactor the mount parsing logic to use Linux-specific logic on macOS
+
+1. `buildkit` ([diff](https://github.com/moby/buildkit/compare/master...walteh:master))
+
+    - **[bug]** on `darwin/arm64`, generate OCI spec with explicit platform: `GenerateSpecWithPlatform(ctx, nil, "linux/arm64", ...)` to avoid missing `.Process.Args` inside the OCI spec
+
+1. `fsutil` ([diff](https://github.com/tonistiigi/fsutil/compare/master...walteh:main))
+
+    - **[rootless]** ignore `EPERM` from `Lchown`/`Chown`
+
+1. `gvisor-tap-vsock` ([diff](https://github.com/containers/gvisor-tap-vsock/compare/main...walteh:main))
+
+    - **[feature]** add raw `net.Listener` port-forwarding support
+
+    - **[context/reliability]** pass context through missing places; return `ctx.Err()` on cancellation
+
+## How it works (high level)
+
+-   Host: a `containerd` shim on macOS
+-   Guest: a tiny Linux VM runs unmodified `runc` over gRPC/vsock
+-   IO/control: stdio, signals, exit codes flow over vsock
+-   Isolation: one micro‑VM per container (no shared kernel)
+-   Networking: per‑VM networking via gvisor‑tap‑vsock
+
+To `containerd`, it looks like a normal OCI runtime; Linux syscalls execute inside the guest.
+
+**Rough outline**
+
+```mermaid
+sequenceDiagram
+    participant U as nerdctl
+    participant CD as containerd
+    participant SH as runm shim (host)
+    participant VF as Virtualization.framework
+    participant VM as runm guest (VM)
+    participant R as runc
+    participant P as container process
+
+    U->>CD: run
+    CD->>SH: create/start task
+    SH->>VF: boot micro-VM
+    VF->>SH: VM ready
+    SH->>VM: gRPC Create/Start
+    VM->>R: runc create/start
+    R->>P: exec process
+    P->>VM: stdout/stderr, exit
+    VM->>SH: IO and status
+    SH->>CD: task state
+    CD->>U: result
+```
+
+---
+
+> [!IMPORTANT]
+> The below docs are even more so under construction and incomplete.
+
+## Unfinished notes / documentation
+
+#### Why
+
+macOS does not provide Linux namespaces, cgroups, or overlayfs. Traditional solutions (e.g., Docker Desktop) run a single Linux VM hosting all containers. Runm explores a Kata-like “VM-per-container” design on macOS using Apple’s Virtualization.framework: stronger isolation, clean lifecycles, and a native integration path. The approach aligns with Apple’s Containerization framework direction while remaining OCI- and containerd-oriented.
+
+#### Architecture (deeper dive)
+
+-   Host shim: adapted from `containerd`’s `containerd-shim-runc-v2`. It translates container lifecycle requests into gRPC calls to the guest.
+-   Guest agent: receives requests over vsock and runs `runc` inside the VM. No changes to `runc` are required beyond extra debug.
+-   IO and control: stdio, signals, and exit codes traverse vsock; networking for the guest is provided via gvisor-tap-vsock style forwarding.
+
+#### Relationship to Kata Containers and Apple’s Containerization
+
+-   Like Kata Containers, runm boots a minimal guest and runs the workload inside that VM for stronger isolation.
+-   Like Apple’s Containerization, runm embraces one-VM-per-container on macOS using Virtualization.framework for fast boots and tight integration.
+-   Unlike Kata’s K8s-focused “one VM per pod” model, runm currently treats each `nerdctl run` as its own sandbox VM.
+
+#### Linux
+
+Runm offloads Linux operations to a lightweight VM launched with Virtualization.framework.
+
+-   Custom Linux kernel configuration lives in `./linux/kernel`.
+-   Static `busybox` is built in `./linux/busybox`.
+
+File system layout:
 
 ```
 # initramfs
@@ -44,7 +183,7 @@ Below is the structure of the linux file systems (excluding )
 /bin/busybox
 ```
 
-`runm-linux-mounter` is the only binary in the initramfs, it handles the logic requred to mount the `mbin` squashfs that containds the rest of the binaries needed to run this project.
+`runm-linux-mounter` is the only binary in the initramfs; it mounts the `mbin` squashfs containing the remaining guest binaries.
 
 ```
 # rootfs
@@ -54,43 +193,15 @@ Below is the structure of the linux file systems (excluding )
 /mbin/runm-linux-host-fork-exec-proxy
 ```
 
-## dependancy on macFUSE
+#### Snapshotting and macFUSE
 
-This projects focus is entiely on seeing how far containerd can go running nativly on macOS. In other words, all the effort is/was put into things that don't work either nativly or via non-comercially free software.
+On Linux, `containerd`’s native snapshotter relies on bind mounts (`mount --bind`). macOS has no `mount --bind`, so we use `bindfs` and a FUSE implementation to simulate bind mounts:
 
-Containerd's native snapshotter depends on bind mounts (`mount --bind`) that are not nativly supported on macOS. However, it can be accomplished by installing 3rd party software - specifially `bindfs` (oss, GPL-2) and either one of `macFUSE` or `fuse-t` (both are closed source but are free to use non-comercially).
+-   `bindfs` (OSS, GPL-2) + either `macFUSE` or `fuse-t` (free to use, closed-source) enable host-side bind-like behavior for the native snapshotter.
+-   `macFUSE` kext requires reduced security mode; `fuse-t` avoids a kext but has proven unstable in practice.
+-   macOS 15 introduced FSKit for user-space file systems; `macFUSE` v5 advertises support, but it has not worked out-of-the-box here yet.
 
-### why the `native` snapshotter needs bind mounts
+Notes from experimentation:
 
-TODO: properly docuemnt this
-
-### notes on `macFUSE` and `fuse-t`
-
-Outside of licensing, the largest caveat with `macFUSE` is that it requires a kernel extension (kext) to function, something that requires any user to safe boot their mac to put it in `Reduced Security` mode. `fuse-t` does not have this requiement. In macOS 15, Apple added `FSKit` which functionally should allow `macFUSE` to do its thing entirly in the userspace and not touch the kernel. As of v5 released in 2025-06, `macFUSE` has added support for it. Although, I was not able to get it working out of the box with this project yet.
-
-In my expericne with this project, `fuse-t` is MUCH more unstable. As an example, using `fuse-t` lead to many cases where random `glibc` files did not exist inside containers that depended on them - completly breaking dynamic linking. `macFUSE (kext)` on the other hand is incredibly stable - well, at least in comparison.
-
-# forks
-
-This project currently uses an aggressive amount of forks to function. Most of the changes are related to debugging and are not required.
-
-Many of the chages are related to getting everything to run without `sudo` (rootless), so here I am seperating them
-
-1. `github.com/containerd/containerd` - https://github.com/walteh/containerd/pull/2
-2.
-
-This section is an attempt to document the **required logical changes** that this project relies on.
-
-### `containerd`
-
-full diff (includes noise): https://github.com/walteh/containerd/pull/2
-
-1. `darwin` build support for the `core/mount` package
-
--   diff:
-
--   effectivly it just requirs us to exec to bindfs when containerd wants to `mount --bind`
-
-### rootless
-
-1.
+-   `fuse-t` was significantly less stable (e.g., sporadic missing `glibc` files breaking dynamic linking).
+-   `macFUSE (kext)` has been much more reliable.

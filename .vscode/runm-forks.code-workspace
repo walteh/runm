@@ -68,6 +68,10 @@
 		{
 			"name": "stargz-snapshotter",
 			"path": "../../stargz-snapshotter"
+		},
+		{
+			"name": "gvisor-tap-vsock",
+			"path": "../../gvisor-tap-vsock"
 		}
 	],
 	"extensions": {

@@ -102,7 +102,7 @@ env:
     GOPROXY: 'https://proxy.golang.org'
     GOSUMDB: sum.golang.org
     GOPRIVATE: github.com/walteh
-    CODE_EDITOR_FILE_REF_PREFIX: windsurf://file/
+    CODE_EDITOR_FILE_REF_PREFIX: cursor://file/
     # OTEL_EXPORTER_OTLP_ENDPOINT: localhost:4317
     DOCKER_BUILDKIT: 1
     PAGER: less
@@ -947,6 +947,24 @@ tasks:
     #region FORKS
     #=================================================================================
 
+    fork:install:*:
+        desc: installs a fork
+        vars:
+            NAME: '{{index .MATCH 0}}'
+            ITEM_PATH: '{{get (index .FORKS .NAME) "path"}}'
+            ITEM_REPO: '{{get (index .FORKS .NAME) "repo"}}'
+        cmds:
+          - cmd: git clone {{.ITEM_REPO}} {{.ITEM_PATH}}
+          - cmd: cd {{.ITEM_PATH}} && git checkout {{.ITEM_BRANCH}}
+
+    fork:install:all:
+        desc: installs all forks
+        cmds:
+          - for: {var: FORKS}
+            task: fork:install:{{.KEY}}
+            vars:
+                NAME: '{{.KEY}}'
+
     fork:sync:*:
         desc: syncs the forks
         label: 'fork:sync:{{.NAME}}'
@@ -958,9 +976,10 @@ tasks:
             ITEM_UPSTREAM: '{{get (index .FORKS .NAME) "upstream"}}'
         dir: '{{.ITEM_PATH}}'
         cmds:
-          - cmd: cp -rf . /tmp/{{.NAME}}-backup
+          #   - cmd: cp -rf . /tmp/{{.NAME}}-backup
           # create the upstream remote if it doesn't exist
-          - cmd: git remote add upstream {{.ITEM_UPSTREAM}} || true
+          - cmd: git remote remove upstream || true
+          - cmd: git remote add upstream https://{{.ITEM_UPSTREAM}} || true
           - cmd: git fetch upstream
           - cmd: git checkout -b upstream-mirror || git checkout upstream-mirror
           - cmd: git reset --hard upstream/{{.ITEM_BRANCH}}
