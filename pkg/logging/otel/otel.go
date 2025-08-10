@@ -174,7 +174,7 @@ func setupOTelSDK(ctx context.Context, serviceName string, dialer proxy.ContextD
 	}
 
 	instances.ErrorHandler = otel.ErrorHandlerFunc(func(err error) {
-		slog.Warn("error in OpenTelemetry", "error", err)
+		slog.ErrorContext(ctx, "error in OpenTelemetry", "error", err)
 	})
 
 	shouldShutdown = false
@@ -209,10 +209,14 @@ func (d *contextDialerFunc) DialContext(ctx context.Context, network, addr strin
 func initConnFromDialer(ctx context.Context, dialer proxy.ContextDialer) (*grpc.ClientConn, error) {
 
 	conn, err := grpc.NewClient(
-		"passthrough://",
+		"passthrough:target",
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
-			return dialer.DialContext(ctx, "tcp", addr)
+			conn, err := dialer.DialContext(ctx, "tcp", addr)
+			if err != nil {
+				slog.ErrorContext(ctx, "failed to dial", "addr", addr, "error", err)
+			}
+			return conn, err
 		}),
 	)
 	if err != nil {
@@ -227,7 +231,7 @@ func initConnFromDialer(ctx context.Context, dialer proxy.ContextDialer) (*grpc.
 func NewOtelGRPCConnFromNetConn(ctx context.Context, nconn net.Conn) (*grpc.ClientConn, error) {
 
 	conn, err := grpc.NewClient(
-		"passthrough://",
+		"passthrough:target",
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
 			return nconn, nil

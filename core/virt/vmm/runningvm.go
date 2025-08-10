@@ -361,7 +361,7 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 
 	rvm.taskGroup.GoWithName("vsock-raw-writer-proxy", func(ctx context.Context) error {
 
-		err = rvm.RunVsockProxyServer(ctx, uint32(constants.VsockRawWriterProxyPort), rvm.rawWriter)
+		err = rvm.RunVsockProxyServer(ctx, uint32(constants.VsockRawWriterProxyPort), rvm.rawWriter, false)
 		if err != nil {
 			slog.ErrorContext(ctx, "error running vsock raw writer proxy server", "error", err)
 			return errors.Errorf("running vsock raw writer proxy server: %w", err)
@@ -370,7 +370,7 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 	})
 
 	rvm.taskGroup.GoWithName("vsock-delimited-writer-proxy", func(ctx context.Context) error {
-		err = rvm.RunVsockProxyServer(ctx, uint32(constants.VsockDelimitedWriterProxyPort), rvm.delimWriter)
+		err = rvm.RunVsockProxyServer(ctx, uint32(constants.VsockDelimitedWriterProxyPort), rvm.delimWriter, false)
 		if err != nil {
 			return errors.Errorf("running vsock delimited writer proxy server: %w", err)
 		}
@@ -404,6 +404,26 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 		}
 		return nil
 	})
+
+	// rvm.taskGroup.GoWithName("vsock-cgroup-exporter-proxy", func(ctx context.Context) error {
+	// 	// try to connect to prom on the host
+	// 	var writer io.Writer
+	// 	conn, err := net.Dial("tcp", "localhost:9091")
+	// 	if err != nil {
+	// 		writer = io.Discard
+	// 		slog.WarnContext(ctx, "failed to connect to prometheus, using discard writer", "error", err)
+	// 	} else {
+	// 		slog.InfoContext(ctx, "connected to prometheus", "conn", conn)
+	// 		writer = conn
+	// 		defer conn.Close()
+	// 	}
+
+	// 	err = rvm.RunVsockProxyServer(ctx, uint32(constants.VsockCgroupExporterPort), writer, true)
+	// 	if err != nil {
+	// 		return errors.Errorf("running vsock cgroup exporter proxy server: %w", err)
+	// 	}
+	// 	return nil
+	// })
 
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" {
 		rvm.taskGroup.GoWithName("otel-forwarder", func(ctx context.Context) error {
@@ -451,7 +471,7 @@ func (rvm *RunningVM[VM]) Start(ctx context.Context) error {
 				}
 				defer conn.Close()
 				// run as a client
-				return rvm.RunVsockProxyServer(ctx, uint32(port), conn)
+				return rvm.RunVsockProxyServer(ctx, uint32(port), conn, false)
 			}
 			defer listener.Close()
 			return rvm.RunVsockProxyClient(ctx, uint32(port), listener)
@@ -553,7 +573,12 @@ func (rvm *RunningVM[VM]) SetupOtelForwarder(ctx context.Context) error {
 	slog.InfoContext(ctx, "vsock listener started", "port", constants.VsockOtelPort)
 
 	// dial tcp localhost:5909
-	conn, err := net.Dial("tcp", os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"))
+	// dns:// is required: https://github.com/open-telemetry/opentelemetry-go/issues/5562
+	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	endpoint = strings.TrimPrefix(endpoint, "dns://")
+	endpoint = strings.TrimPrefix(endpoint, "http://")
+	endpoint = strings.TrimPrefix(endpoint, "https://")
+	conn, err := net.Dial("tcp", endpoint)
 	if err != nil {
 		slog.ErrorContext(ctx, "unix dial failed", "err", err)
 		return errors.Errorf("dialing unix socket: %w", err)
@@ -712,7 +737,33 @@ func TailConsoleLog(ctx context.Context, workingDir string, writer io.Writer) er
 	return nil
 }
 
-func (rvm *RunningVM[VM]) RunVsockProxyServer(ctx context.Context, port uint32, writer io.Writer) error {
+// func (rvm *RunningVM[VM]) RunVsockReverseProxy(ctx context.Context, port uint32, target string, debug bool) error {
+// 	vsockListener, err := rvm.vm.VSockListen(ctx, port)
+// 	if err != nil {
+// 		slog.ErrorContext(ctx, "vsock listen failed", "err", err)
+// 		return errors.Errorf("listening on vsock: %w", err)
+// 	}
+// 	defer vsockListener.Close()
+
+// 	conn, err := net.Dial("tcp", target)
+// 	if err != nil {
+// 		slog.ErrorContext(ctx, "dial failed", "err", err)
+// 		return errors.Errorf("dialing target: %w", err)
+// 	}
+// 	defer conn.Close()
+
+// 	for {
+// 		connz, err := vsockListener.Accept()
+// 		if err != nil {
+// 			slog.ErrorContext(ctx, "vsock accept failed", "err", err)
+// 			continue
+// 		}
+
+// 	}
+
+// }
+
+func (rvm *RunningVM[VM]) RunVsockProxyServer(ctx context.Context, port uint32, writer io.Writer, debug bool) error {
 	vsockListener, err := rvm.vm.VSockListen(ctx, port)
 	if err != nil {
 		slog.ErrorContext(ctx, "vsock listen failed", "err", err)
@@ -726,7 +777,7 @@ func (rvm *RunningVM[VM]) RunVsockProxyServer(ctx context.Context, port uint32, 
 	}
 
 	for {
-		conn, err := vsockListener.Accept()
+		connz, err := vsockListener.Accept()
 		if err != nil {
 			slog.ErrorContext(ctx, "vsock accept failed", "err", err)
 			continue
@@ -735,14 +786,37 @@ func (rvm *RunningVM[VM]) RunVsockProxyServer(ctx context.Context, port uint32, 
 		slog.InfoContext(ctx, "vsock accepted for proxy server", "port", port)
 
 		go func() {
-			defer conn.Close()
-			tb, err := io.Copy(writer, conn)
+			defer connz.Close()
+			var err error
+			if debug {
+				err = <-conn.DebugCopyWithBuffer(ctx, "vsock-proxy-writer", writer, connz, make([]byte, 1024*1024*10))
+			} else {
+				_, err = io.Copy(writer, connz)
+			}
 			if err != nil {
 				slog.ErrorContext(ctx, "error copying to writer", "err", err, "port", port)
 			} else {
-				slog.InfoContext(ctx, "copied to writer - closing connection", "port", port, "bytes", tb)
+				slog.InfoContext(ctx, "copied to writer - closing connection", "port", port)
 			}
 		}()
+
+		if rdr, ok := writer.(io.Reader); ok {
+			go func() {
+				defer connz.Close()
+				var err error
+				if debug {
+					err = <-conn.DebugCopyWithBuffer(ctx, "vsock-proxy-reader", connz, rdr, make([]byte, 1024*1024*10))
+				} else {
+					_, err = io.Copy(connz, rdr)
+				}
+				if err != nil {
+					slog.ErrorContext(ctx, "error copying to reader", "err", err, "port", port)
+				} else {
+					slog.InfoContext(ctx, "copied to reader - closing connection", "port", port)
+				}
+			}()
+
+		}
 	}
 }
 

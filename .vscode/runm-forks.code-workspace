@@ -72,6 +72,10 @@
 		{
 			"name": "gvisor-tap-vsock",
 			"path": "../../gvisor-tap-vsock"
+		},
+		{
+			"name": "cadvisor",
+			"path": "../../cadvisor"
 		}
 	],
 	"extensions": {

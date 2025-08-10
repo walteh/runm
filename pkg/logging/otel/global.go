@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"strings"
 	"sync"
 
 	"gitlab.com/tozd/go/errors"
@@ -30,7 +31,12 @@ func ConfigureOTelSDK(ctx context.Context, serviceName string) (cleanup func(), 
 
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" {
 		return ConfigureOTelSDKWithDialer(ctx, serviceName, true, func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return net.Dial("tcp", os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"))
+			// dns:// is required: https://github.com/open-telemetry/opentelemetry-go/issues/5562
+			endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+			endpoint = strings.TrimPrefix(endpoint, "dns://")
+			endpoint = strings.TrimPrefix(endpoint, "http://")
+			endpoint = strings.TrimPrefix(endpoint, "https://")
+			return net.Dial("tcp", endpoint)
 		})
 	}
 

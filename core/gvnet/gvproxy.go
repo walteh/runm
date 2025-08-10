@@ -13,6 +13,9 @@ import (
 	"github.com/containers/gvisor-tap-vsock/pkg/virtualnetwork"
 	"github.com/soheilhy/cmux"
 	"gitlab.com/tozd/go/errors"
+	"gvisor.dev/gvisor/pkg/tcpip"
+	"gvisor.dev/gvisor/pkg/tcpip/adapters/gonet"
+	"gvisor.dev/gvisor/pkg/tcpip/network/ipv4"
 	"gvisor.dev/gvisor/pkg/tcpip/stack"
 
 	"github.com/walteh/runm/core/gvnet/tapsock"
@@ -31,8 +34,9 @@ type GvproxyConfig struct {
 
 	MTU int // set the MTU, default is 1500
 
-	WorkingDir                      string            // working directory
-	ExtraHostToGuestTCPPortMappings map[uint16]uint16 // extra port mappings to forward
+	WorkingDir                       string            // working directory
+	ExtraHostToGuestTCPPortMappings  map[uint16]uint16 // extra port mappings to forward
+	ExtraHostTCPPortsToExposeToGuest map[uint16]uint16 // extra tcp ports to expose to guest
 }
 
 func GvproxyVersion() string {
@@ -115,6 +119,11 @@ func (p *gvproxy) Wait(ctx context.Context) error {
 		tg.GoWithName("magic-forwarding", func(ctx context.Context) error {
 			return m.Run(ctx)
 		})
+	}
+
+	// Setup reverse port forwarding (host ports exposed to guest)
+	if err := p.setupReversePortForwarding(tg, ctx, p.stack); err != nil {
+		return errors.Errorf("setting up reverse port forwarding: %w", err)
 	}
 
 	// Add cleanup task that monitors context cancellation
@@ -275,6 +284,96 @@ func (p *gvproxy) setupMagicForwarding(tg *taskgroup.TaskGroup, ctx context.Cont
 	}
 
 	return m, nil
+}
+
+// setupReversePortForwarding creates TCP listeners on guest stack that forward to host ports
+func (p *gvproxy) setupReversePortForwarding(tg *taskgroup.TaskGroup, ctx context.Context, stack *stack.Stack) error {
+	if p.cfg.ExtraHostTCPPortsToExposeToGuest == nil {
+		return nil
+	}
+
+	for guestPort, hostPort := range p.cfg.ExtraHostTCPPortsToExposeToGuest {
+		if err := p.setupReversePortForward(tg, ctx, stack, guestPort, hostPort); err != nil {
+			return errors.Errorf("setting up reverse port forward %d->%d: %w", guestPort, hostPort, err)
+		}
+	}
+
+	return nil
+}
+
+// setupReversePortForward sets up a single reverse port forward
+func (p *gvproxy) setupReversePortForward(tg *taskgroup.TaskGroup, ctx context.Context, stack *stack.Stack, guestPort, hostPort uint16) error {
+	hostAddr := fmt.Sprintf("127.0.0.1:%d", hostPort)
+
+	// Create guest TCP address to bind to
+	guestTCPAddr := tcpip.FullAddress{
+		NIC:  1, // Default NIC ID
+		Port: guestPort,
+	}
+
+	// Create gonet listener on guest stack
+	listener, err := gonet.ListenTCP(stack, guestTCPAddr, ipv4.ProtocolNumber)
+	if err != nil {
+		return errors.Errorf("creating gonet TCP listener for port %d: %w", guestPort, err)
+	}
+
+	taskName := fmt.Sprintf("reverse-forward-%d-%d", guestPort, hostPort)
+	
+	// Register closer for cleanup
+	tg.RegisterCloserWithName(taskName+"-listener", listener)
+
+	// Start forwarding task
+	tg.GoWithName(taskName, func(ctx context.Context) error {
+		slog.InfoContext(ctx, "starting reverse port forward",
+			"guest_port", guestPort,
+			"host_port", hostPort,
+			"host_addr", hostAddr)
+
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				select {
+				case <-ctx.Done():
+					return nil // graceful shutdown
+				default:
+					return errors.Errorf("accepting connection on guest port %d: %w", guestPort, err)
+				}
+			}
+
+			// Handle connection in goroutine
+			go func(guestConn net.Conn) {
+				defer guestConn.Close()
+
+				// Dial host port
+				hostConn, err := net.Dial("tcp", hostAddr)
+				if err != nil {
+					slog.ErrorContext(ctx, "failed to dial host port",
+						"host_addr", hostAddr,
+						"error", err)
+					return
+				}
+				defer hostConn.Close()
+
+				// Bidirectional copy
+				done := make(chan struct{}, 2)
+
+				go func() {
+					_, _ = io.Copy(hostConn, guestConn)
+					done <- struct{}{}
+				}()
+
+				go func() {
+					_, _ = io.Copy(guestConn, hostConn)
+					done <- struct{}{}
+				}()
+
+				// Wait for either direction to finish
+				<-done
+			}(conn)
+		}
+	})
+
+	return nil
 }
 
 const (

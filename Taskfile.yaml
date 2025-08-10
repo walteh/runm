@@ -10,6 +10,18 @@ vars:
       - arm64
     FORKS:
         map:
+            cgroup-exporter:
+                branch: main
+                repo: "github.com/walteh/cgroup-exporter"
+                upstream: "github.com/arianvp/cgroup-exporter"
+                path: "../cgroup-exporter"
+
+            cadvisor:
+                branch: main
+                repo: "github.com/walteh/cadvisor"
+                upstream: "github.com/google/cadvisor"
+                path: "../cadvisor"
+
             vz:
                 branch: main
                 repo: "github.com/Code-Hex/vz"
@@ -103,7 +115,15 @@ env:
     GOSUMDB: sum.golang.org
     GOPRIVATE: github.com/walteh
     CODE_EDITOR_FILE_REF_PREFIX: cursor://file/
-    # OTEL_EXPORTER_OTLP_ENDPOINT: localhost:4317
+    # OTEL_ENDPOINT_TO_SET_TCP: dns://localhost:4317
+    OTEL_EXPORTER_OTLP_ENDPOINT:
+        sh: mkdir -p /tmp/tcontainerd-fs-env && echo -n '{{.OTEL_ENDPOINT_TO_SET_TCP | default ""}}' | tee /tmp/tcontainerd-fs-env/OTEL_EXPORTER_OTLP_ENDPOINT
+    OTEL_EXPORTER_OTLP_METRICS_ENDPOINT:
+        sh: mkdir -p /tmp/tcontainerd-fs-env && echo -n '{{.OTEL_ENDPOINT_TO_SET_TCP | default ""}}' | tee /tmp/tcontainerd-fs-env/OTEL_EXPORTER_OTLP_METRICS_ENDPOINT
+    OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:
+        sh: mkdir -p /tmp/tcontainerd-fs-env && echo -n '{{.OTEL_ENDPOINT_TO_SET_TCP | default ""}}' | tee /tmp/tcontainerd-fs-env/OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+    OTEL_EXPORTER_OTLP_PROTOCOL:
+        sh: mkdir -p /tmp/tcontainerd-fs-env && echo -n 'grpc' | tee /tmp/tcontainerd-fs-env/OTEL_EXPORTER_OTLP_PROTOCOL
     DOCKER_BUILDKIT: 1
     PAGER: less
     DEBUG_CONTAINERD_TEST: 0
@@ -579,6 +599,29 @@ tasks:
                 CGO_ENABLED: 1
                 BIN_DIR: '{{.TEST_BIN_DIR}}'
 
+    build:cadvisor-test:
+        desc: builds the cadvisor binary
+        run: once
+        sources:
+          - "../cadvisor/**/*.go"
+          - "pkg/**/*.go"
+          - "test/integration/**/*.go"
+          - "test/integration/cmd/cadvisor-test/**/*.go"
+        generates:
+          - '{{.TEST_BIN_DIR}}/cadvisor-test'
+        vars:
+            GIT_COMMIT:
+                sh: git rev-parse HEAD
+        cmds:
+          - task: build:go:cadvisor-test:linux:arm64
+            vars:
+                DEBUG: '1'
+                STATIC: '1'
+                TAGS: netgo osusergo
+                # CC: aarch64-linux-gnu-gcc
+                # CGO_ENABLED: 1
+                BIN_DIR: '{{.TEST_BIN_DIR}}'
+
     build:busybox:
         desc: builds the busybox binary
         run: once
@@ -1025,9 +1068,11 @@ tasks:
         cmds:
           - defer: '{{if .EXIT_CODE}}echo "{{.TASK_NAME}} exited with code {{.EXIT_CODE}}!"{{end}}'
             silent: true
-          - cmd: sudo -A pkill -f {{.NAME}} || true
+          - cmd: |-
+                {{.SUDO_CMD}} pkill -f {{.NAME}} || true
             silent: true
-          - cmd: sudo -A killall -9 {{.NAME}} || true
+          - cmd: |-
+                {{.SUDO_CMD}} killall -9 {{.NAME}} || true
             silent: true
 
     dev:cleanup-running-shims:

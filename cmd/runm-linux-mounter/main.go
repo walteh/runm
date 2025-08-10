@@ -73,7 +73,8 @@ func (r *runmLinuxMounter) setupLogger(ctx context.Context) (context.Context, fu
 	}
 
 	dialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
-		return vsock.Dial(2, uint32(constants.VsockOtelPort), nil)
+		// return vsock.Dial(2, uint32(constants.VsockOtelPort), nil)
+		return net.Dial("tcp", fmt.Sprintf("%s:4317", gvnet.VIRTUAL_GATEWAY_IP))
 	}
 
 	cleanup, err := otel.ConfigureOTelSDKWithDialer(ctx, serviceName, enableOtel, dialer)

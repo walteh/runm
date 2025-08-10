@@ -4,6 +4,7 @@ package main
 
 import (
 	_ "embed"
+
 	_ "github.com/opencontainers/cgroups/devices"
 
 	"errors"
@@ -26,6 +27,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
+	"github.com/walteh/runm/core/gvnet"
 	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/logging"
 	"github.com/walteh/runm/pkg/logging/otel"
@@ -176,12 +178,18 @@ func main() {
 			return err
 		}
 
-		enableOtel := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != ""
+		// enableOtel := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != ""
+		data, err := os.ReadFile("/runc-config-flags/otel-enabled")
+		if err != nil {
+			fmt.Printf("problem reading otel-enabled: %v\n", err)
+		}
+		enableOtel := string(data) == "1"
 
 		loggerName := fmt.Sprintf("runc[%s]", context.Args().First())
 
 		cleanup, err := otel.ConfigureOTelSDKWithDialer(gocontext.Background(), loggerName, enableOtel, func(ctx gocontext.Context, network, addr string) (net.Conn, error) {
-			return vsock.Dial(2, uint32(constants.VsockOtelPort), nil)
+			// return vsock.Dial(2, uint32(constants.VsockOtelPort), nil)
+			return net.Dial("tcp", fmt.Sprintf("%s:4317", gvnet.VIRTUAL_GATEWAY_IP))
 		})
 		if err != nil {
 			fmt.Printf("problem configuring otel: %v\n", err)

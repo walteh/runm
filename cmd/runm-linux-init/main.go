@@ -5,6 +5,7 @@ package main
 import (
 	_ "crypto/tls"
 	_ "net/http/pprof"
+	"time"
 
 	"bytes"
 	"context"
@@ -28,10 +29,13 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"github.com/arianvp/cgroup-exporter/collector"
 	"github.com/containerd/containerd/v2/pkg/cap"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/mdlayher/vsock"
 	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/push"
 	"github.com/vishvananda/netlink"
 	"gitlab.com/tozd/go/errors"
 	"google.golang.org/grpc"
@@ -68,7 +72,7 @@ var (
 	mshareSockBindsString string
 	enableOtel            bool
 	timezone              string
-	time                  string // unix timestamp in nanoseconds, not meant to be exact (that is what the timesync does)
+	timeArg               string // unix timestamp in nanoseconds, not meant to be exact (that is what the timesync does)
 
 	mshareDirBinds  map[string]string
 	mshareSockBinds map[string]string
@@ -90,7 +94,7 @@ func init() {
 	flag.StringVar(&mshareDirBindsString, "mshare-dir-binds", "", "the mshare dir binds")
 	flag.StringVar(&mshareSockBindsString, "mshare-sock-binds", "", "the mshare sock binds")
 	flag.StringVar(&timezone, "timezone", "", "the timezone")
-	flag.StringVar(&time, "time", "0", "the time in nanoseconds")
+	flag.StringVar(&timeArg, "time", "0", "the time in nanoseconds")
 	// flag.StringVar(&rootfsBindOptions, "rootfs-bind-options", "", "the rootfs bind options")
 	// flag.StringVar(&rootfsBindTarget, "rootfs-bind-target", "", "the rootfs bind target")
 	// flag.StringVar(&rootfsBindSource, "rootfs-bind-source", "", "the rootfs bind source")
@@ -148,12 +152,13 @@ func main() {
 
 	runmLinuxInit := &runmLinuxInit{}
 
-	ctx, err := runmLinuxInit.setupLogger(ctx)
+	ctx, cleanup, err := runmLinuxInit.setupLogger(ctx)
 	if err != nil {
 		fmt.Printf("failed to setup logger: %v\n", err)
 		exitCode = 1
 		return
 	}
+	defer cleanup()
 
 	ctx = slogctx.Append(ctx, slog.Int("pid", pid))
 
@@ -167,7 +172,7 @@ func main() {
 
 func (r *runmLinuxInit) run(ctx context.Context) error {
 
-	requestedNano, err := strconv.ParseInt(time, 10, 64)
+	requestedNano, err := strconv.ParseInt(timeArg, 10, 64)
 	if err != nil {
 		return errors.Errorf("problem parsing time: %w", err)
 	}
@@ -320,6 +325,12 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 		return r.runPprofVsockServer(ctx)
 	})
 
+	if enableOtel {
+		taskgroupz.GoWithName("cgroup-exporter-vsock-server", func(ctx context.Context) error {
+			return r.runCgroupExporterVsockServer(ctx)
+		})
+	}
+
 	for target, port := range mshareSockBinds {
 		portnum, err := strconv.Atoi(port)
 		if err != nil {
@@ -340,19 +351,19 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 	return taskgroupz.Wait()
 }
 
-func (r *runmLinuxInit) setupLogger(ctx context.Context) (context.Context, error) {
+func (r *runmLinuxInit) setupLogger(ctx context.Context) (context.Context, func(), error) {
 	var err error
 
 	fmt.Println("linux-runm-init: setting up logging - all future logs will be sent to vsock (pid: ", os.Getpid(), ")")
 
 	rawWriterConn, err := vsock.Dial(2, uint32(constants.VsockRawWriterProxyPort), nil)
 	if err != nil {
-		return nil, errors.Errorf("problem dialing vsock for raw writer: %w", err)
+		return nil, nil, errors.Errorf("problem dialing vsock for raw writer: %w", err)
 	}
 
 	delimitedLogProxyConn, err := vsock.Dial(2, uint32(constants.VsockDelimitedWriterProxyPort), nil)
 	if err != nil {
-		return nil, errors.Errorf("problem dialing vsock for log proxy: %w", err)
+		return nil, nil, errors.Errorf("problem dialing vsock for log proxy: %w", err)
 	}
 
 	opts := []logging.LoggerOpt{
@@ -360,15 +371,20 @@ func (r *runmLinuxInit) setupLogger(ctx context.Context) (context.Context, error
 	}
 
 	dialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
-		return vsock.Dial(2, uint32(constants.VsockOtelPort), nil)
+		// return vsock.Dial(2, uint32(constants.VsockOtelPort), nil)
+		return net.Dial("tcp", fmt.Sprintf("%s:4317", gvnet.VIRTUAL_GATEWAY_IP))
+	}
+
+	if enableOtel {
+		os.MkdirAll("/runc-config-flags", 0755)
+		// write to /runc-config-flags/otel-enabled
+		os.WriteFile("/runc-config-flags/otel-enabled", []byte("1"), 0644)
 	}
 
 	cleanup, err := otel.ConfigureOTelSDKWithDialer(ctx, serviceName, enableOtel, dialer)
 	if err != nil {
-		return nil, errors.Errorf("failed to setup OTel SDK: %w", err)
+		return nil, nil, errors.Errorf("failed to setup OTel SDK: %w", err)
 	}
-
-	defer cleanup()
 
 	logger := logging.NewDefaultDevLoggerWithDelimiter(serviceName, delimitedLogProxyConn, opts...)
 
@@ -376,7 +392,7 @@ func (r *runmLinuxInit) setupLogger(ctx context.Context) (context.Context, error
 	r.logWriter = delimitedLogProxyConn
 	r.logger = logger
 
-	return slogctx.NewCtx(ctx, logger), nil
+	return slogctx.NewCtx(ctx, logger), cleanup, nil
 }
 
 func recoveryMain(ctx context.Context, r *runmLinuxInit) (err error) {
@@ -461,6 +477,68 @@ func (r *runmLinuxInit) runGrpcVsockServer(ctx context.Context, server *grpc.Ser
 	}
 
 	return nil
+}
+
+func (r *runmLinuxInit) runCgroupExporterVsockServer(ctx context.Context) error {
+	// listener, err := vsock.ListenContextID(3, uint32(constants.VsockCgroupExporterPort), nil)
+	// if err != nil {
+	// 	slog.ErrorContext(ctx, "problem listening vsock", "error", err)
+	// 	return errors.Errorf("problem listening vsock: %w", err)
+	// }
+
+	httpClient := &http.Client{
+		Timeout: 1 * time.Second,
+	}
+
+	cgroupfs := os.DirFS("/sys/fs/cgroup")
+	// handler := http.NewServeMux()
+	registry := prometheus.NewRegistry()
+	registry.MustRegister(collector.New(cgroupfs, ""))
+
+	pusher := push.New(fmt.Sprintf("%s:9091", gvnet.VIRTUAL_GATEWAY_IP), "runm-linux-init")
+	pusher.Client(httpClient)
+	coll := collector.New(cgroupfs, "")
+	// promhttp.InstrumentMetricHandler(registry, promhttp.HandlerFor(registry, promhttp.HandlerOpts{Registry: registry}))
+	pusher.Collector(coll)
+	pusher.Grouping("pid", strconv.Itoa(os.Getpid()))
+	// handler.Handle("/metrics", promhttp.HandlerFor(registry, promhttp.HandlerOpts{Registry: registry}))
+
+	interval := time.NewTicker(10 * time.Millisecond)
+	defer interval.Stop()
+
+	if err := pusher.PushContext(ctx); err != nil {
+		slog.ErrorContext(ctx, "problem pushing metrics", "error", err)
+		return errors.Errorf("problem pushing metrics: %w", err)
+	}
+
+	slog.InfoContext(ctx, "pushed metrics on first attempt", "pid", os.Getpid(), "port", 9091)
+
+	for {
+		select {
+		case <-ctx.Done():
+			// try to push one last time
+			if err := pusher.Push(); err != nil {
+				slog.WarnContext(ctx, "problem pushing metrics (attempted to push one last time)", "error", err)
+			}
+			return ctx.Err()
+		case <-interval.C:
+			if err := pusher.PushContext(ctx); err != nil {
+				slog.ErrorContext(ctx, "problem pushing metrics", "error", err)
+				return errors.Errorf("problem pushing metrics: %w", err)
+			}
+			// slog.InfoContext(ctx, "pushed metrics", "pid", os.Getpid(), "port", 9091)
+		}
+	}
+
+	// server := &http.Server{
+	// 	Handler: handler,
+	// }
+
+	// if err := server.Serve(listener); err != nil {
+	// 	return errors.Errorf("problem serving cgroup exporter vsock server: %w", err)
+	// }
+
+	// return nil
 }
 
 func (r *runmLinuxInit) runPprofVsockServer(ctx context.Context) error {

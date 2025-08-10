@@ -37,6 +37,7 @@ const (
 	VsockRawWriterProxyPort           = 3099
 	VsockDebugPort                    = 2018
 	VsockPprofPort                    = 2017
+	VsockCgroupExporterPort           = 2016
 	MsockBasePort                     = 9000
 	VsockDelimitedLogProxyDelimiter   = rune(0x1F) // ASCII Record Separator
 	MbindSeparator                    = "|"

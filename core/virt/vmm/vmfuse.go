@@ -147,7 +147,7 @@ func newDefaultLinuxVMForVMFuse(ctx context.Context, vmid string, config VMFuseV
 	}
 
 	// Use the existing newDefaultLinuxVM but customize for vmfuse
-	defaults, err := newDefaultLinuxVM(ctx, vmid, constants.MbinVMFUSEFileName, map[string]any{}, mshareDirs, []string{}, map[uint16]uint16{port: 2049})
+	defaults, err := newDefaultLinuxVM(ctx, vmid, constants.MbinVMFUSEFileName, map[string]any{}, mshareDirs, []string{}, map[uint16]uint16{port: 2049}, map[uint16]uint16{9091: 9091})
 	if err != nil {
 		return nil, 0, errors.Errorf("creating default linux VM: %w", err)
 	}
