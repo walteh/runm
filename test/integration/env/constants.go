@@ -166,6 +166,14 @@ func getEnvVar(name string) string {
 	return val
 }
 
+func ensureShimEnvVars(strs ...string) {
+	for _, str := range strs {
+		if val := getEnvVar(str); val != "" {
+			os.Setenv(str, val)
+		}
+	}
+}
+
 func resolveDebugEnvVar() string {
 	exe := getMyExecutableName()
 	envVar := getDebugEnvVarName(exe)

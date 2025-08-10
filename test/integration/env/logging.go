@@ -26,6 +26,13 @@ func SetupLoggingForShim(ctx context.Context) (*slog.Logger, func() error, error
 
 	shimName := "shim[" + mode + "]"
 
+	ensureShimEnvVars(
+		"OTEL_EXPORTER_OTLP_ENDPOINT",
+		"OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
+		"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+		"OTEL_EXPORTER_OTLP_PROTOCOL",
+	)
+
 	return SetupLogForwardingToContainerd(ctx, shimName, mode == "primary")
 }
 

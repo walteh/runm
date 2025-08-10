@@ -80,6 +80,11 @@ services:
     ports:
       - "9090:9090"
 
+  pushgateway:
+    image: prom/pushgateway:latest
+    ports:
+      - "9091:9091"
+
   grafana:
     image: grafana/grafana:12.0.2
     volumes:
