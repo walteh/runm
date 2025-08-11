@@ -1,0 +1,8 @@
+# perses/config.yaml
+database:
+    file:
+        folder: /var/lib/perses
+
+provisioning:
+    folders:
+      - /etc/perses/provisioning

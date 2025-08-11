@@ -81,6 +81,7 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 	defaults, err := newDefaultLinuxVM(ctx, vmid, constants.MbinFileName, mshareFiles, mshareDirs, mshareSocks, nil, map[uint16]uint16{
 		9091: 9091,
 		4317: 4317,
+		4040: 4040,
 	})
 	if err != nil {
 		return nil, errors.Errorf("getting VM defaults: %w", err)

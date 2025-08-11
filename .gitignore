@@ -85,6 +85,8 @@ gen/build
 tempo-data
 loki-data
 grafana-data
+pyroscope-data
+perses-data
 .claude
 
 backlog

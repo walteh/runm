@@ -1,0 +1,10 @@
+# perses/provisioning/global-ds-tempo.yaml
+kind: "GlobalDatasource"
+metadata:
+    name: tempo
+spec:
+    plugin:
+        kind: "TempoDatasource"
+        spec:
+            proxy:
+                url: "http://tempo:3200"

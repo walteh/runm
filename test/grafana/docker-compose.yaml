@@ -3,7 +3,7 @@ services:
   # Tempo runs as user 10001, and docker compose creates the volume as root.
   # As such, we need to chown the volume in order for Tempo to start correctly.
   init:
-    image: &tempoImage grafana/tempo:2.8.1
+    image: &tempoImage grafana/tempo:latest
     user: root
     entrypoint:
       - "chown"
@@ -24,21 +24,7 @@ services:
     depends_on:
       - init
 
-  # Generate fake traces...
-#   k6-tracing:
-#     image: ghcr.io/grafana/xk6-client-tracing:v0.0.7
-#     environment:
-#       - ENDPOINT=otel-collector:4317
-#     restart: always
-#     depends_on:
-#       - otel-collector
 
-#   # And put them in an OTEL collector pipeline...
-#   otel-collector:
-#     image: otel/opentelemetry-collector-contrib:0.128.0
-#     command: [ "--config=/etc/otel-collector.yaml" ]
-#     volumes:
-#       - ./otel-collector.yaml:/etc/otel-collector.yaml
 
   alloy:
     image: grafana/alloy:latest
@@ -57,7 +43,7 @@ services:
 
   # Loki for logs collection
   loki:
-    image: grafana/loki:3.5.0
+    image: grafana/loki:latest
     command: [ "-config.file=/etc/loki/local-config.yaml" ]
     ports:
       - "3100:3100"
@@ -86,11 +72,12 @@ services:
       - "9091:9091"
 
   grafana:
-    image: grafana/grafana:12.0.2
+    image: grafana/grafana:latest
     volumes:
       - ./grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
       - ./grafana-data:/var/lib/grafana
     environment:
+        - GF_INSTALL_PLUGINS=grafana-pyroscope-app
         - GF_AUTH_ANONYMOUS_ENABLED=true
         - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
         - GF_AUTH_DISABLE_LOGIN_FORM=true
@@ -98,3 +85,25 @@ services:
         - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=alloy-tempo
     ports:
       - "3000:3000"
+
+  perses:
+    image: persesdev/perses:latest
+    command: ["--config=/etc/perses/config.yaml"]
+    volumes:
+      - ./perses-config.yaml:/etc/perses/config.yaml:ro
+      - ./perses-data:/var/lib/perses
+      - ./perses-provisioning:/etc/perses/provisioning:ro
+    ports:
+      - "3001:8080"
+    depends_on:
+      - prometheus
+      - tempo
+
+
+  pyroscope:
+    image: grafana/pyroscope:latest
+    command: []
+    volumes:
+      - ./pyroscope-data:/var/lib/pyroscope
+    ports:
+      - "4040:4040"

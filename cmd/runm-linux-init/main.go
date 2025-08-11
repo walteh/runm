@@ -51,7 +51,6 @@ import (
 	"github.com/walteh/runm/core/virt/guest/managerserver"
 	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/grpcerr"
-	"github.com/walteh/runm/pkg/logging"
 	"github.com/walteh/runm/pkg/logging/otel"
 	"github.com/walteh/runm/pkg/netdiag"
 	"github.com/walteh/runm/pkg/taskgroup"
@@ -351,50 +350,6 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 	return taskgroupz.Wait()
 }
 
-func (r *runmLinuxInit) setupLogger(ctx context.Context) (context.Context, func(), error) {
-	var err error
-
-	fmt.Println("linux-runm-init: setting up logging - all future logs will be sent to vsock (pid: ", os.Getpid(), ")")
-
-	rawWriterConn, err := vsock.Dial(2, uint32(constants.VsockRawWriterProxyPort), nil)
-	if err != nil {
-		return nil, nil, errors.Errorf("problem dialing vsock for raw writer: %w", err)
-	}
-
-	delimitedLogProxyConn, err := vsock.Dial(2, uint32(constants.VsockDelimitedWriterProxyPort), nil)
-	if err != nil {
-		return nil, nil, errors.Errorf("problem dialing vsock for log proxy: %w", err)
-	}
-
-	opts := []logging.LoggerOpt{
-		logging.WithRawWriter(rawWriterConn),
-	}
-
-	dialer := func(ctx context.Context, network, addr string) (net.Conn, error) {
-		// return vsock.Dial(2, uint32(constants.VsockOtelPort), nil)
-		return net.Dial("tcp", fmt.Sprintf("%s:4317", gvnet.VIRTUAL_GATEWAY_IP))
-	}
-
-	if enableOtel {
-		os.MkdirAll("/runc-config-flags", 0755)
-		// write to /runc-config-flags/otel-enabled
-		os.WriteFile("/runc-config-flags/otel-enabled", []byte("1"), 0644)
-	}
-
-	cleanup, err := otel.ConfigureOTelSDKWithDialer(ctx, serviceName, enableOtel, dialer)
-	if err != nil {
-		return nil, nil, errors.Errorf("failed to setup OTel SDK: %w", err)
-	}
-
-	logger := logging.NewDefaultDevLoggerWithDelimiter(serviceName, delimitedLogProxyConn, opts...)
-
-	r.rawWriter = rawWriterConn
-	r.logWriter = delimitedLogProxyConn
-	r.logger = logger
-
-	return slogctx.NewCtx(ctx, logger), cleanup, nil
-}
-
 func recoveryMain(ctx context.Context, r *runmLinuxInit) (err error) {
 	errChan := make(chan error)
 	go func() {
@@ -415,6 +370,15 @@ func recoveryMain(ctx context.Context, r *runmLinuxInit) (err error) {
 }
 
 func (r *runmLinuxInit) configureRuntimeServer(ctx context.Context) (*grpc.Server, *server.Server, error) {
+
+	// start an otel trace
+	ctx, span := otel.GetTracerProvider().Tracer("").Start(ctx, "configureRuntimeServer")
+	defer span.End()
+
+	span.AddEvent("configureRuntimeServer")
+
+	span.AddEvent("configureRuntimeServer2")
+
 	namespace := "default"
 	runcRoot := "/run/containerd/runc"
 

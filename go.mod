@@ -63,6 +63,8 @@ require (
 	github.com/fatih/color v1.18.0
 	github.com/goforj/godump v1.5.0
 	github.com/google/cadvisor v0.53.0
+	github.com/grafana/pyroscope-go v1.2.4
+	github.com/grafana/pyroscope-go/godeltaprof v0.1.8
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/hashicorp/go-plugin v1.6.3
 	github.com/kr/pty v1.1.8

@@ -14,7 +14,14 @@ datasources:
     jsonData:
         httpMethod: GET
 
-        # https://grafana.com/docs/grafana-cloud/connect-externally-hosted/data-sources/tempo/configure-tempo-data-source/
+  - name: Pyroscope
+    type: grafana-pyroscope-datasource
+    url: http://pyroscope:4040
+    access: proxy
+    isDefault: false
+    uid: pyroscope
+
+    # https://grafana.com/docs/grafana-cloud/connect-externally-hosted/data-sources/tempo/configure-tempo-data-source/
   - name: Tempo
     type: tempo
     uid: tempo

@@ -1,0 +1,12 @@
+# perses/provisioning/global-ds-prom.yaml
+kind: "GlobalDatasource"
+metadata:
+    name: prom
+spec:
+    default: true
+    plugin:
+        kind: "PrometheusDatasource"
+        spec:
+            # Use Perses proxy so the browser never hits Prometheus directly (no CORS headaches)
+            proxy:
+                url: "http://prometheus:9090"
