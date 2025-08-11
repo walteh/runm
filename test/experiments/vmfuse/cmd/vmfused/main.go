@@ -97,9 +97,13 @@ func runMain(ctx context.Context) error {
 
 	grpcServer := grpc.NewServer(
 		// insecure
-		grpc.Creds(insecure.NewCredentials()),
-		grpcerr.GetGrpcServerOptsCtx(ctx),
-		otel.GetGrpcServerOpts(),
+		append(
+			append(
+				grpcerr.GetGrpcServerOptsCtx(ctx),
+				otel.GetGrpcServerOpts()...,
+			),
+			grpc.Creds(insecure.NewCredentials()),
+		)...,
 	)
 
 	// listen on unix socket

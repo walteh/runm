@@ -105,7 +105,7 @@ require (
 	golang.org/x/mod v0.26.0
 	google.golang.org/protobuf v1.36.6
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
-	gvisor.dev/gvisor v0.0.0-20250509002459-06cdc4c49840
+	gvisor.dev/gvisor v0.0.0-20250807194038-c9af560a03d9
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/utils v0.0.0-20250502105355-0f33e8f1c979
 )

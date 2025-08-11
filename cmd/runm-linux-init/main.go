@@ -428,10 +428,10 @@ func (r *runmLinuxInit) configureRuntimeServer(ctx context.Context) (*grpc.Serve
 		SystemdCgroup: false,
 	})
 
-	serveropts := []grpc.ServerOption{
+	serveropts := append(
 		grpcerr.GetGrpcServerOptsCtx(ctx),
-		otel.GetGrpcServerOpts(),
-	}
+		otel.GetGrpcServerOpts()...,
+	)
 
 	grpcVsockServer := grpc.NewServer(serveropts...)
 

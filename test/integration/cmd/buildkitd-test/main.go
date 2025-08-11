@@ -80,8 +80,10 @@ func main() {
 	containerdclient.AddHackedClientOpts(clientopts...)
 
 	app := buildkitd_main.App(
-		otel.GetGrpcServerOpts(),
-		grpcerr.GetGrpcServerOptsCtx(ctx),
+		append(
+			otel.GetGrpcServerOpts(),
+			grpcerr.GetGrpcServerOptsCtx(ctx)...,
+		)...,
 	)
 
 	var debugDeferred func()

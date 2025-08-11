@@ -112,21 +112,21 @@ func GetLoggerProvider() realotellog.LoggerProvider {
 	return defaultOTelInstances.LoggerProvider
 }
 
-func GetGrpcServerOpts() grpc.ServerOption {
+func GetGrpcServerOpts() []grpc.ServerOption {
 	instancesLock.Lock()
 	defer instancesLock.Unlock()
 	if defaultOTelInstances == nil {
-		return grpc.StatsHandler(otelgrpc.NewServerHandler(
+		return []grpc.ServerOption{grpc.StatsHandler(otelgrpc.NewServerHandler(
 			otelgrpc.WithTracerProvider(realotel.GetTracerProvider()),
 			otelgrpc.WithMeterProvider(realotel.GetMeterProvider()),
 			otelgrpc.WithPropagators(realotel.GetTextMapPropagator()),
-		))
+		))}
 	}
-	return grpc.StatsHandler(otelgrpc.NewServerHandler(
+	return []grpc.ServerOption{grpc.StatsHandler(otelgrpc.NewServerHandler(
 		otelgrpc.WithTracerProvider(defaultOTelInstances.TracerProvider),
 		otelgrpc.WithMeterProvider(defaultOTelInstances.MeterProvider),
 		otelgrpc.WithPropagators(defaultOTelInstances.Propagator),
-	))
+	))}
 }
 
 func GetGrpcClientOpts() grpc.DialOption {

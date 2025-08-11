@@ -1,8 +1,9 @@
 package main
 
 import (
-	_ "github.com/containerd/containerd/v2/cmd/containerd/builtins"
 	_ "net/http/pprof"
+
+	_ "github.com/containerd/containerd/v2/cmd/containerd/builtins"
 
 	"context"
 	"flag"
@@ -39,7 +40,9 @@ import (
 )
 
 func init() {
-	server.AddHackedServerOption(grpcerr.GetGrpcServerOptsCtx(context.Background()))
+	for _, opt := range grpcerr.GetGrpcServerOptsCtx(context.Background()) {
+		server.AddHackedServerOption(opt)
+	}
 }
 
 var ctrCommands = FlagArray[string]{}

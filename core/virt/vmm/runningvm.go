@@ -546,8 +546,10 @@ func (rvm *RunningVM[VM]) SetupHostService(ctx context.Context) error {
 	defer vsockListener.Close()
 
 	grpcServer := grpc.NewServer(
-		otel.GetGrpcServerOpts(),
-		grpcerr.GetGrpcServerOpts(),
+		append(
+			otel.GetGrpcServerOpts(),
+			grpcerr.GetGrpcServerOpts()...,
+		)...,
 	)
 
 	vmmv1.RegisterHostCallbackServiceServer(grpcServer, rvm)

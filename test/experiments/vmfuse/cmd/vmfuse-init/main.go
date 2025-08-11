@@ -225,8 +225,10 @@ func (v *vmfuseInit) run(ctx context.Context) error {
 	taskgroupz.GoWithName("grpc-vsock-server", func(ctx context.Context) error {
 
 		server := grpc.NewServer(
-			grpcerr.GetGrpcServerOptsCtx(ctx),
-			otel.GetGrpcServerOpts(),
+			append(
+				grpcerr.GetGrpcServerOptsCtx(ctx),
+				otel.GetGrpcServerOpts()...,
+			)...,
 		)
 
 		managerserver.Register(server)

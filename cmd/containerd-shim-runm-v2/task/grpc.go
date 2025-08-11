@@ -30,8 +30,10 @@ var (
 func (s *service) serveGrpc(ctx context.Context, cid string) (func() error, func() error, error) {
 
 	grpcServer := grpc.NewServer(
-		otel.GetGrpcServerOpts(),
-		grpcerr.GetGrpcServerOptsCtx(ctx),
+		append(
+			otel.GetGrpcServerOpts(),
+			grpcerr.GetGrpcServerOptsCtx(ctx)...,
+		)...,
 	)
 
 	runmv1.RegisterShimServiceServer(grpcServer, s)

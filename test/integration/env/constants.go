@@ -2,6 +2,7 @@ package env
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -183,6 +184,8 @@ func resolveDebugEnvVar() string {
 	if val == "" {
 		val = getFsEnvVar(envVar)
 	}
+
+	slog.Info("resolveDebugEnvVar", "exe", exe, "envVar", envVar, "val", val)
 
 	return val
 }
