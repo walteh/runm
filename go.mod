@@ -1,6 +1,6 @@
 module github.com/walteh/runm
 
-go 1.25
+go 1.25rc2
 
 exclude github.com/containerd/nerdctl/mod/tigron v0.0.0
 
@@ -24,12 +24,12 @@ replace (
 	github.com/google/cadvisor => ../cadvisor
 	github.com/moby/buildkit => ../buildkit
 	github.com/opencontainers/runc => ../runc
-	github.com/pkg/errors => ../go-errors-2 // this is to avoid duplicate module errors
+	github.com/pkg/errors => ../go-errors/pkg-errors
 	github.com/tonistiigi/fsutil => ../fsutil
 	gitlab.com/tozd/go/errors => ../go-errors
 )
 
-replace gvisor.dev/gvisor => gvisor.dev/gvisor v0.0.0-20250611222258-0fe9a4bf489c // this needs to be updated manually (because the 'go' branch is the only one that works)
+replace gvisor.dev/gvisor => gvisor.dev/gvisor v0.0.0-20250807194038-c9af560a03d9 // this needs to be updated manually (because the 'go' branch is the only one that works)
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.6-20250717185734-6c6e0d3c608e.1
@@ -319,6 +319,8 @@ require (
 	github.com/ulikunitz/xz v0.5.12 // indirect
 	github.com/vbatts/tar-split v0.12.1 // indirect
 	github.com/vishvananda/netns v0.0.5 // indirect
+	github.com/walteh/go-errors v0.0.0-20250811132312-25eac94ea3ee // indirect
+	github.com/walteh/go-errors/pkg-errors v0.0.0-20250811132312-25eac94ea3ee // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect

@@ -20,10 +20,10 @@ replace (
 	github.com/containers/gvisor-tap-vsock => ../../../gvisor-tap-vsock
 	github.com/moby/buildkit => ../../../buildkit
 	github.com/opencontainers/runc => ../../../runc
-	github.com/pkg/errors => ../../../go-errors-2
+	github.com/pkg/errors => ../../../go-errors/pkg-errors
 	github.com/tonistiigi/fsutil => ../../../fsutil
 	gitlab.com/tozd/go/errors => ../../../go-errors
-	gvisor.dev/gvisor => gvisor.dev/gvisor v0.0.0-20250611222258-0fe9a4bf489c
+	gvisor.dev/gvisor => gvisor.dev/gvisor v0.0.0-20250807194038-c9af560a03d9 // this needs to be updated manually (because the 'go' branch is the only one that works)
 	k8s.io/kubernetes => ../../../kubernetes
 )
 
@@ -109,9 +109,10 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/spf13/cobra v1.9.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
+	github.com/walteh/go-errors v0.0.0-20250811132312-25eac94ea3ee // indirect
+	github.com/walteh/go-errors/pkg-errors v0.0.0-20250811132312-25eac94ea3ee // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
-	gitlab.com/tozd/go/errors v0.0.0-00010101000000-000000000000 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/net v0.38.0 // indirect

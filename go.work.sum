@@ -8317,6 +8317,8 @@ github.com/vultr/govultr/v2 v2.17.2 h1:gej/rwr91Puc/tgh+j33p/BLR16UrIPnSr+AIwYWZ
 github.com/vultr/govultr/v2 v2.17.2/go.mod h1:ZFOKGWmgjytfyjeyAdhQlSWwTjh2ig+X49cAp50dzXI=
 github.com/wagoodman/go-progress v0.0.0-20220614130704-4b1c25a33c7c/go.mod h1:jLXFoL31zFaHKAAyZUh+sxiTDFe1L1ZHrcK2T1itVKA=
 github.com/walteh/ec1 v0.0.0-20250613112923-0e64a26166de/go.mod h1:iQE28iihbq8Nq2N16FGEs5fANOkz69Mvmq8i0XAI6oU=
+github.com/walteh/go-errors v0.0.0-20250811132312-25eac94ea3ee h1:sWCsW42P9aj9Ot/MGAfESnL1xyOkwO60IAHiLtYBCgQ=
+github.com/walteh/go-errors v0.0.0-20250811132312-25eac94ea3ee/go.mod h1:QoG4JT1yRtCOo669WNYH8uu5gX7ovZegYQqZiyr+D/E=
 github.com/weppos/publicsuffix-go v0.12.0/go.mod h1:z3LCPQ38eedDQSwmsSRW4Y7t2L8Ln16JPQ02lHAdn5k=
 github.com/weppos/publicsuffix-go v0.13.0/go.mod h1:z3LCPQ38eedDQSwmsSRW4Y7t2L8Ln16JPQ02lHAdn5k=
 github.com/weppos/publicsuffix-go v0.15.1-0.20220329081811-9a40b608a236/go.mod h1:HYux0V0Zi04bHNwOHy4cXJVz/TQjYonnF6aoYhj+3QE=
