@@ -163,10 +163,16 @@ tasks:
 
     otel:grafana:run:
         desc: runs tempo
-        dir: test/integration/grafana
+        dir: test/grafana
         cmds:
           - cmd: docker compose up -d --build --force-recreate --always-recreate-deps --remove-orphans --renew-anon-volumes
           - cmd: docker compose ps
+
+    otel:grafana:stop:
+        desc: stops the grafana
+        dir: test/grafana
+        cmds:
+          - cmd: docker compose down
 
     zellij:
         desc: opens zellij
@@ -1098,7 +1104,7 @@ tasks:
         deps: ['linux:runtime:runm']
         vars:
             TEST_SCENARIO_DIR:
-                sh: realpath ./test/integration/scenarios/2025-07-02
+                sh: realpath ./test/scenarios/2025-07-02
         cmds:
           - task: dev:cleanup-running-shims
           - task: run:nerdctl-test:run
@@ -1231,7 +1237,7 @@ tasks:
         deps: ['linux:runtime:runm']
         vars:
             TEST_SCENARIO_DIR:
-                sh: realpath ./test/integration/scenarios/2025-07-02
+                sh: realpath ./test/scenarios/2025-07-02
         cmds:
           - task: dev:cleanup-running-shims
           - task: run:nerdctl-test:run
@@ -1296,7 +1302,7 @@ tasks:
         deps: ['linux:runtime:runm', 'build:runm-test-binaries']
         vars:
             TEST_SCENARIO_DIR:
-                sh: realpath ./test/integration/scenarios/2025-07-17
+                sh: realpath ./test/scenarios/2025-07-17
             TMP_DIR:
                 sh: mktemp -d
         cmds:
@@ -1322,7 +1328,7 @@ tasks:
         deps: ['linux:runtime:runm', 'build:runm-test-binaries']
         vars:
             TEST_SCENARIO_DIR:
-                sh: realpath ./test/integration/scenarios/2025-07-20
+                sh: realpath ./test/scenarios/2025-07-20
             TMP_DIR:
                 sh: mktemp -d
         cmds:
