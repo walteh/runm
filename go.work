@@ -1,9 +1,38 @@
-go 1.25rc2
+go 1.25rc3
 
-toolchain go1.25rc2
+toolchain go1.25rc3
 
 use (
 	.
 	./tools
 	./exp/k8s
+	./exp/buildkit
+	./exp/containerd
+	./exp/nerdctl
+)
+
+replace (
+	gvisor.dev/gvisor => gvisor.dev/gvisor v0.0.0-20250807194038-c9af560a03d9 // this needs to be updated manually (because the 'go' branch is the only one that works)
+)
+
+replace (
+	github.com/containerd/nerdctl/v2 => ../nerdctl
+	github.com/containerd/nerdctl/mod/tigron => ../nerdctl/mod/tigron
+	github.com/Code-Hex/vz/v3 => ../vz
+	github.com/arianvp/cgroup-exporter => ../cgroup-exporter
+	github.com/containerd/console => ../console
+	github.com/containerd/containerd/api => ../containerd/api
+	github.com/containerd/containerd/v2 => ../containerd
+	github.com/containerd/containerd/v2/pkg/sys => ../containerd/pkg/sys
+	github.com/containerd/go-runc => ../go-runc
+	github.com/containerd/stargz-snapshotter => ../stargz-snapshotter
+	github.com/containerd/stargz-snapshotter/estargz => ../stargz-snapshotter/estargz
+	github.com/containerd/ttrpc => ../ttrpc
+	github.com/containers/gvisor-tap-vsock => ../gvisor-tap-vsock
+	github.com/google/cadvisor => ../cadvisor
+	github.com/moby/buildkit => ../buildkit
+	github.com/opencontainers/runc => ../runc
+	github.com/pkg/errors => ../go-errors/pkg-errors
+	github.com/tonistiigi/fsutil => ../fsutil
+	gitlab.com/tozd/go/errors => ../go-errors
 )

@@ -192,6 +192,8 @@ tasks:
         run: once
         aliases: [go-mod-tidy]
         cmds:
+          - cmd: go tool go-work-sync -quiet
+            silent: true
           - for: {var: GO_MODULES}
             cmd: cd {{.ITEM}} && go mod tidy -e
 

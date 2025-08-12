@@ -17,6 +17,7 @@ exclude google.golang.org/grpc/stats/opentelemetry v0.0.0-20240907200651-3ffb98b
 tool (
 	github.com/walteh/runm/tools/cmd/codesign
 	github.com/walteh/runm/tools/cmd/findcodetag
+	github.com/walteh/runm/tools/cmd/go-work-sync
 	github.com/walteh/runm/tools/cmd/goshim
 	github.com/walteh/runm/tools/cmd/pty-resize-test
 	github.com/walteh/runm/tools/cmd/taskmcp
@@ -44,8 +45,6 @@ tool (
 	gotest.tools/gotestsum
 )
 
-replace github.com/containerd/ttrpc => ../../ttrpc
-
 replace github.com/go-task/task/v3 => ../../task
 
 replace github.com/kazhuravlev/options-gen => github.com/walteh/options-gen v0.0.0-20250713131630-7173908d186c
@@ -59,6 +58,7 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/veqryn/slog-context v0.8.0
 	gitlab.com/tozd/go/errors v0.10.0
+	golang.org/x/mod v0.26.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -253,9 +253,9 @@ require (
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/dnephin/pflag v1.0.7 // indirect
-	github.com/docker/cli v28.2.2+incompatible // indirect
+	github.com/docker/cli v28.3.0+incompatible // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
-	github.com/docker/docker v28.2.2+incompatible // indirect
+	github.com/docker/docker v28.3.3+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.9.3 // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
@@ -451,7 +451,6 @@ require (
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/moby/buildkit v0.20.2 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
-	github.com/moby/sys/user v0.4.0 // indirect
 	github.com/moby/term v0.5.2 // indirect
 	github.com/moricho/tparallel v0.3.2 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
@@ -581,6 +580,8 @@ require (
 	github.com/wagoodman/go-partybus v0.0.0-20230516145632-8ccac152c651 // indirect
 	github.com/wagoodman/go-progress v0.0.0-20230925121702-07e42b3cdba0 // indirect
 	github.com/walteh/claude-squad v0.0.0-20250713133148-ad02a34e76f0 // indirect
+	github.com/walteh/go-errors v0.0.0-20250811142854-50f7750c5484 // indirect
+	github.com/walteh/go-errors/pkg-errors v0.0.0-20250811142854-50f7750c5484 // indirect
 	github.com/walteh/goimports-reviser/v3 v3.9.2 // indirect
 	github.com/walteh/protoc-gen v0.0.0-20250625195119-16fd06a5435a // indirect
 	github.com/walteh/retab/v2 v2.10.2 // indirect
@@ -641,7 +642,6 @@ require (
 	golang.org/x/crypto v0.40.0 // indirect
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b // indirect
 	golang.org/x/exp/typeparams v0.0.0-20250620022241-b7579e27df2b // indirect
-	golang.org/x/mod v0.26.0 // indirect
 	golang.org/x/net v0.42.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/sync v0.16.0 // indirect
@@ -675,3 +675,43 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 	software.sslmate.com/src/go-pkcs12 v0.5.0 // indirect
 )
+
+replace github.com/Code-Hex/vz/v3 => ../../vz // managed by go-work-sync
+
+replace github.com/arianvp/cgroup-exporter => ../../cgroup-exporter // managed by go-work-sync
+
+replace github.com/containerd/console => ../../console // managed by go-work-sync
+
+replace github.com/containerd/containerd/api => ../../containerd/api // managed by go-work-sync
+
+replace github.com/containerd/containerd/v2 => ../../containerd // managed by go-work-sync
+
+replace github.com/containerd/containerd/v2/pkg/sys => ../../containerd/pkg/sys // managed by go-work-sync
+
+replace github.com/containerd/go-runc => ../../go-runc // managed by go-work-sync
+
+replace github.com/containerd/nerdctl/mod/tigron => ../../nerdctl/mod/tigron // managed by go-work-sync
+
+replace github.com/containerd/nerdctl/v2 => ../../nerdctl // managed by go-work-sync
+
+replace github.com/containerd/stargz-snapshotter => ../../stargz-snapshotter // managed by go-work-sync
+
+replace github.com/containerd/stargz-snapshotter/estargz => ../../stargz-snapshotter/estargz // managed by go-work-sync
+
+replace github.com/containerd/ttrpc => ../../ttrpc // managed by go-work-sync
+
+replace github.com/containers/gvisor-tap-vsock => ../../gvisor-tap-vsock // managed by go-work-sync
+
+replace github.com/google/cadvisor => ../../cadvisor // managed by go-work-sync
+
+replace github.com/moby/buildkit => ../../buildkit // managed by go-work-sync
+
+replace github.com/opencontainers/runc => ../../runc // managed by go-work-sync
+
+replace github.com/pkg/errors => ../../go-errors/pkg-errors // managed by go-work-sync
+
+replace github.com/tonistiigi/fsutil => ../../fsutil // managed by go-work-sync
+
+replace gitlab.com/tozd/go/errors => ../../go-errors // managed by go-work-sync
+
+replace gvisor.dev/gvisor => gvisor.dev/gvisor v0.0.0-20250807194038-c9af560a03d9 // managed by go-work-sync

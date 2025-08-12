@@ -4,33 +4,6 @@ go 1.25rc2
 
 exclude github.com/containerd/nerdctl/mod/tigron v0.0.0
 
-// forks
-replace (
-	// forks used for debugging
-	github.com/Code-Hex/vz/v3 => ../vz
-	github.com/arianvp/cgroup-exporter => ../cgroup-exporter
-	github.com/containerd/console => ../console
-	// forks with required logical changes
-	github.com/containerd/containerd/api => ../containerd/api
-	github.com/containerd/containerd/v2 => ../containerd
-	github.com/containerd/containerd/v2/pkg/sys => ../containerd/pkg/sys
-	github.com/containerd/go-runc => ../go-runc
-	github.com/containerd/nerdctl/mod/tigron => ../nerdctl/mod/tigron
-	github.com/containerd/nerdctl/v2 => ../nerdctl
-	github.com/containerd/stargz-snapshotter => ../stargz-snapshotter
-	github.com/containerd/stargz-snapshotter/estargz => ../stargz-snapshotter/estargz
-	github.com/containerd/ttrpc => ../ttrpc
-	github.com/containers/gvisor-tap-vsock => ../gvisor-tap-vsock
-	github.com/google/cadvisor => ../cadvisor
-	github.com/moby/buildkit => ../buildkit
-	github.com/opencontainers/runc => ../runc
-	github.com/pkg/errors => ../go-errors/pkg-errors
-	github.com/tonistiigi/fsutil => ../fsutil
-	gitlab.com/tozd/go/errors => ../go-errors
-)
-
-replace gvisor.dev/gvisor => gvisor.dev/gvisor v0.0.0-20250807194038-c9af560a03d9 // this needs to be updated manually (because the 'go' branch is the only one that works)
-
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.6-20250717185734-6c6e0d3c608e.1
 	buf.build/go/protovalidate v0.14.0
@@ -64,7 +37,6 @@ require (
 	github.com/goforj/godump v1.5.0
 	github.com/google/cadvisor v0.53.0
 	github.com/grafana/pyroscope-go v1.2.4
-	github.com/grafana/pyroscope-go/godeltaprof v0.1.8
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/hashicorp/go-plugin v1.6.3
 	github.com/kr/pty v1.1.8
@@ -95,6 +67,7 @@ require (
 	github.com/urfave/cli/v2 v2.27.7
 	github.com/veqryn/slog-context v0.8.0
 	github.com/vishvananda/netlink v1.3.1
+	github.com/walteh/go-errors v0.0.0-20250811132312-25eac94ea3ee
 	gitlab.com/tozd/go/errors v0.10.0
 	go.opentelemetry.io/contrib/bridges/otelslog v0.12.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.62.0
@@ -213,6 +186,7 @@ require (
 	github.com/google/pprof v0.0.0-20250403155104-27863c87afa6 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
+	github.com/grafana/pyroscope-go/godeltaprof v0.1.8 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.1.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0 // indirect
 	github.com/hanwen/go-fuse/v2 v2.8.0 // indirect
@@ -321,7 +295,6 @@ require (
 	github.com/ulikunitz/xz v0.5.12 // indirect
 	github.com/vbatts/tar-split v0.12.1 // indirect
 	github.com/vishvananda/netns v0.0.5 // indirect
-	github.com/walteh/go-errors v0.0.0-20250811132312-25eac94ea3ee // indirect
 	github.com/walteh/go-errors/pkg-errors v0.0.0-20250811132312-25eac94ea3ee // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
@@ -408,3 +381,43 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250721164621-a45f3dfb1074
 	google.golang.org/grpc v1.74.2
 )
+
+replace github.com/Code-Hex/vz/v3 => ../vz // managed by go-work-sync
+
+replace github.com/arianvp/cgroup-exporter => ../cgroup-exporter // managed by go-work-sync
+
+replace github.com/containerd/console => ../console // managed by go-work-sync
+
+replace github.com/containerd/containerd/api => ../containerd/api // managed by go-work-sync
+
+replace github.com/containerd/containerd/v2 => ../containerd // managed by go-work-sync
+
+replace github.com/containerd/containerd/v2/pkg/sys => ../containerd/pkg/sys // managed by go-work-sync
+
+replace github.com/containerd/go-runc => ../go-runc // managed by go-work-sync
+
+replace github.com/containerd/nerdctl/mod/tigron => ../nerdctl/mod/tigron // managed by go-work-sync
+
+replace github.com/containerd/nerdctl/v2 => ../nerdctl // managed by go-work-sync
+
+replace github.com/containerd/stargz-snapshotter => ../stargz-snapshotter // managed by go-work-sync
+
+replace github.com/containerd/stargz-snapshotter/estargz => ../stargz-snapshotter/estargz // managed by go-work-sync
+
+replace github.com/containerd/ttrpc => ../ttrpc // managed by go-work-sync
+
+replace github.com/containers/gvisor-tap-vsock => ../gvisor-tap-vsock // managed by go-work-sync
+
+replace github.com/google/cadvisor => ../cadvisor // managed by go-work-sync
+
+replace github.com/moby/buildkit => ../buildkit // managed by go-work-sync
+
+replace github.com/opencontainers/runc => ../runc // managed by go-work-sync
+
+replace github.com/pkg/errors => ../go-errors/pkg-errors // managed by go-work-sync
+
+replace github.com/tonistiigi/fsutil => ../fsutil // managed by go-work-sync
+
+replace gitlab.com/tozd/go/errors => ../go-errors // managed by go-work-sync
+
+replace gvisor.dev/gvisor => gvisor.dev/gvisor v0.0.0-20250807194038-c9af560a03d9 // managed by go-work-sync
