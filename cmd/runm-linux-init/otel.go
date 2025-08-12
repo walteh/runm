@@ -6,7 +6,10 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"os/exec"
+	"strconv"
 	"strings"
+	"time"
 
 	pyroscope "github.com/grafana/pyroscope-go"
 	"github.com/mdlayher/vsock"
@@ -55,6 +58,7 @@ func (r *runmLinuxInit) setupLogger(ctx context.Context) (context.Context, func(
 			return nil, nil, errors.Errorf("failed to setup Pyroscope: %w", err)
 		}
 		ctx = ctxz
+
 	}
 
 	cleanupz, err := otel.ConfigureOTelSDKWithDialer(ctx, serviceName, enableOtel, dialer)
@@ -95,6 +99,7 @@ func (r *runmLinuxInit) setupPyroscope(ctx context.Context) (context.Context, fu
 			pyroscope.ProfileBlockCount,
 			pyroscope.ProfileBlockDuration,
 		},
+		UploadRate: time.Second,
 	})
 
 	if err != nil {
@@ -104,6 +109,28 @@ func (r *runmLinuxInit) setupPyroscope(ctx context.Context) (context.Context, fu
 	slog.InfoContext(ctx, "Pyroscope setup complete")
 
 	return ctx, func() {
-		p.Stop()
+		err := p.Stop()
+		if err != nil {
+			slog.InfoContext(ctx, "prob with pyroscope", "err", err)
+		}
 	}, nil
+}
+
+func (r *runmLinuxInit) runCadvisor(ctx context.Context) error {
+	slog.InfoContext(ctx, "setting up cadvisor", "port", constants.GuestCadvisorTCPPort)
+
+	cmd := exec.CommandContext(ctx, "/mbin/cadvisor-test",
+		"--port", strconv.Itoa(constants.GuestCadvisorTCPPort),
+		"--logtostderr")
+
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Start(); err != nil {
+		return errors.Errorf("failed to start cadvisor: %w", err)
+	}
+
+	slog.InfoContext(ctx, "cadvisor started successfully", "pid", cmd.Process.Pid, "port", constants.GuestCadvisorTCPPort)
+
+	return cmd.Wait()
 }

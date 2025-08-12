@@ -208,8 +208,8 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 		taskgroup.WithName("runm-linux-init"),
 		taskgroup.WithPprofLabels(map[string]string{
 			"service":      serviceName,
-			"container-id": containerId,
-			"runm-mode":    runmMode,
+			"container_id": containerId,
+			"runm_mode":    runmMode,
 		}),
 		taskgroup.WithAttrFunc(func() []slog.Attr {
 			return []slog.Attr{
@@ -327,6 +327,9 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 	if enableOtel {
 		taskgroupz.GoWithName("cgroup-exporter-vsock-server", func(ctx context.Context) error {
 			return r.runCgroupExporterVsockServer(ctx)
+		})
+		taskgroupz.GoWithName("cadvisor-vsock-server", func(ctx context.Context) error {
+			return r.runCadvisor(ctx)
 		})
 	}
 

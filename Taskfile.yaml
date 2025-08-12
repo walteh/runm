@@ -6,8 +6,14 @@ vars:
     GO_ROOT_PKG:
         sh: cat go.mod | grep -oE '^module[^\S]+' | cut -d' ' -f2
     GO_COMMAND: go
-    SUPPORTED_ARCHS:
-      - arm64
+    SUPPORTED_ARCHS: [arm64]
+    BUILD_OUT_DIR: gen/build
+    TEST_BIN_DIR: ./gen/build/test-bin
+    LINUX_RUNTIME_DIR: ./gen/build/linux-runtime
+    CLAUDE_FLOW_PROJECT_DIR: .claude/claude-flow
+    NERDCTL_CMD: '{{.SUDO_CMD}} {{.TEST_BIN_DIR}}/nerdctl-test'
+    # NERDCTL_CMD: 'docker'
+    SUDO_CMD: '' # 'sudo -A -E'
     FORKS:
         map:
             cgroup-exporter:
@@ -100,14 +106,6 @@ vars:
                 upstream: "k8s.io/kubernetes"
                 path: "../kubernetes"
 
-    BUILD_OUT_DIR: gen/build
-    TEST_BIN_DIR: ./gen/build/test-bin
-    LINUX_RUNTIME_DIR: ./gen/build/linux-runtime
-    CLAUDE_FLOW_PROJECT_DIR: .claude/claude-flow
-    NERDCTL_CMD: '{{.SUDO_CMD}} {{.TEST_BIN_DIR}}/nerdctl-test'
-    # NERDCTL_CMD: 'docker'
-    SUDO_CMD: '' # 'sudo -A -E'
-
 env:
     COMPOSE_BAKE: true
     CLICOLOR: 1
@@ -115,7 +113,7 @@ env:
     GOSUMDB: sum.golang.org
     GOPRIVATE: github.com/walteh
     CODE_EDITOR_FILE_REF_PREFIX: cursor://file/
-    # OTEL_ENDPOINT_TO_SET_TCP: dns://localhost:4317
+    OTEL_ENDPOINT_TO_SET_TCP: dns://localhost:4317
     OTEL_EXPORTER_OTLP_ENDPOINT:
         sh: mkdir -p /tmp/tcontainerd-fs-env && echo -n '{{.OTEL_ENDPOINT_TO_SET_TCP | default ""}}' | tee /tmp/tcontainerd-fs-env/OTEL_EXPORTER_OTLP_ENDPOINT
     OTEL_EXPORTER_OTLP_METRICS_ENDPOINT:
@@ -130,7 +128,7 @@ env:
     DEBUG_BUILDKITD_TEST: 0
     DEBUG_NERDCTL_TEST: 0
     DEBUG_CONTAINERD_SHIM_RUNM_V2_TEST:
-        sh: mkdir -p /tmp/tcontainerd-fs-env && echo '0' | tee /tmp/tcontainerd-fs-env/DEBUG_CONTAINERD_SHIM_RUNM_V2_TEST
+        sh: mkdir -p /tmp/tcontainerd-fs-env && echo -n '0' | tee /tmp/tcontainerd-fs-env/DEBUG_CONTAINERD_SHIM_RUNM_V2_TEST
 
 tasks:
     #=================================================================================
@@ -877,6 +875,7 @@ tasks:
           - '{{.TEST_BIN_DIR}}/runm-linux-init'
           - '{{.TEST_BIN_DIR}}/runm-linux-host-fork-exec-proxy'
           - '{{.TEST_BIN_DIR}}/runc-test'
+          - '{{.TEST_BIN_DIR}}/cadvisor-test'
         generates:
           - '{{.LINUX_RUNTIME_DIR}}/mbin.squashfs'
         vars:
@@ -887,6 +886,7 @@ tasks:
                     runm-linux-init: '{{.TEST_BIN_DIR}}/runm-linux-init'
                     runm-linux-host-fork-exec-proxy: '{{.TEST_BIN_DIR}}/runm-linux-host-fork-exec-proxy'
                     runc-test: '{{.TEST_BIN_DIR}}/runc-test'
+                    cadvisor-test: '{{.TEST_BIN_DIR}}/cadvisor-test'
         cmds:
           - defer: rm -rf {{.TMP_DIR}}
             silent: true

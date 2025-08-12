@@ -78,11 +78,15 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 	mshareDirs = append(mshareDirs, ctrconfig.RootfsMounts[0].Source)
 	mshareDirs = append(mshareDirs, ctrconfig.Bundle)
 
-	defaults, err := newDefaultLinuxVM(ctx, vmid, constants.MbinFileName, mshareFiles, mshareDirs, mshareSocks, nil, map[uint16]uint16{
-		9091: 9091,
-		4317: 4317,
-		4040: 4040,
-	})
+	defaults, err := newDefaultLinuxVM(ctx, vmid, constants.MbinFileName, mshareFiles, mshareDirs, mshareSocks,
+		map[uint16]uint16{
+			constants.HostCadvisorTCPPort: constants.GuestCadvisorTCPPort,
+		},
+		map[uint16]uint16{
+			9091: 9091,
+			4317: 4317,
+			4040: 4040,
+		})
 	if err != nil {
 		return nil, errors.Errorf("getting VM defaults: %w", err)
 	}
