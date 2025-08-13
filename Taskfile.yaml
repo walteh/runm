@@ -259,6 +259,21 @@ tasks:
         cmds:
           - go tool copygen
 
+    gen:mainpkgcopy:
+        desc: copies the mainpkg to the test/cmd/runc directory
+        vars:
+            GEN_DATA:
+                sh: |-
+                    go tool findcodetag --tag=//go:mainpkgcopy .
+            GEN_SOURCE_FILES:
+                sh: |-
+                    grep -rl "//go:mainpkgcopy" --include="*.go" . || true
+        cmds:
+          - for: {var: GEN_SOURCE_FILES, split: "\n"}
+            cmd: mkdir -p $(dirname ./gen/mainpkg/{{.ITEM}})
+          - for: {var: GEN_DATA, split: "\n"}
+            cmd: cp $(go list -f '{{.Dir}}' -m {{.ITEM}}) ./gen/mainpkg/{{.ITEM}}
+
     gen:options:
         desc: generates options for structs with '//go:opts' comment
         vars:

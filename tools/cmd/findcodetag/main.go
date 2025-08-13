@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 type Config struct {
@@ -55,7 +57,7 @@ func main() {
 	})
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error walking directory: %v\n", err)
+		fmt.Fprintf(os.Stderr, "walking directory: %v\n", err)
 		os.Exit(1)
 	}
 }
@@ -63,7 +65,7 @@ func main() {
 func processFile(filePath string, config Config) error {
 	file, err := os.Open(filePath)
 	if err != nil {
-		return err
+		return errors.Errorf("opening file %s: %w", filePath, err)
 	}
 	defer file.Close()
 
@@ -76,7 +78,7 @@ func processFile(filePath string, config Config) error {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return err
+		return errors.Errorf("scanning file %s: %w", filePath, err)
 	}
 
 	// Look for the specified tag in comments

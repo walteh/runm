@@ -14,6 +14,7 @@ import (
 	"github.com/urfave/cli"
 )
 
+//go:mainpkggen github.com/opencontainers/runc
 func main() {
 
 	app := runc_main.App()
