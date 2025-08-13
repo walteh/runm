@@ -10,10 +10,15 @@ vars:
     BUILD_OUT_DIR: gen/build
     TEST_BIN_DIR: ./gen/build/test-bin
     LINUX_RUNTIME_DIR: ./gen/build/linux-runtime
-    CLAUDE_FLOW_PROJECT_DIR: .claude/claude-flow
-    NERDCTL_CMD: '{{.SUDO_CMD}} {{.TEST_BIN_DIR}}/nerdctl-test'
+    NERDCTL_CMD: '{{.SUDO_CMD}} {{.TEST_BIN_DIR}}/nerdctl'
     # NERDCTL_CMD: 'docker'
     SUDO_CMD: '' # 'sudo -A -E'
+    # GO_BINARIES:
+    #     map:
+    #         buildkitd:
+    #             test: test/cmd/buildkitd
+    #             primary: ../cmd/buildkitd
+
     FORKS:
         map:
             cgroup-exporter:
@@ -113,7 +118,7 @@ env:
     GOSUMDB: sum.golang.org
     GOPRIVATE: github.com/walteh
     CODE_EDITOR_FILE_REF_PREFIX: cursor://file/
-    OTEL_ENDPOINT_TO_SET_TCP: dns://localhost:4317
+    # OTEL_ENDPOINT_TO_SET_TCP: dns://localhost:4317
     OTEL_EXPORTER_OTLP_ENDPOINT:
         sh: mkdir -p /tmp/tcontainerd-fs-env && echo -n '{{.OTEL_ENDPOINT_TO_SET_TCP | default ""}}' | tee /tmp/tcontainerd-fs-env/OTEL_EXPORTER_OTLP_ENDPOINT
     OTEL_EXPORTER_OTLP_METRICS_ENDPOINT:
@@ -249,6 +254,11 @@ tasks:
           - task: gen:buf
           - task: gen:mockery
 
+    gen:copygen:*:
+        desc: generates copygen files
+        cmds:
+          - go tool copygen
+
     gen:options:
         desc: generates options for structs with '//go:opts' comment
         vars:
@@ -344,7 +354,7 @@ tasks:
 
     build:go:*:*:*:
         label: 'build:go:{{.NAME}}:{{.OS}}:{{.ARCH}}'
-        requires: {vars: []}
+        requires: {vars: [MAIN_DIR]}
         desc: builds a binary
         vars:
             OS: '{{index .MATCH 1}}'
@@ -354,9 +364,7 @@ tasks:
             SYMLINK: '{{.SYMLINK | default ""}}'
             EXTLDFLAGS: '{{.STATIC | eq "1" | ternary "-static" ""}} {{.EXTLDFLAGS}}'
             TAGS: '{{.TAGS}}'
-            CMD_DIR_GUESS:
-                sh: test -d ./cmd/{{.NAME}} && echo "./cmd" || echo "./test/integration/cmd"
-            CMD_DIR: '{{.CMD_DIR | default .CMD_DIR_GUESS}}'
+            CD_DIR: '{{.CD_DIR | default "."}}'
             LD_FLAGS: |-
                 -extldflags={{.EXTLDFLAGS}} {{.DEBUG | eq "1" | ternary "-compressdwarf=false" "-s -w"}} {{.LD_FLAGS}}
             GC_FLAGS: '{{.DEBUG | eq "1" | ternary "all=-N -l" ""}}'
@@ -371,7 +379,7 @@ tasks:
                 {{.RACE | default .DEBUG | eq "1" | and (.ASAN | ne "1") | and (.CGO_ENABLED | eq "1") | and (.CC | eq "clang") | ternary "-race" ""}}
 
             BUILD_FLAGS: |-
-                -mod=mod -tags="{{.TAGS}}" -ldflags="{{.LD_FLAGS}}" -gcflags="{{.GC_FLAGS}}" {{.ASAN_FLAG}} {{.RACE_FLAG}} -o="{{.OUT_DIR}}/{{.NAME}}"
+                -mod=mod -tags="{{.TAGS}}" -ldflags="{{.LD_FLAGS}}" -gcflags="{{.GC_FLAGS}}" {{.ASAN_FLAG}} {{.RACE_FLAG}} -o="{{.PWD}}/{{.OUT_DIR}}/{{.NAME}}"
 
         env:
             CC: '{{.CC | default "clang"}}'
@@ -388,7 +396,7 @@ tasks:
         generates:
           - '{{.OUT_DIR}}/{{.NAME}}'
         cmds:
-          - cmd: go build {{.BUILD_FLAGS}} {{.CMD_DIR}}/{{.NAME}}
+          - cmd: cd {{.CD_DIR}} && go build {{.BUILD_FLAGS}} {{.MAIN_DIR}}
           - cmd: if [ "{{.DEBUG}}" != "1" ]; then strip {{.OUT_DIR}}/{{.NAME}}; fi
             silent: true
           - cmd: |-
@@ -397,56 +405,56 @@ tasks:
           - cmd: if [ "{{.SYMLINK}}" != "" ]; then ln -laf {{.OUT_DIR}}/{{.NAME}} {{.OUT_DIR}}/{{.SYMLINK}}; fi
             silent: true
 
-    build:buildctl-test:
+    build:test:buildctl:
         desc: builds the buildctl test
         run: once
         sources:
-          - test/integration/**
+          - ./test/cmd/buildctl/**
           - ../buildkit/**
           - pkg/**
         generates:
-          - '{{.TEST_BIN_DIR}}/buildctl-test'
+          - '{{.TEST_BIN_DIR}}/buildctl'
         cmds:
-          - task: build:go:buildctl-test:darwin:arm64
+          - task: build:go:buildctl:darwin:arm64
             vars:
                 DEBUG: '1'
-                BIN_DIR: '{{.TEST_BIN_DIR}}'
+                MAIN_DIR: './test/cmd/buildctl'
 
-    build:nerdctl-test:
+    build:test:nerdctl:
         desc: builds the nerdctl test
         run: once
         sources:
-          - test/integration/**
+          - ./test/cmd/nerdctl/**
           - ../nerdctl/**
           - pkg/**
         generates:
-          - '{{.TEST_BIN_DIR}}/nerdctl-test'
+          - '{{.TEST_BIN_DIR}}/nerdctl'
         cmds:
-          - task: build:go:nerdctl-test:darwin:arm64
+          - task: build:go:nerdctl:darwin:arm64
             vars:
                 DEBUG: '1'
-                BIN_DIR: '{{.TEST_BIN_DIR}}'
+                MAIN_DIR: './test/cmd/nerdctl'
 
-    build:buildkitd-test:
+    build:test:buildkitd:
         desc: builds the buildkitd test binary
         run: once
         sources:
-          - test/integration/**
+          - ./test/cmd/buildkitd/**
           - ../buildkit/**
           - pkg/**
         generates:
-          - '{{.TEST_BIN_DIR}}/buildkitd-test'
+          - '{{.TEST_BIN_DIR}}/buildkitd'
         cmds:
-          - task: build:go:buildkitd-test:darwin:arm64
+          - task: build:go:buildkitd:darwin:arm64
             vars:
                 DEBUG: '1'
-                BIN_DIR: '{{.TEST_BIN_DIR}}'
+                MAIN_DIR: './test/cmd/buildkitd'
 
-    build:containerd-test:
+    build:test:containerd:
         desc: builds the containerd test
         run: once
         sources:
-          - ./test/integration/**/*.go
+          - ./test/cmd/containerd/**/*.go
           - ./../containerd/**/*.go
           - ./pkg/**/*.go
         generates:
@@ -455,15 +463,15 @@ tasks:
           - task: build:go:containerd-test:darwin:arm64
             vars:
                 DEBUG: '1'
-                BIN_DIR: '{{.TEST_BIN_DIR}}'
+                MAIN_DIR: './test/cmd/containerd'
 
-    build:containerd-shim-runm-v2:
+    build:test:containerd-shim-runm-v2:
         desc: builds the containerd shim
         run: once
         sources:
-          - "**/*.go"
+          - "./test/cmd/containerd-shim-runm-v2/**/*.go"
           - "../containerd/**/*.go"
-          - "../go-runc/**/*.go"
+          - "**/*.go"
         generates:
           - '{{.TEST_BIN_DIR}}/containerd-shim-runm-v2'
         cmds:
@@ -471,32 +479,56 @@ tasks:
             vars:
                 DEBUG: '1'
                 CGO_ENABLED: '1'
-                BIN_DIR: '{{.TEST_BIN_DIR}}'
+                MAIN_DIR: './test/cmd/containerd-shim-runm-v2'
+                CODESIGN: '1'
 
-    build:containerd-shim-runm-v2-test:
-        desc: builds the containerd shim test
+    build:containerd-shim-runm-v2:
+        desc: builds the containerd shim
         run: once
         sources:
-          - "./**/*.go"
+          - "./cmd/containerd-shim-runm-v2/**/*.go"
           - "../containerd/**/*.go"
-          - "../go-runc/**/*.go"
+          - "**/*.go"
         generates:
-          - '{{.TEST_BIN_DIR}}/containerd-shim-runm-v2-test'
+          - '{{.TEST_BIN_DIR}}/containerd-shim-runm-v2'
         cmds:
-          - task: build:go:containerd-shim-runm-v2-test:darwin:arm64
+          - task: build:go:containerd-shim-runm-v2:darwin:arm64
             vars:
                 DEBUG: '1'
                 CGO_ENABLED: '1'
+                MAIN_DIR: './cmd/containerd-shim-runm-v2'
                 CODESIGN: '1'
-                BIN_DIR: '{{.TEST_BIN_DIR}}'
+
+    build:test:runc:
+        desc: builds the runc binary
+        run: once
+        sources:
+          - "./test/cmd/runc/**/*.go"
+          - "pkg/**/*.go"
+          - "test/env/**/*.go"
+          - "../runc/**/*.go"
+        generates:
+          - '{{.TEST_BIN_DIR}}/runc'
+        vars:
+            GIT_COMMIT:
+                sh: git rev-parse HEAD
+        cmds:
+          - task: build:go:runc:linux:arm64
+            vars:
+                DEBUG: '1'
+                STATIC: '1'
+                LD_FLAGS: -X main.gitCommit={{.GIT_COMMIT}}
+                TAGS: netgo osusergo
+                CC: aarch64-linux-gnu-gcc
+                CGO_ENABLED: 1
+                MAIN_DIR: './test/cmd/runc'
 
     build:runm-linux-init:
         desc: builds the runm-linux-init binary
         run: once
         sources:
           - "**/*.go"
-          - ../containerd/**
-          - ../go-runc/**
+          - "../containerd/**"
         generates:
           - '{{.TEST_BIN_DIR}}/runm-linux-init'
         cmds:
@@ -504,7 +536,7 @@ tasks:
             vars:
                 DEBUG: '1'
                 STATIC: '1'
-                BIN_DIR: '{{.TEST_BIN_DIR}}'
+                MAIN_DIR: './cmd/runm-linux-init'
 
     build:runm-linux-host-fork-exec-proxy:
         desc: builds the runm-linux-host-fork-exec-proxy binary
@@ -518,7 +550,7 @@ tasks:
             vars:
                 DEBUG: '1'
                 STATIC: '1'
-                BIN_DIR: '{{.TEST_BIN_DIR}}'
+                MAIN_DIR: './cmd/runm-linux-host-fork-exec-proxy'
 
     build:runm-linux-mounter:
         desc: builds the runm-linux-mounter binary
@@ -532,101 +564,79 @@ tasks:
             vars:
                 DEBUG: '0'
                 STATIC: '1'
-                BIN_DIR: '{{.TEST_BIN_DIR}}'
+                MAIN_DIR: './cmd/runm-linux-mounter'
 
-    build:vmfuse-init:
-        desc: builds the vmfuse-init binary (Linux guest)
-        run: once
-        sources:
-          - "**/*.go"
-          - "proto/vmfuse/**/*.proto"
-        generates:
-          - '{{.TEST_BIN_DIR}}/vmfuse-init'
-        cmds:
-          - task: build:go:vmfuse-init:linux:arm64
-            vars:
-                DEBUG: '1'
-                STATIC: '1'
-                BIN_DIR: '{{.TEST_BIN_DIR}}'
-                CMD_DIR: './test/experiments/vmfuse/cmd'
+    # build:vmfuse-init:
+    #     desc: builds the vmfuse-init binary (Linux guest)
+    #     run: once
+    #     sources:
+    #       - "**/*.go"
+    #       - "proto/vmfuse/**/*.proto"
+    #     generates:
+    #       - '{{.TEST_BIN_DIR}}/vmfuse-init'
+    #     cmds:
+    #       - task: build:go:vmfuse-init:linux:arm64
+    #         vars:
+    #             DEBUG: '1'
+    #             STATIC: '1'
+    #             BIN_DIR: '{{.TEST_BIN_DIR}}'
+    #             CMD_DIR: './test/experiments/vmfuse/cmd'
 
-    build:vmfused:
-        desc: builds the vmfused daemon (macOS host)
-        run: once
-        sources:
-          - "**/*.go"
-          - "proto/vmfuse/**/*.proto"
-        generates:
-          - '{{.TEST_BIN_DIR}}/vmfused'
-        cmds:
-          - task: build:go:vmfused:darwin:arm64
-            vars:
-                DEBUG: '1'
-                CGO_ENABLED: '1'
-                CODESIGN: '1'
-                BIN_DIR: '{{.TEST_BIN_DIR}}'
-                CMD_DIR: './test/experiments/vmfuse/cmd'
+    # build:vmfused:
+    #     desc: builds the vmfused daemon (macOS host)
+    #     run: once
+    #     sources:
+    #       - "**/*.go"
+    #       - "proto/vmfuse/**/*.proto"
+    #     generates:
+    #       - '{{.TEST_BIN_DIR}}/vmfused'
+    #     cmds:
+    #       - task: build:go:vmfused:darwin:arm64
+    #         vars:
+    #             DEBUG: '1'
+    #             CGO_ENABLED: '1'
+    #             CODESIGN: '1'
+    #             BIN_DIR: '{{.TEST_BIN_DIR}}'
+    #             CMD_DIR: './test/experiments/vmfuse/cmd'
 
-    build:vmfusectl:
-        desc: builds the vmfusectl CLI client (macOS host)
-        run: once
-        sources:
-          - "**/*.go"
-          - "proto/vmfuse/**/*.proto"
-        generates:
-          - '{{.TEST_BIN_DIR}}/vmfusectl'
-        cmds:
-          - task: build:go:vmfusectl:darwin:arm64
-            vars:
-                DEBUG: '1'
-                BIN_DIR: '{{.TEST_BIN_DIR}}'
-                CMD_DIR: './test/experiments/vmfuse/cmd'
+    # build:vmfusectl:
+    #     desc: builds the vmfusectl CLI client (macOS host)
+    #     run: once
+    #     sources:
+    #       - "**/*.go"
+    #       - "proto/vmfuse/**/*.proto"
+    #     generates:
+    #       - '{{.TEST_BIN_DIR}}/vmfusectl'
+    #     cmds:
+    #       - task: build:go:vmfusectl:darwin:arm64
+    #         vars:
+    #             DEBUG: '1'
+    #             BIN_DIR: '{{.TEST_BIN_DIR}}'
+    #             CMD_DIR: './test/experiments/vmfuse/cmd'
 
-    build:runc-test:
-        desc: builds the runc binary
-        run: once
-        sources:
-          - "../runc/**/*.go"
-          - "pkg/**/*.go"
-          - "test/integration/**/*.go"
-        generates:
-          - '{{.TEST_BIN_DIR}}/runc-test'
-        vars:
-            GIT_COMMIT:
-                sh: git rev-parse HEAD
-        cmds:
-          - task: build:go:runc-test:linux:arm64
-            vars:
-                DEBUG: '1'
-                STATIC: '1'
-                LD_FLAGS: -X main.gitCommit={{.GIT_COMMIT}}
-                TAGS: netgo osusergo
-                CC: aarch64-linux-gnu-gcc
-                CGO_ENABLED: 1
-                BIN_DIR: '{{.TEST_BIN_DIR}}'
+    # build:cadvisor-test:
+    #     desc: builds the cadvisor binary
+    #     run: once
+    #     sources:
+    #       - "../cadvisor/**/*.go"
+    #       - "pkg/**/*.go"
+    #       - "test/integration/**/*.go"
+    #       - "test/integration/cmd/cadvisor-test/**/*.go"
+    #     generates:
+    #       - '{{.TEST_BIN_DIR}}/cadvisor-test'
+    #     vars:
+    #         GIT_COMMIT:
+    #             sh: git rev-parse HEAD
+    #     cmds:
+    #       - task: build:go:cadvisor-test:linux:arm64
+    #         vars:
+    #             DEBUG: '1'
+    #             STATIC: '1'
+    #             TAGS: netgo osusergo
+    #             MAIN_DIR: './test/integration/cmd/cadvisor-test'
 
-    build:cadvisor-test:
-        desc: builds the cadvisor binary
-        run: once
-        sources:
-          - "../cadvisor/**/*.go"
-          - "pkg/**/*.go"
-          - "test/integration/**/*.go"
-          - "test/integration/cmd/cadvisor-test/**/*.go"
-        generates:
-          - '{{.TEST_BIN_DIR}}/cadvisor-test'
-        vars:
-            GIT_COMMIT:
-                sh: git rev-parse HEAD
-        cmds:
-          - task: build:go:cadvisor-test:linux:arm64
-            vars:
-                DEBUG: '1'
-                STATIC: '1'
-                TAGS: netgo osusergo
-                # CC: aarch64-linux-gnu-gcc
-                # CGO_ENABLED: 1
-                BIN_DIR: '{{.TEST_BIN_DIR}}'
+    # CC: aarch64-linux-gnu-gcc
+    # CGO_ENABLED: 1
 
     build:busybox:
         desc: builds the busybox binary
@@ -666,28 +676,28 @@ tasks:
     build:runm-test-binaries:
         run: once
         deps:
-          - build:containerd-test
-          - build:nerdctl-test
-          - build:runc-test
-          - build:containerd-shim-runm-v2-test
+          - build:test:containerd
+          - build:test:nerdctl
+          - build:test:runc
+          - build:test:buildkitd
+          - build:test:buildctl
+          - build:test:containerd-shim-runm-v2
           - build:runm-linux-init
           - build:runm-linux-host-fork-exec-proxy
           - build:runm-linux-mounter
           - build:busybox
-          - build:buildkitd-test
-          - build:buildctl-test
         desc: builds all test binaries
 
-    build:vmfuse-experiment:
-        run: once
-        deps:
-          - build:vmfuse-init
-          - build:vmfused
-          - build:vmfusectl
-          - build:ganesha
-          - build:busybox
-          - build:runm-linux-mounter
-          - build:runm-linux-host-fork-exec-proxy
+    # build:vmfuse-experiment:
+    #     run: once
+    #     deps:
+    #       - build:vmfuse-init
+    #       - build:vmfused
+    #       - build:vmfusectl
+    #       - build:ganesha
+    #       - build:busybox
+    #       - build:runm-linux-mounter
+    #       - build:runm-linux-host-fork-exec-proxy
 
     #endregion
 
@@ -706,7 +716,7 @@ tasks:
 
         env:
             SHIM_BINARY_PATH:
-                sh: echo $(pwd)/{{.TEST_BIN_DIR}}/containerd-shim-runm-v2-test
+                sh: echo $(pwd)/{{.TEST_BIN_DIR}}/containerd-shim-runm-v2
             LINUX_RUNTIME_DIR:
                 sh: echo $(pwd)/{{.LINUX_RUNTIME_DIR}}
         cmds:
@@ -758,7 +768,7 @@ tasks:
 
     run:nerdctl-test:kill:
         desc: kills a running container
-        deps: ['build:nerdctl-test', 'build:containerd-shim-runm-v2-test']
+        deps: ['build:test:nerdctl', 'build:test:containerd-shim-runm-v2']
         requires: {vars: [CONTAINER_ID]}
         vars:
             CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
@@ -769,7 +779,7 @@ tasks:
 
     run:nerdctl-test:run:
         desc: runs the nerdctl test
-        deps: ['build:nerdctl-test', 'build:containerd-shim-runm-v2-test']
+        deps: ['build:test:nerdctl', 'build:test:containerd-shim-runm-v2']
         vars:
             TIMEOUT: '{{.TIMEOUT | empty | ternary "" "timeout {{.TIMEOUT}}"}}'
             IMAGE: '{{.IMAGE | default "docker.io/library/alpine:latest"}}'
@@ -785,7 +795,7 @@ tasks:
 
     run:nerdctl-test:exec:
         desc: executes a command in a running container
-        deps: ['build:nerdctl-test', 'build:containerd-shim-runm-v2-test']
+        deps: ['build:test:nerdctl', 'build:test:containerd-shim-runm-v2']
         requires: {vars: [CONTAINER_ID]}
         vars:
             TIMEOUT: '{{.TIMEOUT | default ""}}'
@@ -803,7 +813,7 @@ tasks:
 
     run:nerdctl-test:stop:
         desc: stops a running container
-        deps: ['build:nerdctl-test', 'build:containerd-shim-runm-v2-test']
+        deps: ['build:test:nerdctl', 'build:test:containerd-shim-runm-v2']
         requires: {vars: [CONTAINER_ID]}
         vars:
             TIMEOUT: '{{.TIMEOUT | empty | ternary "" "timeout {{.TIMEOUT}}"}}'
@@ -814,7 +824,7 @@ tasks:
 
     run:nerdctl-test:rm:
         desc: deletes a container
-        deps: ['build:nerdctl-test']
+        deps: ['build:test:nerdctl']
         requires: {vars: [CONTAINER_ID]}
         vars:
             CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
@@ -825,7 +835,7 @@ tasks:
 
     run:nerdctl-test:ps:
         desc: lists running containers
-        deps: ['build:nerdctl-test']
+        deps: ['build:test:nerdctl']
         vars:
             FLAGS: '{{.FLAGS | default ""}}'
             STDOUT_FILE: '{{.STDOUT_FILE | default ""}}'
@@ -837,7 +847,7 @@ tasks:
 
     run:nerdctl-test:ps:ensure-container:
         desc: ensures a container is running
-        deps: ['build:nerdctl-test']
+        deps: ['build:test:nerdctl']
         vars:
             FLAGS: '{{.FLAGS | default ""}}'
             CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
@@ -876,8 +886,7 @@ tasks:
         sources:
           - '{{.TEST_BIN_DIR}}/runm-linux-init'
           - '{{.TEST_BIN_DIR}}/runm-linux-host-fork-exec-proxy'
-          - '{{.TEST_BIN_DIR}}/runc-test'
-          - '{{.TEST_BIN_DIR}}/cadvisor-test'
+          - '{{.TEST_BIN_DIR}}/runc'
         generates:
           - '{{.LINUX_RUNTIME_DIR}}/mbin.squashfs'
         vars:
@@ -887,8 +896,7 @@ tasks:
                 map:
                     runm-linux-init: '{{.TEST_BIN_DIR}}/runm-linux-init'
                     runm-linux-host-fork-exec-proxy: '{{.TEST_BIN_DIR}}/runm-linux-host-fork-exec-proxy'
-                    runc-test: '{{.TEST_BIN_DIR}}/runc-test'
-                    cadvisor-test: '{{.TEST_BIN_DIR}}/cadvisor-test'
+                    runc: '{{.TEST_BIN_DIR}}/runc'
         cmds:
           - defer: rm -rf {{.TMP_DIR}}
             silent: true
@@ -1090,6 +1098,8 @@ tasks:
           - task: dev:kill-process:containerd-shim-runm-v2-test
           - task: dev:kill-process:containerd-shim-runc-v2
           - task: dev:kill-process:nerdctl-test
+          - task: dev:kill-process:nerdctl
+          - task: dev:kill-process:containerd-shim-runm-v2
           - task: dev:kill-process:com.apple.Virtualization.VirtualMachine
 
     dev:cleanup-containerd-processes:
@@ -1225,7 +1235,7 @@ tasks:
                 sh: |-
                     go tool pty-resize-test {{.SEQUENCE}} -generate-shell-script
             BASE_CMD: |-
-                {{.TIMEOUT_CMD}} {{.TIMEOUT}} {{.TEST_BIN_DIR}}/nerdctl-test exec {{.FLAGS}} {{.CONTAINER_ID}} sh -c '{{.COMMAND_TO_RUN}}'
+                {{.TIMEOUT_CMD}} {{.TIMEOUT}} {{.TEST_BIN_DIR}}/nerdctl exec {{.FLAGS}} {{.CONTAINER_ID}} sh -c '{{.COMMAND_TO_RUN}}'
             PTY_RESIZE_TEST_CMD: |-
                 go tool pty-resize-test {{.SEQUENCE}} {{.BASE_CMD}}
 

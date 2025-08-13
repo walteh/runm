@@ -119,7 +119,7 @@ func (r *runmLinuxInit) setupPyroscope(ctx context.Context) (context.Context, fu
 func (r *runmLinuxInit) runCadvisor(ctx context.Context) error {
 	slog.InfoContext(ctx, "setting up cadvisor", "port", constants.GuestCadvisorTCPPort)
 
-	cmd := exec.CommandContext(ctx, "/mbin/cadvisor-test",
+	cmd := exec.CommandContext(ctx, "/mbin/cadvisor",
 		"--port", strconv.Itoa(constants.GuestCadvisorTCPPort),
 		"--logtostderr")
 

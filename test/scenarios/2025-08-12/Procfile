@@ -1,0 +1,5 @@
+tmp_dir=/tmp/runm-scenario-2025-08-12
+
+devlog: ${BIN_DIR}/devlog --delim-socket=${tmp_dir}/delim.sock --raw-socket=${tmp_dir}/raw.sock --force
+containerd: ${BIN_DIR}/containerd
+buildkit: ${BIN_DIR}/buildkitd

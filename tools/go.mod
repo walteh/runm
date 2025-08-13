@@ -682,17 +682,9 @@ replace github.com/arianvp/cgroup-exporter => ../../cgroup-exporter // managed b
 
 replace github.com/containerd/console => ../../console // managed by go-work-sync
 
-replace github.com/containerd/containerd/api => ../../containerd/api // managed by go-work-sync
-
-replace github.com/containerd/containerd/v2 => ../../containerd // managed by go-work-sync
-
 replace github.com/containerd/containerd/v2/pkg/sys => ../../containerd/pkg/sys // managed by go-work-sync
 
 replace github.com/containerd/go-runc => ../../go-runc // managed by go-work-sync
-
-replace github.com/containerd/nerdctl/mod/tigron => ../../nerdctl/mod/tigron // managed by go-work-sync
-
-replace github.com/containerd/nerdctl/v2 => ../../nerdctl // managed by go-work-sync
 
 replace github.com/containerd/stargz-snapshotter => ../../stargz-snapshotter // managed by go-work-sync
 
@@ -700,9 +692,17 @@ replace github.com/containerd/stargz-snapshotter/estargz => ../../stargz-snapsho
 
 replace github.com/containerd/ttrpc => ../../ttrpc // managed by go-work-sync
 
-replace github.com/containers/gvisor-tap-vsock => ../../gvisor-tap-vsock // managed by go-work-sync
-
 replace github.com/google/cadvisor => ../../cadvisor // managed by go-work-sync
+
+replace github.com/containerd/containerd/api => ../../containerd/api // managed by go-work-sync
+
+replace github.com/containerd/containerd/v2 => ../../containerd // managed by go-work-sync
+
+replace github.com/containerd/nerdctl/mod/tigron => ../../nerdctl/mod/tigron // managed by go-work-sync
+
+replace github.com/containerd/nerdctl/v2 => ../../nerdctl // managed by go-work-sync
+
+replace github.com/containers/gvisor-tap-vsock => ../../gvisor-tap-vsock // managed by go-work-sync
 
 replace github.com/moby/buildkit => ../../buildkit // managed by go-work-sync
 

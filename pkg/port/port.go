@@ -8,6 +8,10 @@ import (
 	"gvisor.dev/gvisor/pkg/tcpip/ports"
 )
 
+const (
+	HI = "sup"
+)
+
 var portManager *ports.PortManager
 
 func lazyPortManager() *ports.PortManager {

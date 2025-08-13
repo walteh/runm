@@ -386,7 +386,7 @@ func (r *runmLinuxInit) configureRuntimeServer(ctx context.Context) (*grpc.Serve
 	runcRoot := "/run/containerd/runc"
 
 	realRuntime := goruncruntime.WrapdGoRuncRuntime(&gorunc.Runc{
-		Command:       "/mbin/runc-test",
+		Command:       "/mbin/runc",
 		Log:           filepath.Join(constants.MShareAbsPath, runtime.LogFileBase),
 		LogFormat:     gorunc.JSON,
 		PdeathSignal:  unix.SIGKILL,
