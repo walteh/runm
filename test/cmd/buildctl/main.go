@@ -1,6 +1,8 @@
 package main
 
 import (
+	_ "unsafe"
+
 	"context"
 	"log/slog"
 	"os"
@@ -11,18 +13,20 @@ import (
 	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/util/bklog"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 	"gitlab.com/tozd/go/errors"
 	"google.golang.org/grpc"
 
 	containerdclient "github.com/containerd/containerd/v2/client"
-	buildctl_main "github.com/moby/buildkit/cmd/buildctl"
 	slogctx "github.com/veqryn/slog-context"
 
 	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/pkg/logging/otel"
 	"github.com/walteh/runm/test/env"
 )
+
+//go:linkname BuildctlApp github.com/moby/buildkit/cmd/buildctl.BuildctlApp
+func BuildctlApp() (*cli.App, error)
 
 func main() {
 
@@ -66,7 +70,7 @@ func main() {
 	client.AddHackedClientOpts(clientopts...)
 	containerdclient.AddHackedClientOpts(clientopts...)
 
-	app, err := buildctl_main.BuildctlApp()
+	app, err := BuildctlApp()
 	if err != nil {
 		panic(err)
 	}

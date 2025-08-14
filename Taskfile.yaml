@@ -13,11 +13,6 @@ vars:
     NERDCTL_CMD: '{{.SUDO_CMD}} {{.TEST_BIN_DIR}}/nerdctl'
     # NERDCTL_CMD: 'docker'
     SUDO_CMD: '' # 'sudo -A -E'
-    # GO_BINARIES:
-    #     map:
-    #         buildkitd:
-    #             test: test/cmd/buildkitd
-    #             primary: ../cmd/buildkitd
 
     FORKS:
         map:
@@ -259,20 +254,36 @@ tasks:
         cmds:
           - go tool copygen
 
-    gen:mainpkgcopy:
-        desc: copies the mainpkg to the test/cmd/runc directory
-        vars:
-            GEN_DATA:
-                sh: |-
-                    go tool findcodetag --tag=//go:mainpkgcopy .
-            GEN_SOURCE_FILES:
-                sh: |-
-                    grep -rl "//go:mainpkgcopy" --include="*.go" . || true
-        cmds:
-          - for: {var: GEN_SOURCE_FILES, split: "\n"}
-            cmd: mkdir -p $(dirname ./gen/mainpkg/{{.ITEM}})
-          - for: {var: GEN_DATA, split: "\n"}
-            cmd: cp $(go list -f '{{.Dir}}' -m {{.ITEM}}) ./gen/mainpkg/{{.ITEM}}
+    # gen:mainpkgcopy:
+    #     desc: copies the mainpkg to the test/cmd/runc directory
+    #     vars:
+    #         GEN_DATA:
+    #             sh: |-
+    #                 go tool findcodetag --tag=//go:mainpkgcopy .
+    #         GEN_SOURCE_FILES:
+    #             sh: |-
+    #                 grep -rl "//go:mainpkgcopy" --include="*.go" . || true
+    #     cmds:
+    #       - for: {var: GEN_DATA, split: "\n"}
+    #         cmd: |-
+    #             full_module={{splitList " " .ITEM | last}}
+    #             module_base={{splitList " " .ITEM | last | splitList "/" | last}}
+    #             source=$(go list -f '{{printf "{{.Dir}}"}}' $full_module)
+    #             dest=./gen/mainpkgcopy/$full_module
+    #             rsync -av --include='*.go' --exclude='*' $source/ $dest
+    #             # for all files, rename 'package main' to 'package $module' and func main() to func Main()
+    #             find $dest -type f -name '*.go'  -exec sed -i '' "s/package main/package ${module_base}_main/g" {} +
+    #             find $dest -type f -name '*.go' -exec sed -i '' 's/func main()/func Main___main()/g' {} +
+    #             echo '{"Replace":{}}' > $dest/overlay.json
+    #             # for each file in the dest dir, add a mapping entry to the overlay.json file
+    #             files=$(find $dest -type f -name '*.go')
+    #             for file in $files; do
+    #                 # add a mapping entry to the overlay.json file mapping to the old file
+    #                 old_file=$source/$(basename $file)
+    #                 new_file=$dest/$(basename $file)
+    #                 # add Replace[old_file] = new_file mapping to the overlay.json file
+    #                 jq ".Replace[\"$old_file\"] = \"$new_file\"" $dest/overlay.json > tmp.json && mv tmp.json $dest/overlay.json
+    #             done
 
     gen:options:
         desc: generates options for structs with '//go:opts' comment
@@ -367,11 +378,21 @@ tasks:
     #=================================================================================
     #=================================================================================
 
+    build:go:run:overlaygen-main:
+        internal: true
+        desc: runs the overlaygen tool
+        requires: {vars: [MAIN_DIR, TMP_DIR]}
+        cmds:
+          - cmd: go tool overlaygen --tmpdir {{.TMP_DIR}} main {{.MAIN_DIR}} 1>/dev/null
+            silent: true
+
     build:go:*:*:*:
         label: 'build:go:{{.NAME}}:{{.OS}}:{{.ARCH}}'
         requires: {vars: [MAIN_DIR]}
         desc: builds a binary
         vars:
+            TMP_DIR:
+                sh: mktemp -d
             OS: '{{index .MATCH 1}}'
             ARCH: '{{index .MATCH 2}}'
             NAME: '{{index .MATCH 0}}'
@@ -394,7 +415,7 @@ tasks:
                 {{.RACE | default .DEBUG | eq "1" | and (.ASAN | ne "1") | and (.CGO_ENABLED | eq "1") | and (.CC | eq "clang") | ternary "-race" ""}}
 
             BUILD_FLAGS: |-
-                -mod=mod -tags="{{.TAGS}}" -ldflags="{{.LD_FLAGS}}" -gcflags="{{.GC_FLAGS}}" {{.ASAN_FLAG}} {{.RACE_FLAG}} -o="{{.PWD}}/{{.OUT_DIR}}/{{.NAME}}"
+                -mod=mod -overlay={{.TMP_DIR}}/overlay.json -tags="{{.TAGS}} overlaygen" -ldflags="{{.LD_FLAGS}}" -gcflags="{{.GC_FLAGS}}" {{.ASAN_FLAG}} {{.RACE_FLAG}} -o="{{.PWD}}/{{.OUT_DIR}}/{{.NAME}}"
 
         env:
             CC: '{{.CC | default "clang"}}'
@@ -411,13 +432,25 @@ tasks:
         generates:
           - '{{.OUT_DIR}}/{{.NAME}}'
         cmds:
+          - cmd: mkdir -p {{.TMP_DIR}}
+            silent: true
+          - task: build:go:run:overlaygen-main
+            vars:
+                MAIN_DIR: '{{.MAIN_DIR}}'
+                TMP_DIR: '{{.TMP_DIR}}'
+          - cmd: echo "building {{.NAME}} {{.OS}} {{.ARCH}}..."
+            silent: true
           - cmd: cd {{.CD_DIR}} && go build {{.BUILD_FLAGS}} {{.MAIN_DIR}}
+            silent: true
           - cmd: if [ "{{.DEBUG}}" != "1" ]; then strip {{.OUT_DIR}}/{{.NAME}}; fi
             silent: true
           - cmd: |-
                 if [ "{{.CODESIGN}}" = "1" ]; then cd ./tools && go tool codesign -target ../{{.OUT_DIR}}/{{.NAME}} -quiet -mode=sign --force --entitlement=com.apple.security.virtualization; fi
             silent: true
           - cmd: if [ "{{.SYMLINK}}" != "" ]; then ln -laf {{.OUT_DIR}}/{{.NAME}} {{.OUT_DIR}}/{{.SYMLINK}}; fi
+            silent: true
+          - cmd: |- # WARNING - there is a bug in 'defer', DO NOT MOVE THIS LINE
+                rm -rf {{.TMP_DIR}}
             silent: true
 
     build:test:buildctl:
@@ -537,6 +570,9 @@ tasks:
                 CC: aarch64-linux-gnu-gcc
                 CGO_ENABLED: 1
                 MAIN_DIR: './test/cmd/runc'
+                OVERLAY_JSON: |-
+                    sh: |-
+                        {{.GO_TOOL_CMD}} overlaygen main {{.MAIN_DIR}} -tmpdir={{.TMP_DIR}}
 
     build:runm-linux-init:
         desc: builds the runm-linux-init binary

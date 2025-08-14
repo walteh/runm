@@ -1,6 +1,8 @@
 package main
 
 import (
+	_ "unsafe"
+
 	_ "net/http/pprof"
 
 	"context"
@@ -22,13 +24,15 @@ import (
 	"google.golang.org/grpc"
 
 	containerdclient "github.com/containerd/containerd/v2/client"
-	buildkitd_main "github.com/moby/buildkit/cmd/buildkitd"
 	slogctx "github.com/veqryn/slog-context"
 
 	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/pkg/logging/otel"
 	"github.com/walteh/runm/test/env"
 )
+
+//go:linkname App github.com/moby/buildkit/cmd/buildkitd.App
+func App(serverOptions ...grpc.ServerOption) *cli.App
 
 func init() {
 	cap.SetMissingProcOverrides(env.GetCurrentRunmProcs())
@@ -70,7 +74,7 @@ func main() {
 	client.AddHackedClientOpts(clientopts...)
 	containerdclient.AddHackedClientOpts(clientopts...)
 
-	app := buildkitd_main.App(
+	app := App(
 		append(
 			otel.GetGrpcServerOpts(),
 			grpcerr.GetGrpcServerOptsCtx(ctx)...,

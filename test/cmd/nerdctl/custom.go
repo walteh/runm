@@ -1,6 +1,8 @@
 package main
 
 import (
+	_ "unsafe"
+
 	"context"
 	"log/slog"
 	"os"
@@ -8,15 +10,18 @@ import (
 
 	"github.com/containerd/containerd/v2/client"
 	"github.com/containerd/log"
-	nerdctl_main "github.com/containerd/nerdctl/v2/cmd/nerdctl"
 	"github.com/containerd/nerdctl/v2/cmd/nerdctl/container"
 	"github.com/containerd/nerdctl/v2/pkg/errutil"
 	"github.com/containerd/nerdctl/v2/pkg/logging"
+	"github.com/spf13/cobra"
 	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/pkg/logging/otel"
 	"github.com/walteh/runm/test/env"
 	"google.golang.org/grpc"
 )
+
+//go:linkname NewApp github.com/containerd/nerdctl/v2/cmd/nerdctl.NewApp
+func NewApp() (*cobra.Command, error)
 
 func init() {
 
@@ -60,7 +65,7 @@ func xmain() error {
 	defer cancel()
 
 	// nerdctl CLI mode
-	app, err := nerdctl_main.NewApp()
+	app, err := NewApp()
 	if err != nil {
 		return err
 	}

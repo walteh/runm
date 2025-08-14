@@ -21,6 +21,7 @@ tool (
 	github.com/walteh/runm/tools/cmd/goshim
 	github.com/walteh/runm/tools/cmd/pty-resize-test
 	github.com/walteh/runm/tools/cmd/taskmcp
+	github.com/walteh/runm/tools/cmd/overlaygen
 )
 
 tool (

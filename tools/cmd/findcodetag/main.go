@@ -8,13 +8,14 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/pkg/errors"
+	"gitlab.com/tozd/go/errors"
 )
 
 type Config struct {
-	tag        string
-	typeFilter string
-	rootDir    string
+	tag            string
+	typeFilter     string
+	rootDir        string
+	includeDotDirs bool
 }
 
 func main() {
@@ -23,6 +24,7 @@ func main() {
 	// Define command line flags
 	flag.StringVar(&config.tag, "tag", "//go:mock", "Tag to search for in comments (e.g., //go:mock, //go:generate)")
 	flag.StringVar(&config.typeFilter, "type", "", "Filter by specific type name (empty means all types)")
+	flag.BoolVar(&config.includeDotDirs, "include-dot-dirs", false, "Include dot directories (e.g., .git, .idea, .vscode)")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [OPTIONS] <root_directory>\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "\nOptions:\n")
@@ -46,6 +48,10 @@ func main() {
 	err := filepath.Walk(config.rootDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
+		}
+
+		if !config.includeDotDirs && (strings.HasPrefix(path, ".") || strings.Contains(path, "/.")) {
+			return nil
 		}
 
 		// Only process .go files
@@ -84,25 +90,29 @@ func processFile(filePath string, config Config) error {
 	// Look for the specified tag in comments
 	for i, line := range lines {
 		if strings.Contains(line, config.tag) {
-			// Find the next type declaration
-			typeName, typeType := findNextTypeDeclaration(lines, i+1)
-			if typeName != "" {
-				// Apply type filter if specified
-				if config.typeFilter != "" && !strings.Contains(typeType, config.typeFilter) {
-					continue
-				}
+			if config.typeFilter != "" {
+				// Find the next type declaration
+				typeName, typeType := findNextTypeDeclaration(lines, i+1)
+				if typeName != "" {
+					// Apply type filter if specified
+					if !strings.Contains(typeType, config.typeFilter) {
+						continue
+					}
 
-				// Format output like the shell script
-				dir := filepath.Dir(filePath)
-				if strings.HasPrefix(dir, config.rootDir) {
-					dir = strings.TrimPrefix(dir, config.rootDir)
-					dir = strings.TrimPrefix(dir, "/")
-					dir = strings.TrimPrefix(dir, "\\")
+					// Format output like the shell script
+					dir := filepath.Dir(filePath)
+					if strings.HasPrefix(dir, config.rootDir) {
+						dir = strings.TrimPrefix(dir, config.rootDir)
+						dir = strings.TrimPrefix(dir, "/")
+						dir = strings.TrimPrefix(dir, "\\")
+					}
+					if dir == "" {
+						dir = "."
+					}
+					fmt.Printf("%s %s %s\n", dir, filePath, typeName)
 				}
-				if dir == "" {
-					dir = "."
-				}
-				fmt.Printf("%s %s %s\n", dir, filePath, typeName)
+			} else {
+				fmt.Printf("%s %s\n", filePath, line)
 			}
 		}
 	}

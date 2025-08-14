@@ -7,6 +7,7 @@ exclude github.com/containerd/nerdctl/mod/tigron v0.0.0
 ignore (
 	.archive
 	test/archive
+	test/cmd/buildctl/overlay.go
 )
 
 require (
@@ -57,6 +58,7 @@ require (
 	github.com/rs/xid v1.6.0
 	github.com/samber/slog-multi v1.4.1
 	github.com/soheilhy/cmux v0.1.5
+	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.10.0
 	github.com/urfave/cli v1.22.17
 	github.com/urfave/cli/v2 v2.27.7
@@ -267,7 +269,6 @@ require (
 	github.com/sorairolake/lzip-go v0.3.5 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spdx/tools-golang v0.5.5 // indirect
-	github.com/spf13/cobra v1.9.1 // indirect
 	github.com/spf13/pflag v1.0.7 // indirect
 	github.com/stefanberger/go-pkcs11uri v0.0.0-20230803200340-78284954bff6 // indirect
 	github.com/tchap/go-patricia/v2 v2.3.3 // indirect
