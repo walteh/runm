@@ -32,7 +32,7 @@ func App() *cli.App {
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:  "verbose",
-				Usage: "Enable detailed logging",
+				Usage: "Enable detailed logging (to stderr)",
 			},
 			&cli.StringFlag{
 				Name:  "tmpdir",
@@ -41,6 +41,10 @@ func App() *cli.App {
 			&cli.StringFlag{
 				Name:  "append-to",
 				Usage: "Append to an existing overlay.json file",
+			},
+			&cli.BoolFlag{
+				Name:  "quiet",
+				Usage: "Quiet mode (does not print anything to stdout)",
 			},
 		},
 		Before: func(c *cli.Context) error {
@@ -80,7 +84,9 @@ func App() *cli.App {
 						return err
 					}
 
-					fmt.Print(overlayPath)
+					if !c.Bool("quiet") {
+						fmt.Print(overlayPath)
+					}
 					return nil
 				},
 			},
@@ -105,7 +111,9 @@ func App() *cli.App {
 						return err
 					}
 
-					fmt.Print(overlayPath)
+					if !c.Bool("quiet") {
+						fmt.Print(overlayPath)
+					}
 					return nil
 				},
 			},

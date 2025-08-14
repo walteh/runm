@@ -10,6 +10,6 @@
 	},
 	"settings": {
 		// "go.languageServerFlags": ["-mcp.listen=localhost:50051"]
-		"gopls": {}
+		// "gopls": {}
 	}
 }

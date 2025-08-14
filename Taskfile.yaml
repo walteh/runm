@@ -383,7 +383,7 @@ tasks:
         desc: runs the overlaygen tool
         requires: {vars: [MAIN_DIR, TMP_DIR]}
         cmds:
-          - cmd: go tool overlaygen --tmpdir {{.TMP_DIR}} main {{.MAIN_DIR}} 1>/dev/null
+          - cmd: go tool overlaygen --quiet --tmpdir {{.TMP_DIR}} main {{.MAIN_DIR}}
             silent: true
 
     build:go:*:*:*:
@@ -391,11 +391,12 @@ tasks:
         requires: {vars: [MAIN_DIR]}
         desc: builds a binary
         vars:
-            TMP_DIR:
+            TMP_DIR_SH:
                 sh: mktemp -d
             OS: '{{index .MATCH 1}}'
             ARCH: '{{index .MATCH 2}}'
             NAME: '{{index .MATCH 0}}'
+            TMP_DIR: '{{.TMP_DIR_SH}}/{{.OS}}_{{.ARCH}}_{{.NAME}}'
             BIN_DIR: '{{.TEST_BIN_DIR}}'
             SYMLINK: '{{.SYMLINK | default ""}}'
             EXTLDFLAGS: '{{.STATIC | eq "1" | ternary "-static" ""}} {{.EXTLDFLAGS}}'
@@ -438,8 +439,9 @@ tasks:
             vars:
                 MAIN_DIR: '{{.MAIN_DIR}}'
                 TMP_DIR: '{{.TMP_DIR}}'
-          - cmd: echo "building {{.NAME}} {{.OS}} {{.ARCH}}..."
+          - defer: rm -rf {{.TMP_DIR}}
             silent: true
+          - cmd: echo "building {{.NAME}} {{.OS}} {{.ARCH}}..." 1>/dev/null
           - cmd: cd {{.CD_DIR}} && go build {{.BUILD_FLAGS}} {{.MAIN_DIR}}
             silent: true
           - cmd: if [ "{{.DEBUG}}" != "1" ]; then strip {{.OUT_DIR}}/{{.NAME}}; fi
@@ -448,9 +450,6 @@ tasks:
                 if [ "{{.CODESIGN}}" = "1" ]; then cd ./tools && go tool codesign -target ../{{.OUT_DIR}}/{{.NAME}} -quiet -mode=sign --force --entitlement=com.apple.security.virtualization; fi
             silent: true
           - cmd: if [ "{{.SYMLINK}}" != "" ]; then ln -laf {{.OUT_DIR}}/{{.NAME}} {{.OUT_DIR}}/{{.SYMLINK}}; fi
-            silent: true
-          - cmd: |- # WARNING - there is a bug in 'defer', DO NOT MOVE THIS LINE
-                rm -rf {{.TMP_DIR}}
             silent: true
 
     build:test:buildctl:
