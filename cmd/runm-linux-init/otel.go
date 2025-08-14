@@ -11,14 +11,16 @@ import (
 	"strings"
 	"time"
 
-	pyroscope "github.com/grafana/pyroscope-go"
 	"github.com/mdlayher/vsock"
+	"gitlab.com/tozd/go/errors"
+
+	pyroscope "github.com/grafana/pyroscope-go"
 	slogctx "github.com/veqryn/slog-context"
+
 	"github.com/walteh/runm/core/gvnet"
 	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/logging"
 	"github.com/walteh/runm/pkg/logging/otel"
-	"gitlab.com/tozd/go/errors"
 )
 
 func (r *runmLinuxInit) setupLogger(ctx context.Context) (context.Context, func(), error) {

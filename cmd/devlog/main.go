@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/walteh/go-errors"
+
 	"github.com/walteh/runm/linux/constants"
 	"github.com/walteh/runm/pkg/logging"
 )

@@ -6,16 +6,17 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/mod/modfile"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/mod/modfile"
 )
 
 type testCase struct {
 	name        string
 	description string
 	goWork      string
-	modules     map[string]string // path -> go.mod content
+	modules     map[string]string   // path -> go.mod content
 	expected    map[string][]string // path -> expected strings in output
 	shouldError bool
 }
@@ -327,7 +328,7 @@ func setupTestWorkspace(t *testing.T, tc testCase) string {
 	for modPath, content := range tc.modules {
 		fullPath := filepath.Join(tempDir, modPath)
 		dir := filepath.Dir(fullPath)
-		
+
 		require.NoError(t, os.MkdirAll(dir, 0755), "Failed to create directory for %s", modPath)
 		require.NoError(t, os.WriteFile(fullPath, []byte(content), 0644), "Failed to write %s", modPath)
 	}
@@ -341,7 +342,7 @@ func setupTestWorkspace(t *testing.T, tc testCase) string {
 		"shared/lib",
 		"forks/errors", "forks/logrus", "forks/mux", "forks/example",
 	}
-	
+
 	for _, depPath := range depPaths {
 		depDir := filepath.Join(tempDir, depPath)
 		if err := os.MkdirAll(depDir, 0755); err == nil {
@@ -359,16 +360,16 @@ func verifyTestResults(t *testing.T, tempDir string, tc testCase) {
 
 	for modPath, expectedStrings := range tc.expected {
 		fullPath := filepath.Join(tempDir, modPath)
-		
+
 		content, err := os.ReadFile(fullPath)
 		require.NoError(t, err, "Failed to read %s", modPath)
-		
+
 		contentStr := string(content)
 		t.Logf("\n--- %s content ---\n%s", modPath, contentStr)
 
 		for _, expected := range expectedStrings {
-			assert.Contains(t, contentStr, expected, 
-				"Expected string not found in %s:\n  Expected: %q\n  Content:\n%s", 
+			assert.Contains(t, contentStr, expected,
+				"Expected string not found in %s:\n  Expected: %q\n  Content:\n%s",
 				modPath, expected, contentStr)
 		}
 	}
@@ -437,10 +438,10 @@ replace github.com/single/line => ../single
 					return
 				}
 				require.NoError(t, err)
-				
+
 				// Verify we can parse the structure
 				assert.NotNil(t, workFile)
-				t.Logf("Parsed %d use directives and %d replace directives", 
+				t.Logf("Parsed %d use directives and %d replace directives",
 					len(workFile.Use), len(workFile.Replace))
 			}
 
@@ -461,7 +462,7 @@ replace github.com/single/line => ../single
 
 				// Verify we can parse the structure
 				assert.NotNil(t, modFile)
-				t.Logf("Parsed module: %s with %d replace directives", 
+				t.Logf("Parsed module: %s with %d replace directives",
 					modFile.Module.Mod.Path, len(modFile.Replace))
 			}
 		})
@@ -480,9 +481,9 @@ func parseGoMod(path string, data []byte) (*modfile.File, error) {
 func TestFindGoWork(t *testing.T) {
 	tests := []struct {
 		name         string
-		setupDirs    []string    // directories to create
-		workLocation string      // where to place go.work (relative to temp root)
-		startDir     string      // directory to start search from (relative to temp root)
+		setupDirs    []string // directories to create
+		workLocation string   // where to place go.work (relative to temp root)
+		startDir     string   // directory to start search from (relative to temp root)
 		expectError  bool
 	}{
 		{

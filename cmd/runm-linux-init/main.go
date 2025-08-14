@@ -5,7 +5,6 @@ package main
 import (
 	_ "crypto/tls"
 	_ "net/http/pprof"
-	"time"
 
 	"bytes"
 	"context"
@@ -24,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	goruntime "runtime"
 

@@ -12,8 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/walteh/runm/core/virt/vmm"
 	"gitlab.com/tozd/go/errors"
+
+	"github.com/walteh/runm/core/virt/vmm"
 )
 
 func (mountState *MountState[VM]) waitForNFS(ctx context.Context) error {
