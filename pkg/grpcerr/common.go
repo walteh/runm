@@ -54,9 +54,9 @@ var ignoredMethods = map[string]bool{
 	"/containerd.services.content.v1.Content/Read":         true,
 	"/containerd.services.containers.v1.Containers/Get":    true,
 	"/containerd.services.leases.v1.Leases/Delete":         true,
-	"/containerd.services.images.v1.Images/List":           true,
-	"/containerd.services.snapshots.v1.Snapshots/Stat":     true,
-	"/containerd.services.tasks.v1.Tasks/Get":              true,
+	// "/containerd.services.images.v1.Images/List":           true,
+	"/containerd.services.snapshots.v1.Snapshots/Stat": true,
+	"/containerd.services.tasks.v1.Tasks/Get":          true,
 }
 
 var ignoredServices = map[string]bool{

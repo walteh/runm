@@ -76,6 +76,10 @@
 		{
 			"name": "cadvisor",
 			"path": "../../cadvisor"
+		},
+		{
+			"name": "cni-plugins",
+			"path": "../../cni-plugins"
 		}
 	],
 	"extensions": {

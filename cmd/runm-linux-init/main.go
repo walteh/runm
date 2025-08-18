@@ -328,9 +328,9 @@ func (r *runmLinuxInit) run(ctx context.Context) error {
 		taskgroupz.GoWithName("cgroup-exporter-vsock-server", func(ctx context.Context) error {
 			return r.runCgroupExporterVsockServer(ctx)
 		})
-		taskgroupz.GoWithName("cadvisor-vsock-server", func(ctx context.Context) error {
-			return r.runCadvisor(ctx)
-		})
+		// taskgroupz.GoWithName("cadvisor-vsock-server", func(ctx context.Context) error {
+		// 	return r.runCadvisor(ctx)
+		// })
 	}
 
 	for target, port := range mshareSockBinds {
@@ -907,6 +907,7 @@ func mount(ctx context.Context) error {
 	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "cgroup2", "none", "/sys/fs/cgroup", "-o", "nsdelegate"); err != nil {
 		return errors.Errorf("problem mounting cgroup2: %w", err)
 	}
+
 
 	// Enable the memory controller in the root cgroup
 	if err := ExecCmdForwardingStdio(ctx, "sh", "-c", "echo +memory > /sys/fs/cgroup/cgroup.subtree_control"); err != nil {

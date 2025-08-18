@@ -170,6 +170,13 @@ func NewContainer(
 		return nil, errors.Errorf("failed to create runtime: %w", err)
 	}
 
+	// // list out the files in the rootfs
+	// if out, err := exec.CommandContext(ctx, "ls", "-la", filepath.Join(r.Bundle, "rootfs")).CombinedOutput(); err != nil {
+	// 	return nil, errors.Errorf("failed to list rootfs: %w", err)
+	// } else {
+	// 	slog.InfoContext(ctx, "rootfs contents", "contents", string(out))
+	// }
+
 	slog.InfoContext(ctx, "created container runtime", "id", r.ID)
 
 	// var runner run.Runnable

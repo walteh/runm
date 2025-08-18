@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -139,6 +140,14 @@ func newDefaultLinuxVM(ctx context.Context, vmid string, mbinFile string, mshare
 		slog.InfoContext(ctx, "created mshare virtio device", "msharedir", msharedir, "tag", tag)
 		defs.Devices = append(defs.Devices, dev)
 		defs.MshareDirTags[msharedir] = tag
+
+		if strings.Contains(msharedir, "/native/snapshots/") {
+			out, err := exec.CommandContext(ctx, "ls", "-la", filepath.Join(msharedir, "var")).CombinedOutput()
+			if err != nil {
+				return nil, errors.Errorf("listing mshare directory: %w", err)
+			}
+			slog.InfoContext(ctx, "mshare directory contents (var)", "contents", string(out))
+		}
 	}
 
 	for i, msockbind := range mshareSocks {

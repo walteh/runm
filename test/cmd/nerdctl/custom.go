@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	_ "unsafe"
 
 	"context"
@@ -17,6 +18,7 @@ import (
 	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/pkg/logging/otel"
 	"github.com/walteh/runm/test/env"
+	"gitlab.com/tozd/go/errors"
 	"google.golang.org/grpc"
 )
 
@@ -49,6 +51,7 @@ func init() {
 
 func main() {
 	if err := xmain(); err != nil {
+		fmt.Println("error", err)
 		errutil.HandleExitCoder(err)
 		log.L.Fatal(err)
 	}
@@ -69,7 +72,11 @@ func xmain() error {
 	if err != nil {
 		return err
 	}
-	return app.ExecuteContext(ctx)
+	err = app.ExecuteContext(ctx)
+	if err != nil {
+		return errors.Errorf("failed to execute app: %w", err)
+	}
+	return nil
 }
 
 func initContext() (context.Context, context.CancelFunc) {

@@ -80,7 +80,7 @@ func NewOCIVirtualMachine[VM VirtualMachine](
 
 	defaults, err := newDefaultLinuxVM(ctx, vmid, constants.MbinFileName, mshareFiles, mshareDirs, mshareSocks,
 		map[uint16]uint16{
-			constants.HostCadvisorTCPPort: constants.GuestCadvisorTCPPort,
+			// WARNING: this can't work with compose or any multi-container setups
 		},
 		map[uint16]uint16{
 			9091: 9091,

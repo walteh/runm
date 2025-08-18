@@ -263,7 +263,7 @@ func mount(ctx context.Context) error {
 	}
 
 	// mkdir newroot
-	if err := os.MkdirAll(constants.NewRootAbsPath, 0755); err != nil {
+	if err := os.MkdirAll(constants.NewRootAbsPath, 0o755); err != nil {
 		return errors.Errorf("failed to create newroot: %w", err)
 	}
 
@@ -273,14 +273,14 @@ func mount(ctx context.Context) error {
 	// }
 
 	// mkdir mbin
-	if err := os.MkdirAll(filepath.Join(constants.NewRootAbsPath, constants.MbinAbsPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(constants.NewRootAbsPath, constants.MbinAbsPath), 0o755); err != nil {
 		return errors.Errorf("failed to create mbin: %w", err)
 	}
 
 	for tag, target := range mfsBinds {
 		out := filepath.Join(constants.NewRootAbsPath, target)
 		if _, err := os.Stat(out); os.IsNotExist(err) {
-			os.MkdirAll(out, 0755)
+			os.MkdirAll(out, 0o755)
 		}
 
 		if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "virtiofs", tag, out); err != nil {

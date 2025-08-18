@@ -6,8 +6,6 @@ import (
 	"log/slog"
 	"net"
 	"os"
-	"os/exec"
-	"strconv"
 	"strings"
 	"time"
 
@@ -118,21 +116,21 @@ func (r *runmLinuxInit) setupPyroscope(ctx context.Context) (context.Context, fu
 	}, nil
 }
 
-func (r *runmLinuxInit) runCadvisor(ctx context.Context) error {
-	slog.InfoContext(ctx, "setting up cadvisor", "port", constants.GuestCadvisorTCPPort)
+// func (r *runmLinuxInit) runCadvisor(ctx context.Context) error {
+// 	slog.InfoContext(ctx, "setting up cadvisor", "port", constants.GuestCadvisorTCPPort)
 
-	cmd := exec.CommandContext(ctx, "/mbin/cadvisor",
-		"--port", strconv.Itoa(constants.GuestCadvisorTCPPort),
-		"--logtostderr")
+// 	cmd := exec.CommandContext(ctx, "/mbin/cadvisor",
+// 		"--port", strconv.Itoa(constants.GuestCadvisorTCPPort),
+// 		"--logtostderr")
 
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+// 	cmd.Stdout = os.Stdout
+// 	cmd.Stderr = os.Stderr
 
-	if err := cmd.Start(); err != nil {
-		return errors.Errorf("failed to start cadvisor: %w", err)
-	}
+// 	if err := cmd.Start(); err != nil {
+// 		return errors.Errorf("failed to start cadvisor: %w", err)
+// 	}
 
-	slog.InfoContext(ctx, "cadvisor started successfully", "pid", cmd.Process.Pid, "port", constants.GuestCadvisorTCPPort)
+// 	slog.InfoContext(ctx, "cadvisor started successfully", "pid", cmd.Process.Pid, "port", constants.GuestCadvisorTCPPort)
 
-	return cmd.Wait()
-}
+// 	return cmd.Wait()
+// }

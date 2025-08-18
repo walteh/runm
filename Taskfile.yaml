@@ -567,9 +567,6 @@ tasks:
                 CC: aarch64-linux-gnu-gcc
                 CGO_ENABLED: 1
                 MAIN_DIR: "./test/cmd/runc"
-                OVERLAY_JSON: |-
-                    sh: |-
-                        {{.GO_TOOL_CMD}} overlaygen main {{.MAIN_DIR}} -tmpdir={{.TMP_DIR}}
 
     build:runm-linux-init:
         desc: builds the runm-linux-init binary
@@ -757,7 +754,7 @@ tasks:
     #=================================================================================
     #=================================================================================
     run:containerd-test:
-        desc: runs the shim for 2025-07-01
+        desc: runs the containerd server for testing
         deps:
           - linux:runtime:runm
           - build:runm-test-binaries
@@ -783,13 +780,13 @@ tasks:
                 {{.SUDO_CMD}} {{.TEST_BIN_DIR}}/buildkitd-test
 
     run:containerd-test:pipe-to-file:
-        desc: runs the shim for 2025-07-01
+        desc: runs the containerd server for testing (pipe to file)
         deps:
           - linux:runtime:runm
           - build:runm-test-binaries
         env:
             SHIM_BINARY_PATH:
-                sh: echo $(pwd)/{{.TEST_BIN_DIR}}/containerd-shim-runm-v2-test
+                sh: echo $(pwd)/{{.TEST_BIN_DIR}}/containerd-shim-runm-v2
             LINUX_RUNTIME_DIR:
                 sh: echo $(pwd)/{{.LINUX_RUNTIME_DIR}}
         vars:
@@ -797,7 +794,7 @@ tasks:
         cmds:
           - task: dev:cleanup-running-shims
           - cmd: |-
-                {{.SUDO_CMD}} {{.TEST_BIN_DIR}}/containerd-test > {{.FILE}}
+                {{.SUDO_CMD}} {{.TEST_BIN_DIR}}/containerd-test | tee {{.FILE}}
 
     #endregion run
 
@@ -1527,6 +1524,50 @@ tasks:
           - cmd: 'echo "  - Remove with: task run:nerdctl-test:rm CONTAINER_ID=$(cat {{.TMP_DIR}}/server-container-id.txt)"'
           - cmd: echo "Press Ctrl+C to stop this task (containers will remain running)"
           - cmd: sleep 3600 # Hold for inspection (1 hour)
+
+    dev:2025-08-18:01:
+        desc: runs nginx web service from compose-test using nerdctl run
+        deps: ["linux:runtime:runm", "build:runm-test-binaries"]
+        vars:
+            COMPOSE_DIR:
+                sh: realpath ./test/scenarios/compose-test
+        cmds:
+          - task: run:nerdctl-test:rm-all-running-containers
+          - task: run:nerdctl-test:run
+            vars:
+                FLAGS: |-
+                    --rm \
+                    -p 8080:80 \
+                    -v {{.COMPOSE_DIR}}/html:/usr/share/nginx/html:ro \
+                    -e NGINX_HOST=localhost \
+                    -e NGINX_PORT=80 \
+                    --network=host
+                IMAGE: "nginx:alpine"
+                ARGS: ""
+
+    dev:2025-08-18:02:
+        desc: runs postgres database service from compose-test using nerdctl run
+        deps: ["linux:runtime:runm", "build:runm-test-binaries"]
+        vars:
+            TMP_DIR:
+                sh: mktemp -d -t runm-postgres-XXXXXX
+        cmds:
+          - defer: "rm -rf {{.TMP_DIR}}"
+            silent: true
+          - task: run:nerdctl-test:rm-all-running-containers
+          - task: run:nerdctl-test:run
+            vars:
+                FLAGS: |-
+                    --rm \
+                    -p 5432:5432 \
+                    -v {{.TMP_DIR}}:/var/lib/postgresql \
+                    --user=0:0 \
+                    -e POSTGRES_DB=testdb \
+                    -e POSTGRES_USER=testuser \
+                    -e POSTGRES_PASSWORD=testpass \
+                    --network=host
+                IMAGE: "postgres:alpine"
+                ARGS: ""
 
     dev:compose-test:
         desc: Test Docker Compose functionality with nerdctl

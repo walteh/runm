@@ -39,8 +39,8 @@ const (
 	VsockPprofPort                = 2017
 	VsockCgroupExporterPort       = 2016
 	MsockBasePort                 = 9000
-	GuestCadvisorTCPPort          = 4433
-	HostCadvisorTCPPort           = 4434
+	// GuestCadvisorTCPPort          = 4433
+	// HostCadvisorTCPPort           = 4434
 
 	VsockDelimitedLogProxyDelimiter   = rune(0x1F) // ASCII Record Separator
 	MbindSeparator                    = "|"
