@@ -10,9 +10,9 @@ vars:
     BUILD_OUT_DIR: gen/build
     TEST_BIN_DIR: ./gen/build/test-bin
     LINUX_RUNTIME_DIR: ./gen/build/linux-runtime
-    NERDCTL_CMD: '{{.SUDO_CMD}} {{.TEST_BIN_DIR}}/nerdctl'
+    NERDCTL_CMD: "{{.SUDO_CMD}} {{.TEST_BIN_DIR}}/nerdctl"
     # NERDCTL_CMD: 'docker'
-    SUDO_CMD: '' # 'sudo -A -E'
+    SUDO_CMD: "" # 'sudo -A -E'
 
     FORKS:
         map:
@@ -109,7 +109,7 @@ vars:
 env:
     COMPOSE_BAKE: true
     CLICOLOR: 1
-    GOPROXY: 'https://proxy.golang.org'
+    GOPROXY: "https://proxy.golang.org"
     GOSUMDB: sum.golang.org
     GOPRIVATE: github.com/walteh
     CODE_EDITOR_FILE_REF_PREFIX: cursor://file/
@@ -126,7 +126,7 @@ env:
     PAGER: less
     DEBUG_CONTAINERD_TEST: 0
     DEBUG_BUILDKITD_TEST: 0
-    DEBUG_NERDCTL_TEST: 0
+    DEBUG_NERDCTL: 0
     DEBUG_CONTAINERD_SHIM_RUNM_V2_TEST:
         sh: mkdir -p /tmp/tcontainerd-fs-env && echo -n '0' | tee /tmp/tcontainerd-fs-env/DEBUG_CONTAINERD_SHIM_RUNM_V2_TEST
 
@@ -145,8 +145,7 @@ tasks:
                 sh: echo "{{.CLI_ARGS | default ""}}"
 
         cmds:
-          - cmd: bun install -g @anthropic-ai/claude-code
-          - cmd: bun --bun run claude --ide {{.CLI_ARGS}}
+          - cmd: bunx --bun @anthropic-ai/claude-code@latest --ide {{.CLI_ARGS}}
 
     term:
         desc: opens a terminal in the project root
@@ -359,11 +358,11 @@ tasks:
         desc: generates protobuf files
         dir: proto
         sources:
-          - '**/*.proto'
-          - 'buf.*'
-          - '../tools/cmd/**/*.go'
+          - "**/*.proto"
+          - "buf.*"
+          - "../tools/cmd/**/*.go"
         generates:
-          - '**/*.pb.go'
+          - "**/*.pb.go"
         cmds:
           - |-
             {{.GO_COMMAND}} tool github.com/bufbuild/buf/cmd/buf generate
@@ -387,20 +386,20 @@ tasks:
             silent: true
 
     build:go:*:*:*:
-        label: 'build:go:{{.NAME}}:{{.OS}}:{{.ARCH}}'
+        label: "build:go:{{.NAME}}:{{.OS}}:{{.ARCH}}"
         requires: {vars: [MAIN_DIR]}
         desc: builds a binary
         vars:
             TMP_DIR_SH:
                 sh: mktemp -d
-            OS: '{{index .MATCH 1}}'
-            ARCH: '{{index .MATCH 2}}'
-            NAME: '{{index .MATCH 0}}'
-            TMP_DIR: '{{.TMP_DIR_SH}}/{{.OS}}_{{.ARCH}}_{{.NAME}}'
-            BIN_DIR: '{{.TEST_BIN_DIR}}'
+            OS: "{{index .MATCH 1}}"
+            ARCH: "{{index .MATCH 2}}"
+            NAME: "{{index .MATCH 0}}"
+            TMP_DIR: "{{.TMP_DIR_SH}}/{{.OS}}_{{.ARCH}}_{{.NAME}}"
+            BIN_DIR: "{{.TEST_BIN_DIR}}"
             SYMLINK: '{{.SYMLINK | default ""}}'
             EXTLDFLAGS: '{{.STATIC | eq "1" | ternary "-static" ""}} {{.EXTLDFLAGS}}'
-            TAGS: '{{.TAGS}}'
+            TAGS: "{{.TAGS}}"
             CD_DIR: '{{.CD_DIR | default "."}}'
             LD_FLAGS: |-
                 -extldflags={{.EXTLDFLAGS}} {{.DEBUG | eq "1" | ternary "-compressdwarf=false" "-s -w"}} {{.LD_FLAGS}}
@@ -420,25 +419,24 @@ tasks:
 
         env:
             CC: '{{.CC | default "clang"}}'
-            CGO_ENABLED: '{{.CGO_ENABLED}}'
-            GOOS: '{{.OS}}'
-            GOARCH: '{{.ARCH}}'
+            CGO_ENABLED: "{{.CGO_ENABLED}}"
+            GOOS: "{{.OS}}"
+            GOARCH: "{{.ARCH}}"
             CGO_LDFLAGS: '{{.CC | empty | ternary "-Wl,-no_warn_duplicate_libraries" ""}}' # https://stackoverflow.com/a/78585264/11025621
             # Go 1.25 environment variables
             GOEXPERIMENT: |-
                 greenteagc,jsonv2
-            GOWORK: 'off'
-
-            ASAN_OPTIONS: '{{.ASAN_OPTIONS}}'
+            GOWORK: "off"
+            ASAN_OPTIONS: "{{.ASAN_OPTIONS}}"
         generates:
-          - '{{.OUT_DIR}}/{{.NAME}}'
+          - "{{.OUT_DIR}}/{{.NAME}}"
         cmds:
           - cmd: mkdir -p {{.TMP_DIR}}
             silent: true
           - task: build:go:run:overlaygen-main
             vars:
-                MAIN_DIR: '{{.MAIN_DIR}}'
-                TMP_DIR: '{{.TMP_DIR}}'
+                MAIN_DIR: "{{.MAIN_DIR}}"
+                TMP_DIR: "{{.TMP_DIR}}"
           - defer: rm -rf {{.TMP_DIR}}
             silent: true
           - cmd: echo "building {{.NAME}} {{.OS}} {{.ARCH}}..." 1>/dev/null
@@ -460,12 +458,12 @@ tasks:
           - ../buildkit/**
           - pkg/**
         generates:
-          - '{{.TEST_BIN_DIR}}/buildctl'
+          - "{{.TEST_BIN_DIR}}/buildctl"
         cmds:
           - task: build:go:buildctl:darwin:arm64
             vars:
-                DEBUG: '1'
-                MAIN_DIR: './test/cmd/buildctl'
+                DEBUG: "1"
+                MAIN_DIR: "./test/cmd/buildctl"
 
     build:test:nerdctl:
         desc: builds the nerdctl test
@@ -475,12 +473,12 @@ tasks:
           - ../nerdctl/**
           - pkg/**
         generates:
-          - '{{.TEST_BIN_DIR}}/nerdctl'
+          - "{{.TEST_BIN_DIR}}/nerdctl"
         cmds:
           - task: build:go:nerdctl:darwin:arm64
             vars:
-                DEBUG: '1'
-                MAIN_DIR: './test/cmd/nerdctl'
+                DEBUG: "1"
+                MAIN_DIR: "./test/cmd/nerdctl"
 
     build:test:buildkitd:
         desc: builds the buildkitd test binary
@@ -490,12 +488,12 @@ tasks:
           - ../buildkit/**
           - pkg/**
         generates:
-          - '{{.TEST_BIN_DIR}}/buildkitd'
+          - "{{.TEST_BIN_DIR}}/buildkitd"
         cmds:
           - task: build:go:buildkitd:darwin:arm64
             vars:
-                DEBUG: '1'
-                MAIN_DIR: './test/cmd/buildkitd'
+                DEBUG: "1"
+                MAIN_DIR: "./test/cmd/buildkitd"
 
     build:test:containerd:
         desc: builds the containerd test
@@ -505,12 +503,12 @@ tasks:
           - ./../containerd/**/*.go
           - ./pkg/**/*.go
         generates:
-          - '{{.TEST_BIN_DIR}}/containerd-test'
+          - "{{.TEST_BIN_DIR}}/containerd-test"
         cmds:
           - task: build:go:containerd-test:darwin:arm64
             vars:
-                DEBUG: '1'
-                MAIN_DIR: './test/cmd/containerd'
+                DEBUG: "1"
+                MAIN_DIR: "./test/cmd/containerd"
 
     build:test:containerd-shim-runm-v2:
         desc: builds the containerd shim
@@ -520,14 +518,14 @@ tasks:
           - "../containerd/**/*.go"
           - "**/*.go"
         generates:
-          - '{{.TEST_BIN_DIR}}/containerd-shim-runm-v2'
+          - "{{.TEST_BIN_DIR}}/containerd-shim-runm-v2"
         cmds:
           - task: build:go:containerd-shim-runm-v2:darwin:arm64
             vars:
-                DEBUG: '1'
-                CGO_ENABLED: '1'
-                MAIN_DIR: './test/cmd/containerd-shim-runm-v2'
-                CODESIGN: '1'
+                DEBUG: "1"
+                CGO_ENABLED: "1"
+                MAIN_DIR: "./test/cmd/containerd-shim-runm-v2"
+                CODESIGN: "1"
 
     build:containerd-shim-runm-v2:
         desc: builds the containerd shim
@@ -537,14 +535,14 @@ tasks:
           - "../containerd/**/*.go"
           - "**/*.go"
         generates:
-          - '{{.TEST_BIN_DIR}}/containerd-shim-runm-v2'
+          - "{{.TEST_BIN_DIR}}/containerd-shim-runm-v2"
         cmds:
           - task: build:go:containerd-shim-runm-v2:darwin:arm64
             vars:
-                DEBUG: '1'
-                CGO_ENABLED: '1'
-                MAIN_DIR: './cmd/containerd-shim-runm-v2'
-                CODESIGN: '1'
+                DEBUG: "1"
+                CGO_ENABLED: "1"
+                MAIN_DIR: "./cmd/containerd-shim-runm-v2"
+                CODESIGN: "1"
 
     build:test:runc:
         desc: builds the runc binary
@@ -555,20 +553,20 @@ tasks:
           - "test/env/**/*.go"
           - "../runc/**/*.go"
         generates:
-          - '{{.TEST_BIN_DIR}}/runc'
+          - "{{.TEST_BIN_DIR}}/runc"
         vars:
             GIT_COMMIT:
                 sh: git rev-parse HEAD
         cmds:
           - task: build:go:runc:linux:arm64
             vars:
-                DEBUG: '1'
-                STATIC: '1'
+                DEBUG: "1"
+                STATIC: "1"
                 LD_FLAGS: -X main.gitCommit={{.GIT_COMMIT}}
                 TAGS: netgo osusergo
                 CC: aarch64-linux-gnu-gcc
                 CGO_ENABLED: 1
-                MAIN_DIR: './test/cmd/runc'
+                MAIN_DIR: "./test/cmd/runc"
                 OVERLAY_JSON: |-
                     sh: |-
                         {{.GO_TOOL_CMD}} overlaygen main {{.MAIN_DIR}} -tmpdir={{.TMP_DIR}}
@@ -580,13 +578,13 @@ tasks:
           - "**/*.go"
           - "../containerd/**"
         generates:
-          - '{{.TEST_BIN_DIR}}/runm-linux-init'
+          - "{{.TEST_BIN_DIR}}/runm-linux-init"
         cmds:
           - task: build:go:runm-linux-init:linux:arm64
             vars:
-                DEBUG: '1'
-                STATIC: '1'
-                MAIN_DIR: './cmd/runm-linux-init'
+                DEBUG: "1"
+                STATIC: "1"
+                MAIN_DIR: "./cmd/runm-linux-init"
 
     build:runm-linux-host-fork-exec-proxy:
         desc: builds the runm-linux-host-fork-exec-proxy binary
@@ -594,13 +592,13 @@ tasks:
         sources:
           - "**/*.go"
         generates:
-          - '{{.TEST_BIN_DIR}}/runm-linux-host-fork-exec-proxy'
+          - "{{.TEST_BIN_DIR}}/runm-linux-host-fork-exec-proxy"
         cmds:
           - task: build:go:runm-linux-host-fork-exec-proxy:linux:arm64
             vars:
-                DEBUG: '1'
-                STATIC: '1'
-                MAIN_DIR: './cmd/runm-linux-host-fork-exec-proxy'
+                DEBUG: "1"
+                STATIC: "1"
+                MAIN_DIR: "./cmd/runm-linux-host-fork-exec-proxy"
 
     build:runm-linux-mounter:
         desc: builds the runm-linux-mounter binary
@@ -608,13 +606,13 @@ tasks:
         sources:
           - "**/*.go"
         generates:
-          - '{{.TEST_BIN_DIR}}/runm-linux-mounter'
+          - "{{.TEST_BIN_DIR}}/runm-linux-mounter"
         cmds:
           - task: build:go:runm-linux-mounter:linux:arm64
             vars:
-                DEBUG: '0'
-                STATIC: '1'
-                MAIN_DIR: './cmd/runm-linux-mounter'
+                DEBUG: "0"
+                STATIC: "1"
+                MAIN_DIR: "./cmd/runm-linux-mounter"
 
     # build:vmfuse-init:
     #     desc: builds the vmfuse-init binary (Linux guest)
@@ -694,7 +692,7 @@ tasks:
         sources:
           - ./linux/busybox/*
         generates:
-          - '{{.TEST_BIN_DIR}}/busybox'
+          - "{{.TEST_BIN_DIR}}/busybox"
         cmds:
           - cmd: |-
                 docker buildx build \
@@ -711,7 +709,7 @@ tasks:
         sources:
           - ./linux/extras/*
         generates:
-          - '{{.TEST_BIN_DIR}}/ganesha/*'
+          - "{{.TEST_BIN_DIR}}/ganesha/*"
         cmds:
           - cmd: |-
                 docker buildx build \
@@ -818,7 +816,7 @@ tasks:
 
     run:nerdctl-test:kill:
         desc: kills a running container
-        deps: ['build:test:nerdctl', 'build:test:containerd-shim-runm-v2']
+        deps: ["build:test:nerdctl", "build:test:containerd-shim-runm-v2"]
         requires: {vars: [CONTAINER_ID]}
         vars:
             CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
@@ -829,14 +827,14 @@ tasks:
 
     run:nerdctl-test:run:
         desc: runs the nerdctl test
-        deps: ['build:test:nerdctl', 'build:test:containerd-shim-runm-v2']
+        deps: ["build:test:nerdctl", "build:test:containerd-shim-runm-v2"]
         vars:
             TIMEOUT: '{{.TIMEOUT | empty | ternary "" "timeout {{.TIMEOUT}}"}}'
             IMAGE: '{{.IMAGE | default "docker.io/library/alpine:latest"}}'
             ARGS: '{{.ARGS | default ""}}'
             FLAGS: '{{.FLAGS | default ""}}'
             STDOUT_FILE_PIPE: '{{.STDOUT_FILE | empty | ternary "" ">"}}'
-            STATIC_FLAGS: '--platform=linux/arm64 --network=host --runtime=containerd.shim.runc.v2 --pull=missing'
+            STATIC_FLAGS: "--platform=linux/arm64 --network=host --runtime=containerd.shim.runc.v2 --pull=missing"
         # env:
         # DEBUG_NERDCTL_TEST: '12348'
         cmds:
@@ -845,7 +843,7 @@ tasks:
 
     run:nerdctl-test:exec:
         desc: executes a command in a running container
-        deps: ['build:test:nerdctl', 'build:test:containerd-shim-runm-v2']
+        deps: ["build:test:nerdctl", "build:test:containerd-shim-runm-v2"]
         requires: {vars: [CONTAINER_ID]}
         vars:
             TIMEOUT: '{{.TIMEOUT | default ""}}'
@@ -863,7 +861,7 @@ tasks:
 
     run:nerdctl-test:stop:
         desc: stops a running container
-        deps: ['build:test:nerdctl', 'build:test:containerd-shim-runm-v2']
+        deps: ["build:test:nerdctl", "build:test:containerd-shim-runm-v2"]
         requires: {vars: [CONTAINER_ID]}
         vars:
             TIMEOUT: '{{.TIMEOUT | empty | ternary "" "timeout {{.TIMEOUT}}"}}'
@@ -874,7 +872,7 @@ tasks:
 
     run:nerdctl-test:rm:
         desc: deletes a container
-        deps: ['build:test:nerdctl']
+        deps: ["build:test:nerdctl"]
         requires: {vars: [CONTAINER_ID]}
         vars:
             CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
@@ -885,7 +883,7 @@ tasks:
 
     run:nerdctl-test:ps:
         desc: lists running containers
-        deps: ['build:test:nerdctl']
+        deps: ["build:test:nerdctl"]
         vars:
             FLAGS: '{{.FLAGS | default ""}}'
             STDOUT_FILE: '{{.STDOUT_FILE | default ""}}'
@@ -897,7 +895,7 @@ tasks:
 
     run:nerdctl-test:ps:ensure-container:
         desc: ensures a container is running
-        deps: ['build:test:nerdctl']
+        deps: ["build:test:nerdctl"]
         vars:
             FLAGS: '{{.FLAGS | default ""}}'
             CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
@@ -931,22 +929,22 @@ tasks:
 
     linux:runtime:mbin.squashfs:
         desc: builds the mbin squashfs
-        deps: ['build:runm-test-binaries']
+        deps: ["build:runm-test-binaries"]
         run: once
         sources:
-          - '{{.TEST_BIN_DIR}}/runm-linux-init'
-          - '{{.TEST_BIN_DIR}}/runm-linux-host-fork-exec-proxy'
-          - '{{.TEST_BIN_DIR}}/runc'
+          - "{{.TEST_BIN_DIR}}/runm-linux-init"
+          - "{{.TEST_BIN_DIR}}/runm-linux-host-fork-exec-proxy"
+          - "{{.TEST_BIN_DIR}}/runc"
         generates:
-          - '{{.LINUX_RUNTIME_DIR}}/mbin.squashfs'
+          - "{{.LINUX_RUNTIME_DIR}}/mbin.squashfs"
         vars:
             TMP_DIR:
                 sh: mktemp -d -t runm-linux-runtime-mbin-XXXXXX
             FS:
                 map:
-                    runm-linux-init: '{{.TEST_BIN_DIR}}/runm-linux-init'
-                    runm-linux-host-fork-exec-proxy: '{{.TEST_BIN_DIR}}/runm-linux-host-fork-exec-proxy'
-                    runc: '{{.TEST_BIN_DIR}}/runc'
+                    runm-linux-init: "{{.TEST_BIN_DIR}}/runm-linux-init"
+                    runm-linux-host-fork-exec-proxy: "{{.TEST_BIN_DIR}}/runm-linux-host-fork-exec-proxy"
+                    runc: "{{.TEST_BIN_DIR}}/runc"
         cmds:
           - defer: rm -rf {{.TMP_DIR}}
             silent: true
@@ -962,21 +960,21 @@ tasks:
 
     linux:runtime:mbin-vmfuse.squashfs:
         desc: builds the mbin squashfs
-        deps: ['build:runm-test-binaries']
+        deps: ["build:runm-test-binaries"]
         run: once
         sources:
-          - '{{.TEST_BIN_DIR}}/vmfuse-init'
-          - '{{.TEST_BIN_DIR}}/ganesha*'
+          - "{{.TEST_BIN_DIR}}/vmfuse-init"
+          - "{{.TEST_BIN_DIR}}/ganesha*"
         generates:
-          - '{{.LINUX_RUNTIME_DIR}}/mbin-vmfuse.squashfs'
+          - "{{.LINUX_RUNTIME_DIR}}/mbin-vmfuse.squashfs"
         vars:
             TMP_DIR:
                 sh: mktemp -d -t runm-linux-runtime-mbin-vmfuse-XXXXXX
             FS:
                 map:
-                    vmfuse-init: '{{.TEST_BIN_DIR}}/vmfuse-init'
-                    ganesha: '{{.TEST_BIN_DIR}}/ganesha'
-                    ganesha-plugins.tar.gz: '{{.TEST_BIN_DIR}}/ganesha-plugins.tar.gz'
+                    vmfuse-init: "{{.TEST_BIN_DIR}}/vmfuse-init"
+                    ganesha: "{{.TEST_BIN_DIR}}/ganesha"
+                    ganesha-plugins.tar.gz: "{{.TEST_BIN_DIR}}/ganesha-plugins.tar.gz"
         cmds:
           - defer: rm -rf {{.TMP_DIR}}
             silent: true
@@ -993,22 +991,22 @@ tasks:
     linux:runtime:initramfs:
         desc: builds the initramfs
         run: once
-        deps: ['build:runm-test-binaries']
+        deps: ["build:runm-test-binaries"]
         sources:
-          - '{{.TEST_BIN_DIR}}/busybox'
-          - '{{.TEST_BIN_DIR}}/runm-linux-mounter'
+          - "{{.TEST_BIN_DIR}}/busybox"
+          - "{{.TEST_BIN_DIR}}/runm-linux-mounter"
         generates:
-          - '{{.LINUX_RUNTIME_DIR}}/initramfs.cpio.gz'
+          - "{{.LINUX_RUNTIME_DIR}}/initramfs.cpio.gz"
         vars:
             TMP_DIR:
                 sh: mktemp -d -t runm-linux-runtime-initramfs-XXXXXX
             FS:
                 map:
-                    /bin/busybox: '{{.TEST_BIN_DIR}}/busybox'
-                    /runm-linux-mounter: '{{.TEST_BIN_DIR}}/runm-linux-mounter'
+                    /bin/busybox: "{{.TEST_BIN_DIR}}/busybox"
+                    /runm-linux-mounter: "{{.TEST_BIN_DIR}}/runm-linux-mounter"
             INIT_SYMLINK: "/runm-linux-mounter"
         cmds:
-          - defer: 'rm -rf {{.TMP_DIR}}'
+          - defer: "rm -rf {{.TMP_DIR}}"
             silent: true
           - cmd: mkdir -p {{.TMP_DIR}}/initramfs {{.LINUX_RUNTIME_DIR}}
             silent: true
@@ -1037,7 +1035,7 @@ tasks:
             TMP_DIR:
                 sh: mktemp -d -t runm-linux-runtime-kernel-XXXXXX
         cmds:
-          - defer: 'rm -rf {{.TMP_DIR}}'
+          - defer: "rm -rf {{.TMP_DIR}}"
             silent: true
           - cmd: mkdir -p {{.TMP_DIR}}
             silent: true
@@ -1059,7 +1057,7 @@ tasks:
     fork:install:*:
         desc: installs a fork
         vars:
-            NAME: '{{index .MATCH 0}}'
+            NAME: "{{index .MATCH 0}}"
             ITEM_PATH: '{{get (index .FORKS .NAME) "path"}}'
             ITEM_REPO: '{{get (index .FORKS .NAME) "repo"}}'
         cmds:
@@ -1072,18 +1070,18 @@ tasks:
           - for: {var: FORKS}
             task: fork:install:{{.KEY}}
             vars:
-                NAME: '{{.KEY}}'
+                NAME: "{{.KEY}}"
 
     fork:sync:*:
         desc: syncs the forks
-        label: 'fork:sync:{{.NAME}}'
+        label: "fork:sync:{{.NAME}}"
         vars:
-            NAME: '{{index .MATCH 0}}'
+            NAME: "{{index .MATCH 0}}"
             ITEM_PATH: '{{get (index .FORKS .NAME) "path"}}'
             ITEM_BRANCH: '{{get (index .FORKS .NAME) "branch"}}'
             ITEM_REPO: '{{get (index .FORKS .NAME) "repo"}}'
             ITEM_UPSTREAM: '{{get (index .FORKS .NAME) "upstream"}}'
-        dir: '{{.ITEM_PATH}}'
+        dir: "{{.ITEM_PATH}}"
         cmds:
           #   - cmd: cp -rf . /tmp/{{.NAME}}-backup
           # create the upstream remote if it doesn't exist
@@ -1124,11 +1122,11 @@ tasks:
     #=================================================================================
 
     dev:kill-process:*:
-        label: 'dev:kill-process:{{.NAME}}'
+        label: "dev:kill-process:{{.NAME}}"
         # internal: true
         desc: kills a process
         vars:
-            NAME: '{{index .MATCH 0}}'
+            NAME: "{{index .MATCH 0}}"
         status:
           - ps aux | grep | grep -qv {{.NAME}}
         cmds:
@@ -1163,7 +1161,7 @@ tasks:
 
     dev:2025-06-18:01:
         desc: runs the shim for 2025-06-18 - bun version from entrypoint
-        deps: ['linux:runtime:runm']
+        deps: ["linux:runtime:runm"]
         vars:
             TEST_SCENARIO_DIR:
                 sh: realpath ./test/scenarios/2025-07-02
@@ -1171,14 +1169,14 @@ tasks:
           - task: dev:cleanup-running-shims
           - task: run:nerdctl-test:run
             vars:
-                FLAGS: '-rm'
-                IMAGE: 'docker.io/oven/bun:alpine'
+                FLAGS: "-rm"
+                IMAGE: "docker.io/oven/bun:alpine"
                 ARGS: |-
                     --version
 
     dev:2025-07-12:01:
         desc: runs the nerd fonts patcher
-        deps: ['linux:runtime:runm', 'build:runm-test-binaries']
+        deps: ["linux:runtime:runm", "build:runm-test-binaries"]
         interactive: true
         vars:
             TMP_DIR:
@@ -1188,7 +1186,7 @@ tasks:
           - task: run:nerdctl-test:rm-all-running-containers
           - task: run:nerdctl-test:run
             vars:
-                IMAGE: 'docker.io/nerdfonts/patcher:latest'
+                IMAGE: "docker.io/nerdfonts/patcher:latest"
                 FLAGS: |-
                     --rm \
                     -v ./tmp/fonts-raw:/in \
@@ -1211,7 +1209,7 @@ tasks:
 
     dev:compare-nerdctl-docker:single:
         desc: compares the nerdctl and docker commands
-        deps: ['linux:runtime:runm', 'build:runm-test-binaries']
+        deps: ["linux:runtime:runm", "build:runm-test-binaries"]
         requires: {vars: [CMD, VOLUME_FLAGS, IMAGE]}
         interactive: true
         vars:
@@ -1243,7 +1241,7 @@ tasks:
 
     dev:compare-nerdctl-docker:nerd-fonts-patcher:
         desc: runs the nerd fonts patcher
-        deps: ['linux:runtime:runm', 'build:runm-test-binaries']
+        deps: ["linux:runtime:runm", "build:runm-test-binaries"]
         vars:
             COMMANDS:
               - cmd: |-
@@ -1262,8 +1260,8 @@ tasks:
           - for: {var: COMMANDS}
             task: dev:compare-nerdctl-docker
             vars:
-                CMD: '{{.ITEM.cmd}}'
-                CUSTOM_ENTRYPOINT: '{{.ITEM.entrypoint}}'
+                CMD: "{{.ITEM.cmd}}"
+                CUSTOM_ENTRYPOINT: "{{.ITEM.entrypoint}}"
                 VOLUME_FLAGS: -v ./tmp/fonts-raw:/in -v ./tmp/fonts-patched:/out
                 IMAGE: docker.io/nerdfonts/patcher:latest
 
@@ -1272,7 +1270,7 @@ tasks:
     dev:pty-resize-test:
         desc: Test PTY resize functionality using custom PTY environment
         aliases: [pty-resize-test]
-        deps: ['linux:runtime:runm', 'build:runm-test-binaries']
+        deps: ["linux:runtime:runm", "build:runm-test-binaries"]
 
         vars:
             CONTAINER_ID: '{{.CONTAINER_ID | default ""}}'
@@ -1296,7 +1294,7 @@ tasks:
 
     dev:2025-07-02:01:
         desc: runs the shim for 2025-07-02 - complex TypeScript compilation and execution
-        deps: ['linux:runtime:runm']
+        deps: ["linux:runtime:runm"]
         vars:
             TEST_SCENARIO_DIR:
                 sh: realpath ./test/scenarios/2025-07-02
@@ -1304,8 +1302,8 @@ tasks:
           - task: dev:cleanup-running-shims
           - task: run:nerdctl-test:run
             vars:
-                IMAGE: 'docker.io/oven/bun:alpine'
-                FLAGS: '--rm --workdir=/app --mount=type=bind,src={{.TEST_SCENARIO_DIR}},dst=/app,ro=true'
+                IMAGE: "docker.io/oven/bun:alpine"
+                FLAGS: "--rm --workdir=/app --mount=type=bind,src={{.TEST_SCENARIO_DIR}},dst=/app,ro=true"
                 ARGS: |-
                     sh -c "cat '/proc/self/mountinfo' && echo '📦 Installing dependencies...' && \
                     bun install --verbose && echo '🧪 Running tests...' && \
@@ -1315,20 +1313,20 @@ tasks:
 
     dev:2025-07-05:01:
         desc: runs the shim for 2025-07-05 - detached mode
-        deps: ['linux:runtime:runm', 'build:runm-test-binaries']
+        deps: ["linux:runtime:runm", "build:runm-test-binaries"]
         # interactive: true
         vars:
             TMP_DIR:
                 sh: mktemp -d -t runm-2025-07-05-XXXXXX
         cmds:
-          - defer: 'rm -rf {{.TMP_DIR}}'
+          - defer: "rm -rf {{.TMP_DIR}}"
             silent: true
           - task: run:nerdctl-test:rm-all-running-containers
           - task: run:nerdctl-test:run
             vars:
-                FLAGS: '-d'
-                IMAGE: 'docker.io/library/alpine:latest'
-                STDOUT_FILE: '{{.TMP_DIR}}/stdout.txt'
+                FLAGS: "-d"
+                IMAGE: "docker.io/library/alpine:latest"
+                STDOUT_FILE: "{{.TMP_DIR}}/stdout.txt"
                 ARGS: |-
                     sh -c 'echo "Container PID 1: $$"; ps aux; sleep 300'
           - cmd: bat {{.TMP_DIR}}/stdout.txt
@@ -1338,19 +1336,19 @@ tasks:
             vars:
                 CONTAINER_ID:
                     sh: cat {{.TMP_DIR}}/stdout.txt
-                STATUS: 'Up'
+                STATUS: "Up"
           - task: dev:pty-resize-test
             vars:
                 COMMAND: 'echo "hello world! this is a test"'
                 CONTAINER_ID:
                     sh: cat {{.TMP_DIR}}/stdout.txt
-                FLAGS: '--tty'
+                FLAGS: "--tty"
           - task: run:nerdctl-test:exec
             vars:
                 COMMAND: 'echo "hello world! this is a test"'
                 CONTAINER_ID:
                     sh: cat {{.TMP_DIR}}/stdout.txt
-                FLAGS: '--tty'
+                FLAGS: "--tty"
 
           - task: run:nerdctl-test:rm
             vars:
@@ -1361,7 +1359,7 @@ tasks:
 
     dev:2025-07-17:01:
         desc: runs the shim for 2025-07-17 - runm-linux-mounter
-        deps: ['linux:runtime:runm', 'build:runm-test-binaries']
+        deps: ["linux:runtime:runm", "build:runm-test-binaries"]
         vars:
             TEST_SCENARIO_DIR:
                 sh: realpath ./test/scenarios/2025-07-17
@@ -1387,7 +1385,7 @@ tasks:
 
     dev:2025-07-20:01:
         desc: runs the shim for 2025-07-20
-        deps: ['linux:runtime:runm', 'build:runm-test-binaries']
+        deps: ["linux:runtime:runm", "build:runm-test-binaries"]
         vars:
             TEST_SCENARIO_DIR:
                 sh: realpath ./test/scenarios/2025-07-20
@@ -1407,7 +1405,7 @@ tasks:
 
     dev:vmfuse:2025-07-23:01:
         desc: vmfuse POC end-to-end test - mount directory via Linux VM and NFS
-        deps: ['linux:runtime:vmfuse', 'build:vmfuse-experiment-binaries']
+        deps: ["linux:runtime:vmfuse", "build:vmfuse-experiment-binaries"]
         interactive: true
         vars:
             TMP_DIR:
@@ -1421,7 +1419,7 @@ tasks:
         env:
             LINUX_RUNTIME_BUILD_DIR:
                 sh: realpath '{{.LINUX_RUNTIME_DIR}}'
-            VMFUSED_ADDRESS: 'unix://{{.VMFUSED_SOCK}}'
+            VMFUSED_ADDRESS: "unix://{{.VMFUSED_SOCK}}"
             VMFUSED_BIN:
                 sh: realpath '{{.TEST_BIN_DIR}}/vmfused'
             VMFUSECTL_BIN:
@@ -1432,19 +1430,19 @@ tasks:
 
     dev:2025-07-26:01:
         desc: runs the shim for 2025-07-26 - detached mode
-        deps: ['linux:runtime:runm', 'build:runm-test-binaries']
+        deps: ["linux:runtime:runm", "build:runm-test-binaries"]
         vars:
             TMP_DIR:
                 sh: mktemp -d -t runm-XXXXXX
         cmds:
-          - defer: 'rm -rf {{.TMP_DIR}}'
+          - defer: "rm -rf {{.TMP_DIR}}"
             silent: true
           - task: run:nerdctl-test:rm-all-running-containers
           - task: run:nerdctl-test:run
             vars:
-                FLAGS: '-d'
-                IMAGE: 'docker.io/library/alpine:latest'
-                STDOUT_FILE: '{{.TMP_DIR}}/stdout.txt'
+                FLAGS: "-d"
+                IMAGE: "docker.io/library/alpine:latest"
+                STDOUT_FILE: "{{.TMP_DIR}}/stdout.txt"
                 ARGS: |-
                     sh -c 'echo "Container PID 1: $$"; ps aux; sleep 300'
           - cmd: bat {{.TMP_DIR}}/stdout.txt
@@ -1454,20 +1452,20 @@ tasks:
             vars:
                 CONTAINER_ID:
                     sh: cat {{.TMP_DIR}}/stdout.txt
-                STATUS: 'Up'
+                STATUS: "Up"
           - task: run:nerdctl-test:exec
             vars:
                 COMMAND: 'echo "dev:2025-07-26:01 - about to sleep (os:$(uname -o))" && sleep 1 && echo "dev:2025-07-26:01
                     - sleep finished (os:$(uname -o))"'
                 CONTAINER_ID:
                     sh: cat {{.TMP_DIR}}/stdout.txt
-                FLAGS: '--tty'
+                FLAGS: "--tty"
           - task: run:nerdctl-test:exec
             vars:
                 COMMAND: 'echo "dev:2025-07-26:01 - about to not sleep (os:$(uname -o))"'
                 CONTAINER_ID:
                     sh: cat {{.TMP_DIR}}/stdout.txt
-                FLAGS: '--tty'
+                FLAGS: "--tty"
 
           - task: run:nerdctl-test:rm
             vars:
@@ -1478,21 +1476,21 @@ tasks:
 
     dev:2025-07-31:01:
         desc: simulates server + topz pattern from book - server running with topz container for inspection
-        deps: ['linux:runtime:runm', 'build:runm-test-binaries']
+        deps: ["linux:runtime:runm", "build:runm-test-binaries"]
         vars:
             TMP_DIR:
                 sh: mktemp -d -t runm-XXXXXX
         cmds:
-          - defer: 'rm -rf {{.TMP_DIR}}'
+          - defer: "rm -rf {{.TMP_DIR}}"
             silent: true
           - task: run:nerdctl-test:rm-all-running-containers
           # Step 1: Run server container in detached mode (simulating my-app-image)
           - task: run:nerdctl-test:run
             vars:
-                FLAGS: '-d'
-                IMAGE: 'docker.io/library/nginx:alpine'
-                STDOUT_FILE: '{{.TMP_DIR}}/server-container-id.txt'
-                ARGS: ''
+                FLAGS: "-d"
+                IMAGE: "docker.io/library/nginx:alpine"
+                STDOUT_FILE: "{{.TMP_DIR}}/server-container-id.txt"
+                ARGS: ""
           - cmd: echo "Server container started with ID:"
           - cmd: bat {{.TMP_DIR}}/server-container-id.txt
             silent: true
@@ -1501,16 +1499,16 @@ tasks:
             vars:
                 CONTAINER_ID:
                     sh: cat {{.TMP_DIR}}/server-container-id.txt
-                STATUS: 'Up'
+                STATUS: "Up"
           # Step 2: Run topz container sharing PID namespace and exposing port 8080
           - task: run:nerdctl-test:run
             vars:
-                FLAGS: '--tty -d -p 19999:19999'
-                IMAGE: 'netdata/netdata'
-                STDOUT_FILE: '{{.TMP_DIR}}/topz-container-id.txt'
+                FLAGS: "--tty -d -p 19999:19999"
+                IMAGE: "netdata/netdata"
+                STDOUT_FILE: "{{.TMP_DIR}}/topz-container-id.txt"
                 EXTRA_FLAGS:
                     sh: echo "--pid=container:$(cat {{.TMP_DIR}}/server-container-id.txt)"
-                ARGS: ''
+                ARGS: ""
 
           - cmd: echo "Topz container started with ID:"
           - cmd: bat {{.TMP_DIR}}/topz-container-id.txt
@@ -1520,7 +1518,7 @@ tasks:
             vars:
                 CONTAINER_ID:
                     sh: cat {{.TMP_DIR}}/topz-container-id.txt
-                STATUS: 'Up'
+                STATUS: "Up"
           - cmd: echo "Both containers are running. You can now:"
           - cmd: echo "  - Access topz at http://localhost:8080"
           - cmd: echo "  - Inspect containers with 'task run:nerdctl-test:ps'"
@@ -1529,6 +1527,31 @@ tasks:
           - cmd: 'echo "  - Remove with: task run:nerdctl-test:rm CONTAINER_ID=$(cat {{.TMP_DIR}}/server-container-id.txt)"'
           - cmd: echo "Press Ctrl+C to stop this task (containers will remain running)"
           - cmd: sleep 3600 # Hold for inspection (1 hour)
+
+    dev:compose-test:
+        desc: Test Docker Compose functionality with nerdctl
+        deps: ["linux:runtime:runm", "build:runm-test-binaries"]
+        vars:
+            COMPOSE_DIR:
+                sh: realpath ./test/scenarios/compose-test
+            TMP_DIR:
+                sh: mktemp -d -t runm-compose-test-XXXXXX
+            NERDCTL_FULL_PATH:
+                sh: realpath {{.TEST_BIN_DIR}}/nerdctl
+        cmds:
+          - defer: "rm -rf {{.TMP_DIR}}"
+            silent: true
+          - task: run:nerdctl-test:rm-all-running-containers
+          - cmd: echo "Testing Docker Compose with runm..."
+          - cmd: 'echo "Compose directory: {{.COMPOSE_DIR}}"'
+          - cmd: cd {{.COMPOSE_DIR}} && {{.NERDCTL_FULL_PATH}} compose version
+          - cmd: cd {{.COMPOSE_DIR}} && {{.NERDCTL_FULL_PATH}} compose config
+          - cmd: cd {{.COMPOSE_DIR}} && {{.NERDCTL_FULL_PATH}} compose up -d
+          - cmd: sleep 5 # Give services time to start
+          - cmd: cd {{.COMPOSE_DIR}} && {{.NERDCTL_FULL_PATH}} compose ps
+          - cmd: cd {{.COMPOSE_DIR}} && {{.NERDCTL_FULL_PATH}} compose logs
+          - cmd: echo "Cleaning up compose services..."
+          - cmd: cd {{.COMPOSE_DIR}} && {{.NERDCTL_FULL_PATH}} compose down -v
 
     #endregion dev
 
