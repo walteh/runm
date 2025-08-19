@@ -19,17 +19,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/containerd/command"
 	"github.com/containerd/containerd/v2/cmd/containerd/server"
 	"github.com/containerd/log"
-	"github.com/moby/buildkit/frontend/gateway/grpcclient"
-	"github.com/moby/buildkit/session"
 	"github.com/sirupsen/logrus"
 	"gitlab.com/tozd/go/errors"
-	"google.golang.org/grpc"
 
-	containerdclient "github.com/containerd/containerd/v2/client"
 	slogctx "github.com/veqryn/slog-context"
 
 	"github.com/walteh/runm/pkg/grpcerr"
@@ -75,16 +70,6 @@ func main() {
 		os.Exit(1)
 	}
 	defer cleanup()
-
-	clientopts := []grpc.DialOption{
-		otel.GetGrpcClientOpts(),
-		grpcerr.GetGrpcClientOptsCtx(ctx),
-	}
-
-	grpcclient.AddHackedClientOpts(clientopts...)
-	session.AddHackedClientOpts(clientopts...)
-	client.AddHackedClientOpts(clientopts...)
-	containerdclient.AddHackedClientOpts(clientopts...)
 
 	if json {
 		logger := logging.NewDefaultJSONLogger("containerd", os.Stdout)

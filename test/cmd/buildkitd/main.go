@@ -14,16 +14,12 @@ import (
 
 	"github.com/containerd/containerd/v2/pkg/cap"
 	"github.com/containerd/log"
-	"github.com/moby/buildkit/client"
-	"github.com/moby/buildkit/frontend/gateway/grpcclient"
-	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/util/bklog"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 
-	containerdclient "github.com/containerd/containerd/v2/client"
 	slogctx "github.com/veqryn/slog-context"
 
 	"github.com/walteh/runm/pkg/grpcerr"
@@ -63,16 +59,6 @@ func main() {
 	// Start pprof server
 	pprofPort := startPprofServer(ctx)
 	logger.Info("buildkitd pprof server started", "port", pprofPort)
-
-	clientopts := []grpc.DialOption{
-		otel.GetGrpcClientOpts(),
-		grpcerr.GetGrpcClientOptsCtx(ctx),
-	}
-
-	grpcclient.AddHackedClientOpts(clientopts...)
-	session.AddHackedClientOpts(clientopts...)
-	client.AddHackedClientOpts(clientopts...)
-	containerdclient.AddHackedClientOpts(clientopts...)
 
 	app := App(
 		append(

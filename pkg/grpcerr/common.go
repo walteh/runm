@@ -60,10 +60,13 @@ var ignoredMethods = map[string]bool{
 }
 
 var ignoredServices = map[string]bool{
-	"containerd.services.content.v1.Content":             true,
-	"grpc.health.v1.Health":                              true,
-	"containerd.services.leases.v1.Leases":               true,
-	"containerd.services.introspection.v1.Introspection": true,
+	"containerd.services.content.v1.Content":                  true,
+	"grpc.health.v1.Health":                                   true,
+	"containerd.services.leases.v1.Leases":                    true,
+	"containerd.services.introspection.v1.Introspection":      true,
+	"opentelemetry.proto.collector.logs.v1.LogsService":       true,
+	"opentelemetry.proto.collector.metrics.v1.MetricsService": true,
+	"opentelemetry.proto.collector.trace.v1.TraceService":     true,
 }
 
 var ignoredMethodsLock sync.Mutex

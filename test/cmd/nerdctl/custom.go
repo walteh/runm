@@ -9,17 +9,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/containerd/containerd/v2/client"
 	"github.com/containerd/log"
-	"github.com/containerd/nerdctl/v2/cmd/nerdctl/container"
 	"github.com/containerd/nerdctl/v2/pkg/errutil"
 	"github.com/containerd/nerdctl/v2/pkg/logging"
 	"github.com/spf13/cobra"
-	"github.com/walteh/runm/pkg/grpcerr"
-	"github.com/walteh/runm/pkg/logging/otel"
 	"github.com/walteh/runm/test/env"
 	"gitlab.com/tozd/go/errors"
-	"google.golang.org/grpc"
 )
 
 //go:linkname NewApp github.com/containerd/nerdctl/v2/cmd/nerdctl.NewApp
@@ -37,15 +32,6 @@ func init() {
 	}
 
 	os.Setenv("BUILDKIT_BUILDCTL_BINARY", strings.Replace(buildctlBinary, "nerdctl", "buildctl", 1))
-
-	clientopts := []grpc.DialOption{
-		otel.GetGrpcClientOpts(),
-		grpcerr.GetGrpcClientOptsCtx(context.Background()),
-	}
-
-	container.AddHackedClientOpts(client.WithExtraDialOpts(clientopts))
-
-	client.AddHackedClientOpts(clientopts...)
 
 }
 

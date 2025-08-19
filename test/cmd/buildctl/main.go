@@ -8,20 +8,13 @@ import (
 	"os"
 
 	"github.com/containerd/log"
-	"github.com/moby/buildkit/client"
-	"github.com/moby/buildkit/frontend/gateway/grpcclient"
-	"github.com/moby/buildkit/session"
 	"github.com/moby/buildkit/util/bklog"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"gitlab.com/tozd/go/errors"
-	"google.golang.org/grpc"
 
-	containerdclient "github.com/containerd/containerd/v2/client"
 	slogctx "github.com/veqryn/slog-context"
 
-	"github.com/walteh/runm/pkg/grpcerr"
-	"github.com/walteh/runm/pkg/logging/otel"
 	"github.com/walteh/runm/test/env"
 )
 
@@ -59,16 +52,6 @@ func main() {
 	ctx = log.WithLogger(ctx, log.L)
 
 	ctx = slogctx.NewCtx(ctx, logger)
-
-	clientopts := []grpc.DialOption{
-		otel.GetGrpcClientOpts(),
-		grpcerr.GetGrpcClientOptsCtx(ctx),
-	}
-
-	grpcclient.AddHackedClientOpts(clientopts...)
-	session.AddHackedClientOpts(clientopts...)
-	client.AddHackedClientOpts(clientopts...)
-	containerdclient.AddHackedClientOpts(clientopts...)
 
 	app, err := BuildctlApp()
 	if err != nil {

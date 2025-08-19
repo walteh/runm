@@ -125,7 +125,7 @@ env:
     DOCKER_BUILDKIT: 1
     PAGER: less
     DEBUG_CONTAINERD_TEST: 0
-    DEBUG_BUILDKITD_TEST: 0
+    DEBUG_BUILDKITD: 0
     DEBUG_NERDCTL: 0
     DEBUG_CONTAINERD_SHIM_RUNM_V2_TEST:
         sh: mkdir -p /tmp/tcontainerd-fs-env && echo -n '0' | tee /tmp/tcontainerd-fs-env/DEBUG_CONTAINERD_SHIM_RUNM_V2_TEST
@@ -1588,9 +1588,22 @@ tasks:
           - cmd: cd {{.COMPOSE_DIR}} && {{.NERDCTL_FULL_PATH}} compose version
           - cmd: cd {{.COMPOSE_DIR}} && {{.NERDCTL_FULL_PATH}} compose config
           - cmd: cd {{.COMPOSE_DIR}} && {{.NERDCTL_FULL_PATH}} compose up -d
-          - cmd: sleep 5 # Give services time to start
+          - cmd: sleep 10 # Give services time to start
           - cmd: cd {{.COMPOSE_DIR}} && {{.NERDCTL_FULL_PATH}} compose ps
+          - cmd: echo "=== Container Status Check ==="
+          - cmd: cd {{.COMPOSE_DIR}} && {{.NERDCTL_FULL_PATH}} compose exec web ps aux || echo "Cannot exec into web container"
+          - cmd: cd {{.COMPOSE_DIR}} && {{.NERDCTL_FULL_PATH}} compose exec api ps aux || echo "Cannot exec into api container"
+          - cmd: cd {{.COMPOSE_DIR}} && {{.NERDCTL_FULL_PATH}} compose exec db ps aux || echo "Cannot exec into db container"
+          - cmd: echo "=== Container Logs ==="
           - cmd: cd {{.COMPOSE_DIR}} && {{.NERDCTL_FULL_PATH}} compose logs
+          - cmd: echo "=== Testing inter-service communication ==="
+          - cmd: cd {{.COMPOSE_DIR}} && {{.NERDCTL_FULL_PATH}} compose exec web curl -v --max-time 5 http://localhost:80 ||
+                echo "Web server test failed"
+          - cmd: cd {{.COMPOSE_DIR}} && {{.NERDCTL_FULL_PATH}} compose exec api curl -v --max-time 5 http://localhost:3000
+                || echo "API server test failed"
+            #   - cmd: cd {{.COMPOSE_DIR}} && {{.NERDCTL_FULL_PATH}} compose exec db redis-cli --pass testpass ping || echo "Redis test failed"
+          - cmd: cd {{.COMPOSE_DIR}} && {{.NERDCTL_FULL_PATH}} compose exec web curl -v --max-time 5 http://api:3000 || echo
+                "Web->API communication test failed"
           - cmd: echo "Cleaning up compose services..."
           - cmd: cd {{.COMPOSE_DIR}} && {{.NERDCTL_FULL_PATH}} compose down -v
 
