@@ -395,10 +395,11 @@ func (r *runmLinuxInit) configureRuntimeServer(ctx context.Context) (*grpc.Serve
 		SystemdCgroup: false,
 	})
 
-	serveropts := append(
-		grpcerr.GetGrpcServerOptsCtx(ctx),
-		otel.GetGrpcServerOpts()...,
-	)
+	serveropts := []grpc.ServerOption{}
+	if os.Getenv("RUNM_USING_TEST_ENV") != "1" {
+		serveropts = append(serveropts, grpcerr.GetGrpcServerOptsCtx(ctx)...)
+		serveropts = append(serveropts, otel.GetGrpcServerOpts()...)
+	}
 
 	grpcVsockServer := grpc.NewServer(serveropts...)
 
@@ -907,7 +908,6 @@ func mount(ctx context.Context) error {
 	if err := ExecCmdForwardingStdio(ctx, "mount", "-t", "cgroup2", "none", "/sys/fs/cgroup", "-o", "nsdelegate"); err != nil {
 		return errors.Errorf("problem mounting cgroup2: %w", err)
 	}
-
 
 	// Enable the memory controller in the root cgroup
 	if err := ExecCmdForwardingStdio(ctx, "sh", "-c", "echo +memory > /sys/fs/cgroup/cgroup.subtree_control"); err != nil {

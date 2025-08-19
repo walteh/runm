@@ -22,8 +22,6 @@ import (
 
 	slogctx "github.com/veqryn/slog-context"
 
-	"github.com/walteh/runm/pkg/grpcerr"
-	"github.com/walteh/runm/pkg/logging/otel"
 	"github.com/walteh/runm/test/env"
 )
 
@@ -60,12 +58,7 @@ func main() {
 	pprofPort := startPprofServer(ctx)
 	logger.Info("buildkitd pprof server started", "port", pprofPort)
 
-	app := App(
-		append(
-			otel.GetGrpcServerOpts(),
-			grpcerr.GetGrpcServerOptsCtx(ctx)...,
-		)...,
-	)
+	app := App()
 
 	var debugDeferred func()
 

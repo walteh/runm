@@ -19,7 +19,6 @@ import (
 
 	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/pkg/logging/otel"
-
 	runmv1 "github.com/walteh/runm/proto/v1"
 )
 
@@ -29,11 +28,14 @@ var (
 
 func (s *service) serveGrpc(ctx context.Context, cid string) (func() error, func() error, error) {
 
+	opts := []grpc.ServerOption{}
+	if os.Getenv("RUNM_USING_TEST_ENV") != "1" {
+		opts = append(opts, otel.GetGrpcServerOpts()...)
+		opts = append(opts, grpcerr.GetGrpcServerOptsCtx(ctx)...)
+	}
+
 	grpcServer := grpc.NewServer(
-		append(
-			otel.GetGrpcServerOpts(),
-			grpcerr.GetGrpcServerOptsCtx(ctx)...,
-		)...,
+		opts...,
 	)
 
 	runmv1.RegisterShimServiceServer(grpcServer, s)

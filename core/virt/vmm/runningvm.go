@@ -159,9 +159,12 @@ func (r *RunningVM[VM]) buildGuestGrpcConn(ctx context.Context) (*grpc.ClientCon
 			}
 			return conn, nil
 		}),
-		grpcerr.GetGrpcClientOptsCtx(ctx),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024*10), grpc.WaitForReady(true)),
-		otel.GetGrpcClientOpts(),
+	}
+
+	if os.Getenv("RUNM_USING_TEST_ENV") != "1" {
+		opts = append(opts, grpcerr.GetGrpcClientOptsCtx(ctx))
+		opts = append(opts, otel.GetGrpcClientOpts())
 	}
 
 	grpcConn, err := grpc.NewClient("passthrough:target", opts...)

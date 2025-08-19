@@ -20,24 +20,16 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/cmd/containerd/command"
-	"github.com/containerd/containerd/v2/cmd/containerd/server"
 	"github.com/containerd/log"
 	"github.com/sirupsen/logrus"
 	"gitlab.com/tozd/go/errors"
 
 	slogctx "github.com/veqryn/slog-context"
 
-	"github.com/walteh/runm/pkg/grpcerr"
 	"github.com/walteh/runm/pkg/logging"
 	"github.com/walteh/runm/pkg/logging/otel"
 	"github.com/walteh/runm/test/env"
 )
-
-func init() {
-	for _, opt := range grpcerr.GetGrpcServerOptsCtx(context.Background()) {
-		server.AddHackedServerOption(opt)
-	}
-}
 
 var exitCode = 0
 
